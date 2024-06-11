@@ -1,4 +1,18 @@
-declare module '*.keys' {
+interface NXKitBridge {
+  isWindows: boolean;
+}
+
+interface NXKitTegraRcmSmashResult {
+  success: boolean;
+  stdout: string;
+  stderr: string;
+}
+
+interface NXKitTegraRcmSmash {
+  run: (payloadFilePath: string) => Promise<NXKitTegraRcmSmashResult>;
+}
+
+declare module '*.exe' {
   const src: string;
   export default src;
 }

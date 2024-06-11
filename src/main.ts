@@ -1,5 +1,7 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import path from 'path';
+import { platform } from 'os';
+import cp from 'child_process';
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) {
@@ -35,7 +37,29 @@ const createWindow = () => {
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
-app.on('ready', createWindow);
+app.on('ready', () => {
+  ipcMain.handle('nxkit:bridge', () => {
+    const bridgeApi: NXKitBridge = {
+      isWindows: platform() === 'win32',
+    };
+    return bridgeApi;
+  });
+
+  ipcMain.handle('nxkit:tegra_rcm_smash', async (event, payloadFilePath: string) => {
+    return new Promise<NXKitTegraRcmSmashResult>((resolve) => {
+      // TODO: compile TegraRcmSmash ourselves
+      const exePath = app.isPackaged
+        ? path.join(process.resourcesPath, 'TegraRcmSmash.exe')
+        : path.join('vendor', 'TegraRcmSmash', 'TegraRcmSmash.exe');
+
+      cp.execFile(exePath, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
+        resolve({ success: !err, stdout: stdout.trim(), stderr: stderr.trim() });
+      });
+    });
+  });
+
+  createWindow();
+});
 
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits

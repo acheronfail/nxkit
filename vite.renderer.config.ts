@@ -12,18 +12,12 @@ export default defineConfig((env) => {
   return {
     root,
     mode,
-    assetsInclude: [
-      "**/exefs/*",
-      "**/*.keys"
-    ],
+    assetsInclude: ['**/exefs/*'],
     base: './',
     build: {
       outDir: `.vite/renderer/${name}`,
     },
-    plugins: [
-      pluginExposeRenderer(name),
-      wasm(),
-    ],
+    plugins: [pluginExposeRenderer(name), wasm()],
     resolve: {
       preserveSymlinks: true,
     },

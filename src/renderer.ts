@@ -8,20 +8,25 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
 {
   // TODO: bundle in some payloads
   // TODO: fetch latest payloads
-  // TODO: windows support - include `TegraRcmSmash` in app and run that?
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).inject = async function () {
     const injectOutput = document.querySelector('#inject-logs');
+    injectOutput.textContent = '';
+
     const { files } = document.querySelector<HTMLInputElement>('#rcm-payload');
     const [payload] = files;
     if (!payload) return alert('Please select a payload to inject!');
 
-    const [dev] = await findRCMDevices();
-    if (!dev) return alert('No Switch found in RCM mode!');
+    if (window.nxkit.isWindows) {
+      const result = await window.nxkitTegraRcmSmash.run(payload.path);
+      if (result.stderr) injectOutput.textContent += ' -- -- -- \n' + result.stderr;
+    } else {
+      const [dev] = await findRCMDevices();
+      if (!dev) return alert('No Switch found in RCM mode!');
 
-    injectOutput.textContent = '';
-    await injectPayload(dev, await readFile(payload), (log) => (injectOutput.textContent += `${log}\n`));
+      await injectPayload(dev, await readFile(payload), (log) => (injectOutput.textContent += `${log}\n`));
+    }
   };
 }
 
