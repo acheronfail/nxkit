@@ -26,7 +26,9 @@ const createWindow = () => {
   }
 
   // Open the DevTools.
-  mainWindow.webContents.openDevTools();
+  if (!app.isPackaged) {
+    mainWindow.webContents.openDevTools();
+  }
 
   // Automatically select a pre-mariko Switch in RCM
   mainWindow.webContents.session.on('select-usb-device', (_event, details, callback) => {

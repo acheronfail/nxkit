@@ -20,6 +20,7 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
 
     if (window.nxkit.isWindows) {
       const result = await window.nxkitTegraRcmSmash.run(payload.path);
+      injectOutput.textContent = result.stdout;
       if (result.stderr) injectOutput.textContent += ' -- -- -- \n' + result.stderr;
     } else {
       const [dev] = await findRCMDevices();
