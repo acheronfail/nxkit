@@ -8,6 +8,13 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
 {
   // TODO: bundle in some payloads
   // TODO: fetch latest payloads
+  // TODO: doc linux udev: `SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"` @ `/etc/udev/rules.d/50-switch.rules`
+  // TODO: doc windows usb driver install:
+  //  - download https://zadig.akeo.ie/
+  //  - connect Switch in RCM
+  //  - choose `APX`
+  //  - select `libusbK`
+  //  - select `Install Driver`
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (window as any).inject = async function () {
@@ -33,6 +40,9 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
 
 // nro forwarder
 {
+  // TODO: dynamic ui for retroarch forwarding, including verification and/or auto-complete of fields, etc
+  // TODO: choose mounted Switch SD card for path autocomplete and validation
+
   document.querySelector<HTMLInputElement>('#nsp-id').value = generateRandomId();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -69,4 +79,15 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
       alert(String(err));
     }
   };
+}
+
+// TODO: nand viewer
+{
+  // https://github.com/suchmememanyskill/TegraExplorer
+  // https://github.com/eliboa/NxNandManager/
+  // https://github.com/ihaveamac/ninfs/blob/main/ninfs/mount/nandhac.py
+  // https://gitlab.com/roothorick/busehac
+  // http://elm-chan.org/fsw/ff/ (wasm? native node module?)
+  // https://github.com/irori/js-fatfs#readme
+  // https://github.com/parkertomatoes/fatfs-wasm
 }
