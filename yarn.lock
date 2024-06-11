@@ -647,6 +647,11 @@
   resolved "https://packages.atlassian.com/api/npm/npm-remote/@types/semver/-/semver-7.5.8.tgz"
   integrity sha512-I8EUhyrgfLrcTkzV3TSsGyl1tSuPrEDzr0yd5m90UgNxQkyDXULk3b6MlQqTCpZpNtWe1K0hzclnZkTcLBe2UQ==
 
+"@types/w3c-web-usb@^1.0.10":
+  version "1.0.10"
+  resolved "https://packages.atlassian.com/api/npm/npm-remote/@types/w3c-web-usb/-/w3c-web-usb-1.0.10.tgz"
+  integrity sha512-CHgUI5kTc/QLMP8hODUHhge0D4vx+9UiAwIGiT0sTy/B2XpdX1U5rJt6JSISgr6ikRT7vxV9EVAFeYZqUnl1gQ==
+
 "@types/yauzl@^2.9.1":
   version "2.10.3"
   resolved "https://packages.atlassian.com/api/npm/npm-remote/@types/yauzl/-/yauzl-2.10.3.tgz"

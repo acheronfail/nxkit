@@ -25,6 +25,11 @@ const createWindow = () => {
 
   // Open the DevTools.
   mainWindow.webContents.openDevTools();
+
+  // Automatically select a pre-mariko Switch in RCM
+  mainWindow.webContents.session.on('select-usb-device', (_event, details, callback) => {
+    callback(details.deviceList.find((dev) => dev.vendorId === 0x0955)?.deviceId);
+  });
 };
 
 // This method will be called when Electron has finished
