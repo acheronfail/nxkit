@@ -1,5 +1,6 @@
 import type { ConfigEnv, UserConfig } from 'vite';
 import { defineConfig } from 'vite';
+import wasm from 'vite-plugin-wasm';
 import { pluginExposeRenderer } from './vite.base.config';
 
 // https://vitejs.dev/config
@@ -11,11 +12,18 @@ export default defineConfig((env) => {
   return {
     root,
     mode,
+    assetsInclude: [
+      "**/exefs/*",
+      "**/*.keys"
+    ],
     base: './',
     build: {
       outDir: `.vite/renderer/${name}`,
     },
-    plugins: [pluginExposeRenderer(name)],
+    plugins: [
+      pluginExposeRenderer(name),
+      wasm(),
+    ],
     resolve: {
       preserveSymlinks: true,
     },

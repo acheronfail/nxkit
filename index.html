@@ -3,11 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <title>Hello World!</title>
-
   </head>
   <body>
-    <h1>💖 Hello World!</h1>
-    <p>Welcome to your Electron application.</p>
+    <h1>💖 NXKit</h1>
+    <p>I'm hoping to build much more functionality into this app!</p>
+
+    <form onsubmit="return false" style="display: flex; flex-direction: column">
+      <span>prod.keys</span>
+      <input type="file" name="keys" id="nsp-keys" />
+      <br />
+      <input type="text" name="id" id="nsp-id" placeholder="id" />
+      <input type="text" name="title" id="nsp-title" placeholder="title" />
+      <input type="text" name="author" id="nsp-author" placeholder="author" />
+      <input type="text" name="nroPath" id="nsp-nroPath" placeholder="sdmc:/switch/your_app.nro" />
+      <input type="submit" onclick="generate()" />
+    </form>
+
+    <pre id="nsp-stdout"></pre>
+    <pre id="nsp-stderr"></pre>
+
     <script type="module" src="/src/renderer.ts"></script>
   </body>
 </html>

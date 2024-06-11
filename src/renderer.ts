@@ -28,4 +28,52 @@
 
 import './index.css';
 
-console.log('👋 This message is being logged by "renderer.ts", included via Vite');
+import { buildNsp, generateRandomId } from './hacbrewpack/nsp';
+import { downloadFile } from './browser/download';
+
+document.querySelector<HTMLInputElement>('#nsp-id').value = generateRandomId();
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(window as any).generate = async function () {
+  const { value: id } = document.querySelector<HTMLInputElement>('#nsp-id');
+  const { value: title } = document.querySelector<HTMLInputElement>('#nsp-title');
+  const { value: author } = document.querySelector<HTMLInputElement>('#nsp-author');
+  const { value: nroPath } = document.querySelector<HTMLInputElement>('#nsp-nroPath');
+  const {
+    files: [keys],
+  } = document.querySelector<HTMLInputElement>('#nsp-keys');
+
+  try {
+    const result = await buildNsp({
+      id,
+      title,
+      author,
+      keys: await readFile(keys),
+      nroPath,
+      nroArgv: [],
+    });
+
+    document.querySelector('#nsp-stdout').textContent = result.stdout;
+    document.querySelector('#nsp-stderr').textContent = result.stderr;
+
+    if (result.exitCode !== 0) {
+      alert(`Error generating NSP, please check the logs`);
+    }
+
+    if (result.nsp) {
+      downloadFile(result.nsp);
+    }
+  } catch (err) {
+    alert(String(err));
+  }
+};
+
+async function readFile(file: File): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = (event) => resolve(new Uint8Array(event.target.result as ArrayBuffer));
+
+    reader.readAsArrayBuffer(file);
+  });
+}
