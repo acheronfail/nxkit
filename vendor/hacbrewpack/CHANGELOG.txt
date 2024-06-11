@@ -1,0 +1,62 @@
+v3.05
+Added support for keygeneration 8+
+
+v3.00
+Added support for creating LegalInformation NCA
+Added program nca signature 2 signing using self-generated acid public key
+Added automatic backup from main.npdm and control.nacp
+Fixed a bug in loading keyset file
+
+v2.05
+hacBrewPack now tries to load "keys.txt", "keys.ini", "prod.keys" and "~/.switch/prod.keys" files if "keys.dat" doesn't exist  
+
+v2.00
+Added support for creating HtmlDocument ncas
+
+v1.30
+Added --titleid, --titlename and --titlepublisher options for overriding main.npdm and control.nacp
+
+v1.21
+Added support for keygeneration 7
+Changed PFS0 hash block size and padding size
+
+v1.20
+hacBrewPack now reads titleid from NPDM
+Added nonacplogopatch option
+Fixed a bug cause invalid IVFC level 6 when romfs section is big
+Fixed a bug in writing padding
+Fixed sdkversion valid range
+Changed hash block size for better compatibility 
+Increased NCA section encryption buffer size 
+Changed valid titleid range
+
+v1.18
+Fixed a bug cause making bad PFS0 for files larger than 4GB in 32-bit platforms
+
+v1.17
+Added buffer for creating PFS0
+Increased buffer size for creating RomFS
+
+v1.16
+Fixed a bug cause failure of control.nacp validation in titles without AmericanEnglish title name and title author
+
+v1.15
+hacBrewPack now removes temp and nca directories before start and after the process is done. You can use --keepncadir to keep nca directory and files after the process is done
+hacBrewpack no longer creates separate files for ivfc level 6 and romfs which decreases the temp folder size
+Added buffer for calculating PFS0 masterhash
+Fixed a bug in building PFS0 which cause duplicate filepath separator in paths
+
+v1.10
+Added sdkverison option
+Added keyareakey option
+Added summary
+
+v1.00
+Added keygeneration option
+
+v0.99-beta.2
+Added NACP verification for TitleID, Title Name and Author
+Added Plaintext option
+
+v0.99-beta.1
+Initial Release
