@@ -1,17 +1,3 @@
-interface NXKitBridge {
-  isWindows: boolean;
-}
-
-interface NXKitTegraRcmSmashResult {
-  success: boolean;
-  stdout: string;
-  stderr: string;
-}
-
-interface NXKitTegraRcmSmash {
-  run: (payloadFilePath: string) => Promise<NXKitTegraRcmSmashResult>;
-}
-
 declare module '*.exe' {
   const src: string;
   export default src;
@@ -42,4 +28,16 @@ declare module '*?worker' {
     new (options?: { name?: string }): Worker;
   };
   export default workerConstructor;
+}
+
+declare module 'mbr' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: any;
+  export default mod;
+}
+
+declare module 'gpt' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: any;
+  export default mod;
 }

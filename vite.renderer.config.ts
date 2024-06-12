@@ -1,3 +1,4 @@
+import path from 'node:path';
 import type { ConfigEnv, UserConfig } from 'vite';
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
@@ -16,6 +17,11 @@ export default defineConfig((env) => {
     base: './',
     build: {
       outDir: `.vite/renderer/${name}`,
+      rollupOptions: {
+        input: {
+          window_main: path.join(root, 'src', 'window_main', 'index.html'),
+        }
+      }
     },
     plugins: [pluginExposeRenderer(name), wasm()],
     resolve: {

@@ -7,11 +7,12 @@ export default defineConfig((env) => {
   const forgeEnv = env as ConfigEnv<'build'>;
   const { forgeConfigSelf } = forgeEnv;
   const define = getBuildDefine(forgeEnv);
+
   const config: UserConfig = {
     build: {
       lib: {
         entry: forgeConfigSelf.entry!,
-        fileName: () => '[name].js',
+        fileName: () => 'main.js',
         formats: [esmodule ? 'es' : 'cjs'],
       },
       rollupOptions: {

@@ -7,6 +7,13 @@
   <body>
     <h1>💖 NXKit</h1>
 
+    <div>
+      <p>
+        Select your prod keys (if they're not in ~/.switch or cwd)
+        <input type="file" name="keys" id="keys" />
+      </p>
+    </div>
+
     <h3>Payload Injector</h3>
 
     <span>Choose payload to inject</span>
@@ -19,9 +26,6 @@
     <h3>NRO Forwarder</h3>
 
     <form onsubmit="return false" style="display: flex; flex-direction: column">
-      <span>prod.keys</span>
-      <input type="file" name="keys" id="nsp-keys" />
-      <br />
       <input type="text" name="id" id="nsp-id" placeholder="id" />
       <input type="text" name="title" id="nsp-title" placeholder="title" />
       <input type="text" name="author" id="nsp-author" placeholder="author" />
@@ -34,7 +38,10 @@
 
     <hr />
 
-    <p>I'm hoping to build much more functionality into this app!</p>
-    <script type="module" src="/src/renderer.ts"></script>
+    <h3>Nand Viewer</h3>
+    <span>Choose your rawnand.bin</span>
+    <input type="file" name="rawnand.bin" id="nand-file" onchange="openNand()" />
+
+    <script type="module" src="/src/window_main/index.ts"></script>
   </body>
 </html>

@@ -1,8 +1,24 @@
 import './index.css';
 
-import { buildNsp, generateRandomId } from './hacbrewpack/nsp';
-import { readFile, downloadFile } from './browser/file';
-import { findRCMDevices, injectPayload } from './rcm/inject';
+import { readFile, downloadFile } from '../browser/file';
+import { buildNsp, generateRandomId } from '../hacbrewpack/nsp';
+import { findRCMDevices, injectPayload } from '../rcm/inject';
+
+async function keysFromUser(): Promise<Uint8Array | null> {
+  const { files } = document.querySelector<HTMLInputElement>('#keys');
+  if (files[0]) return readFile(files[0]);
+  return null;
+}
+
+async function getKeys(): Promise<string | Uint8Array> {
+  let keys: string | Uint8Array = await keysFromUser();
+  if (!keys) keys = await window.nxkit.findProdKeys();
+  if (!keys) {
+    throw new Error('prod.keys are required to create an NSP!');
+  }
+
+  return keys;
+}
 
 // payload injector
 {
@@ -26,7 +42,7 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
     if (!payload) return alert('Please select a payload to inject!');
 
     if (window.nxkit.isWindows) {
-      const result = await window.nxkitTegraRcmSmash.run(payload.path);
+      const result = await window.nxkit.runTegraRcmSmash(payload.path);
       injectOutput.textContent = result.stdout;
       if (result.stderr) injectOutput.textContent += ' -- -- -- \n' + result.stderr;
     } else {
@@ -51,16 +67,14 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
     const { value: title } = document.querySelector<HTMLInputElement>('#nsp-title');
     const { value: author } = document.querySelector<HTMLInputElement>('#nsp-author');
     const { value: nroPath } = document.querySelector<HTMLInputElement>('#nsp-nroPath');
-    const { files } = document.querySelector<HTMLInputElement>('#nsp-keys');
-    const [keys] = files;
-    if (!keys) return alert('prod.keys are required to create an NSP!');
+    const keys = await getKeys();
 
     try {
       const result = await buildNsp({
         id,
         title,
         author,
-        keys: await readFile(keys),
+        keys,
         nroPath,
         nroArgv: [],
       });
@@ -83,11 +97,18 @@ import { findRCMDevices, injectPayload } from './rcm/inject';
 
 // TODO: nand viewer
 {
-  // https://github.com/suchmememanyskill/TegraExplorer
-  // https://github.com/eliboa/NxNandManager/
-  // https://github.com/ihaveamac/ninfs/blob/main/ninfs/mount/nandhac.py
   // https://gitlab.com/roothorick/busehac
-  // http://elm-chan.org/fsw/ff/ (wasm? native node module?)
-  // https://github.com/irori/js-fatfs#readme
-  // https://github.com/parkertomatoes/fatfs-wasm
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (window as any).openNand = async function () {
+    const { files } = document.querySelector<HTMLInputElement>('#nand-file');
+    const [rawNand] = files;
+    if (!rawNand) return;
+
+    const userKeys = await keysFromUser();
+    const result = await window.nxkit.openNand(rawNand.path, userKeys ? new TextDecoder().decode(userKeys) : undefined);
+    alert(result);
+  };
 }
+
+// TODO: tool to split/merge files to/from fat32 chunks
