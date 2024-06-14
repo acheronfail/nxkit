@@ -49,10 +49,10 @@ ConvertUTF.o: ConvertUTF.h
 rsa.o: rsa.h rsa_keys.h
 
 clean:
-	rm -f *.o hacbrewpack hacbrewpack.exe
+	rm -f *.o hacbrewpack hacbrewpack.exe hacbrewpack.wasm
 
 clean_full:
-	rm -f *.o hacbrewpack hacbrewpack.exe
+	rm -f *.o hacbrewpack hacbrewpack.exe hacbrewpack.wasm
 	cd mbedtls && $(MAKE) clean
 
 dist: clean_full
@@ -63,4 +63,3 @@ dist: clean_full
 	cp -R *.c *.h config.mk.template Makefile README.md LICENSE mbedtls hacbrewpack-$(HACBREWPACKVER)
 	tar czf hacbrewpack-$(HACBREWPACKVER).tar.gz hacbrewpack-$(HACBREWPACKVER)
 	rm -r hacbrewpack-$(HACBREWPACKVER)
-

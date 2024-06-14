@@ -7,7 +7,7 @@ import { BuildNSPArgs, HacBrewPackResult, StartupUserAccount, Screenshots, LogoT
 
 import defaultStartupMovie from '../public/StartupMovie.gif';
 import defaultLogo from '../public/NintendoLogo.png';
-import defaultImage from '../public/DefaultNSPImage.png';
+import defaultImage from '../public/DefaultNSPImage.jpg';
 import exefsMain from '../public/exefs/main';
 import exefsMainNpdm from '../public/exefs/main.npdm';
 
@@ -40,6 +40,8 @@ export async function buildNsp(args: BuildNSPArgs): Promise<HacBrewPackResult> {
     controlNacp: new Uint8Array(nacp.buffer),
     keys: args.keys,
     fileName: args.fileName,
+    // FIXME: strip unnecessary metadata
+    // https://github.com/rlaphoenix/nton/blob/master/nton/main.py#L328
     image: args.image ?? (await fetchBinary(defaultImage)),
     logo: args.logo ?? (await fetchBinary(defaultLogo)),
     startupMovie: args.startupMovie ?? (await fetchBinary(defaultStartupMovie)),
