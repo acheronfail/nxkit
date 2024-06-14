@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { Xtsn } from '../nand/xtsn';
 
 const PROD_KEYS_SEARCH_PATHS: string[] = [
   path.join(os.homedir(), '.switch', 'prod.keys'),
@@ -41,6 +42,11 @@ export class Keys {
       crypto: Buffer.from(text.substring(0, 32), 'hex'),
       tweak: Buffer.from(text.substring(32), 'hex'),
     };
+  }
+
+  getXtsn(id: 0 | 1 | 2 | 3): Xtsn {
+    const { crypto, tweak } = this.getBisKey(id);
+    return new Xtsn(crypto, tweak);
   }
 
   toString(): string {

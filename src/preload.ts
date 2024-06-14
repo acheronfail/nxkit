@@ -28,7 +28,11 @@ invoke(Channels.PreloadBrige).then((bridge) =>
   exposeInMainWorld(ExposedAPIs.Bridge, {
     ...bridge,
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
-    openNand: (nandPath, keysFromUser) => invoke(Channels.OpenNand, nandPath, keysFromUser),
     findProdKeys: () => invoke(Channels.findProdKeys),
+
+    nandOpen: (nandPath) => invoke(Channels.NandOpen, nandPath),
+    nandClose: () => invoke(Channels.NandClose),
+    nandMount: (partName, keys) => invoke(Channels.NandMountPartition, partName, keys),
+    nandReaddir: (path) => invoke(Channels.NandReaddir, path),
   })
 );

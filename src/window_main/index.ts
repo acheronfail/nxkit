@@ -105,9 +105,19 @@ async function getKeys(): Promise<string | Uint8Array> {
     const [rawNand] = files;
     if (!rawNand) return;
 
-    const userKeys = await keysFromUser();
-    const result = await window.nxkit.openNand(rawNand.path, userKeys ? new TextDecoder().decode(userKeys) : undefined);
-    alert(result);
+    const userKeys = await keysFromUser().then((k) => k && new TextDecoder().decode(k));
+
+    const partitions = await window.nxkit.nandOpen(rawNand.path);
+    console.log(partitions);
+
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const userPartition = partitions.find((p) => p.name === 'USER')!.name;
+    await window.nxkit.nandMount(userPartition, userKeys);
+
+    const entries = await window.nxkit.nandReaddir('/');
+    console.log(entries);
+
+    await window.nxkit.nandClose();
   };
 }
 

@@ -1,4 +1,6 @@
 import { IpcMainInvokeEvent } from 'electron';
+import { FSEntry } from './nand/fatfs/fs';
+import { PartitionEntry } from './nand/gpt';
 
 export interface NXKitTegraRcmSmashResult {
   success: boolean;
@@ -8,8 +10,12 @@ export interface NXKitTegraRcmSmashResult {
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
-  openNand: RendererChannelImpl[Channels.OpenNand];
   findProdKeys: RendererChannelImpl[Channels.findProdKeys];
+
+  nandOpen: RendererChannelImpl[Channels.NandOpen];
+  nandClose: RendererChannelImpl[Channels.NandClose];
+  nandMount: RendererChannelImpl[Channels.NandMountPartition];
+  nandReaddir: RendererChannelImpl[Channels.NandReaddir];
 }
 
 export interface NXKitBridge {
@@ -21,31 +27,47 @@ export interface NXKitBridge {
  */
 export enum Channels {
   PreloadBrige = 'bridge',
-  TegraRcmSmash = 'tegra_rcm_smash',
-  OpenNand = 'open_nand',
+  TegraRcmSmash = 'tegraRcmSmash',
   findProdKeys = 'findProdKeys',
+
+  /** Open nand disk image */
+  NandOpen = 'nandOpen',
+  /** Close nand disk image */
+  NandClose = 'nandClose',
+
+  /** Read directory from mounted currently nand partition */
+  NandMountPartition = 'NandMountPartition',
+
+  /** Read directory from mounted currently nand partition */
+  NandReaddir = 'nandReaddir',
 }
 
 /**
  * Utility type to assist in defining IPC channel type definitions.
  */
-type ChannelImpl<Args extends Array<unknown> = [], Result = void> = [Args, Promise<Result>];
+// eslint-disable-next-line @typescript-eslint/ban-types
+type ChannelImpl<F extends (...args: unknown[]) => unknown> = [Parameters<F>, Promise<ReturnType<F>>];
 
 /**
  * List of all IPC channel type definitions.
  */
 export type ChannelImplDefinition<C extends Channels> = {
-  [Channels.PreloadBrige]: ChannelImpl<[], NXKitBridge>;
+  [Channels.PreloadBrige]: ChannelImpl<() => NXKitBridge>;
   [Channels.TegraRcmSmash]: ChannelImpl<
-    [string],
-    {
+    (payloadPath: string) => {
       success: boolean;
       stdout: string;
       stderr: string;
     }
   >;
-  [Channels.OpenNand]: ChannelImpl<[string, string | undefined], string>;
-  [Channels.findProdKeys]: ChannelImpl<[], string | null>;
+  [Channels.findProdKeys]: ChannelImpl<() => string | null>;
+
+  [Channels.NandOpen]: ChannelImpl<(nandPath: string) => PartitionEntry[]>;
+  [Channels.NandClose]: ChannelImpl<() => void>;
+
+  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: string) => void>;
+
+  [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
 }[C];
 
 /**

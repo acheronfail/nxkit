@@ -4,9 +4,9 @@ import cp from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { nandExplorerPoc } from '../nand/explorer';
 import { Channels, MainChannelImpl } from '../channels';
-import { Keys, findProdKeys } from './keys';
+import { findProdKeys, Keys } from './keys';
+import * as nand from '../nand/explorer';
 
 // TODO: fix typescript here
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment
@@ -68,9 +68,13 @@ app.on('ready', () => {
         });
       });
     },
-    [Channels.OpenNand]: async (_event, path, keysFromUser) =>
-      nandExplorerPoc(path, keysFromUser ? Keys.parseKeys(keysFromUser) : await findProdKeys()),
     [Channels.findProdKeys]: (_event) => findProdKeys().then((keys) => keys.toString()),
+
+    [Channels.NandOpen]: async (_event, path) => nand.open(path),
+    [Channels.NandClose]: async (_event) => nand.close(),
+    [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) =>
+      nand.mount(paritionName, keysFromUser ? Keys.parseKeys(keysFromUser) : await findProdKeys()),
+    [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
   };
 
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {
