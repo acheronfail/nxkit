@@ -46,7 +46,7 @@ bool __nx_fsdev_support_cwd = false;
 // Used by trampoline.s
 Result g_lastRet = 0;
 
-void NORETURN nroEntrypointTrampoline(const ConfigEntry* entries, u64 handle, u64 entrypoint);
+void _Noreturn nroEntrypointTrampoline(const ConfigEntry* entries, u64 handle, u64 entrypoint);
 
 void __libnx_initheap(void)
 {
