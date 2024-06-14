@@ -45,6 +45,9 @@ export async function buildNsp(args: BuildNSPArgs): Promise<HacBrewPackResult> {
     startupMovie: args.startupMovie ?? (await fetchBinary(defaultStartupMovie)),
     nextNroPath: args.nroPath,
     nextArgv: [args.nroPath, ...args.nroArgv].join(' '),
+
+    // TODO: be able to compile our own exefs files
+    // https://github.com/rlaphoenix/nton/issues/31
     main: await fetchBinary(exefsMain),
     mainNpdm: await fetchBinary(exefsMainNpdm),
   };
