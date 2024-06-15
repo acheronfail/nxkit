@@ -1,6 +1,8 @@
 <script lang="ts">
   import ProdKeysNeeded from './ProdKeysNeeded.svelte';
   import { keys } from './stores/keys.svelte';
+  import Button from './utility/Button.svelte';
+  import TabContent from './utility/TabContent.svelte';
 
   let files = $state<FileList | null>(null);
   let nandFile = $derived(files?.[0]);
@@ -28,11 +30,15 @@
   });
 </script>
 
-<ProdKeysNeeded />
-<div class="picker">
-  <button disabled={!keys.value}><label for="rawnand-file">Choose your rawnand.bin</label></button>
-  <input hidden type="file" name="rawnand-file" id="rawnand-file" bind:files />
-</div>
+<TabContent>
+  <ProdKeysNeeded />
+  <div class="picker">
+    <Button disabled={!keys.value}>
+      <label for="rawnand-file">Choose your rawnand.bin</label>
+    </Button>
+    <input hidden type="file" bind:files />
+  </div>
+</TabContent>
 
 <style>
   .picker {

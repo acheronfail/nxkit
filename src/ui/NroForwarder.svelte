@@ -3,15 +3,20 @@
   import { buildNsp, generateRandomId } from '../hacbrewpack/nsp';
   import ProdKeysNeeded from './ProdKeysNeeded.svelte';
   import { keys } from './stores/keys.svelte';
+  import Button from './utility/Button.svelte';
+  import TabContent from './utility/TabContent.svelte';
+  import TabItem from './utility/TabItem.svelte';
+  import Tabs from './utility/Tabs.svelte';
+  import TextInput from './utility/TextInput.svelte';
 
   // TODO: image selection
-  // TODO: dynamic ui for retroarch forwarding, including verification and/or auto-complete of fields, etc
-  // TODO: choose mounted Switch SD card for path autocomplete and validation
+  // TODO: choose mounted Switch SD card for path autocomplete and validation?
 
   let id = $state(generateRandomId());
   let title = $state('');
   let author = $state('');
   let nroPath = $state('');
+  let romPath = $state('');
 
   let stdout = $state('');
   let stderr = $state('');
@@ -23,7 +28,7 @@
         title,
         author,
         keys: keys.value.data,
-        nroPath,
+        nroPath: `sdmc:${nroPath}`,
         nroArgv: [],
       });
 
@@ -44,14 +49,30 @@
   }
 </script>
 
-<div style="display: flex; flex-direction: column">
-  <input type="text" name="id" placeholder="id" bind:value={id} />
-  <input type="text" name="title" placeholder="title" bind:value={title} />
-  <input type="text" name="author" placeholder="author" bind:value={author} />
-  <input type="text" name="nroPath" placeholder="sdmc:/switch/your_app.nro" bind:value={nroPath} />
+<TabContent>
+  <Tabs>
+    <TabItem title="Application" defaultOpen>
+      <TabContent>
+        <TextInput label="App ID" placeholder="01..........0000" bind:value={id} />
+        <TextInput label="App Title" placeholder="NX Shell" bind:value={title} />
+        <TextInput label="App Publisher" placeholder="joel16" bind:value={author} />
+        <TextInput label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath} />
+      </TabContent>
+    </TabItem>
+    <TabItem title="RetroArch ROM">
+      <TabContent>
+        <TextInput label="App ID" placeholder="01..........0000" bind:value={id} />
+        <TextInput label="Game Title" placeholder="Kirby's Adventure" bind:value={title} />
+        <TextInput label="Game Publisher" placeholder="Nintendo" bind:value={author} />
+        <TextInput label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath} />
+        <TextInput label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath} />
+      </TabContent>
+    </TabItem>
+  </Tabs>
+
   <ProdKeysNeeded />
-  <input type="submit" value="Generate NSP" disabled={!keys.value} onclick={generate} />
-</div>
+  <Button onclick={generate} disabled={!keys.value}>Generate NSP</Button>
+</TabContent>
 
 <pre>{stdout}</pre>
 <pre>{stderr}</pre>

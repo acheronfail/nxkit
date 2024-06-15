@@ -1,6 +1,9 @@
 <script lang="ts">
-  import { readFile } from "../browser/file";
-  import { findRCMDevices, injectPayload } from "../rcm/inject";
+  import { readFile } from '../browser/file';
+  import { findRCMDevices, injectPayload } from '../rcm/inject';
+  import Button from './utility/Button.svelte';
+  import FileInput from './utility/FileInput.svelte';
+  import TabContent from './utility/TabContent.svelte';
 
   // TODO: bundle in some payloads
   // TODO: fetch latest payloads
@@ -12,15 +15,12 @@
   //  - select `libusbK`
   //  - select `Install Driver`
 
-
-  let output = '';
+  let files = $state<FileList | null>(null);
+  let payload = $derived(files?.[0]);
+  let output = $state('');
 
   async function inject() {
     output = '';
-
-    const { files } = document.querySelector<HTMLInputElement>('#rcm-payload');
-    const [payload] = files;
-    if (!payload) return alert('Please select a payload to inject!');
 
     if (window.nxkit.isWindows) {
       const result = await window.nxkit.runTegraRcmSmash(payload.path);
@@ -35,7 +35,12 @@
   }
 </script>
 
-<span>Choose payload to inject</span>
-<input type="file" name="rcm-payload" id="rcm-payload" />
-<input type="submit" value="Inject" onclick={inject} />
-<pre id="inject-logs">{output}</pre>
+<TabContent>
+  <p>
+    You can send payloads to a Switch in RCM mode directly.
+  </p>
+  <!-- TODO: description of how to enter RCM mode -->
+  <FileInput label="Payload" bind:files />
+  <Button disabled={!payload} onclick={inject}>Inject</Button>
+  <pre id="inject-logs">{output}</pre>
+</TabContent>

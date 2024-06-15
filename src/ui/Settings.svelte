@@ -1,6 +1,9 @@
 <script lang="ts">
   import { keys } from './stores/keys.svelte';
   import { readFile } from '../browser/file';
+  import Button from './utility/Button.svelte';
+  import TabContent from './utility/TabContent.svelte';
+  import Code from './utility/Code.svelte';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -21,58 +24,47 @@
   }
 </script>
 
-<h4>Select Prod Keys</h4>
+<TabContent>
+  <h4 class="font-bold">Select Prod Keys</h4>
 
-{#if keys.value}
-  ✅️ Configured keys: <span class="code">{keys.value.location}</span>
-{:else}
-  ❌️ No keys found
-{/if}
-
-<p>
-  <span class="manual">
-    {#if keyFile}
-      <button onclick={resetKeys}>Clear selected keys</button>
+  <div class="flex gap-2">
+    {#if keys.value}
+      ✅️ Configured keys: <Code class="grow">{keys.value.location}</Code>
+    {:else}
+      ❌️ No keys found
     {/if}
-    <button hidden={!!keyFile}>
-      <label for="prod-keys">Manually select keys</label>
-    </button>
-    <input type="file" id="prod-keys" name="prod-keys" bind:this={input} bind:files />
-  </span>
-</p>
+  </div>
 
-<p>
-  Prod keys are required for creating NSPs with the NRO Forwarder, and also for reading the Switch's NAND partition in
-  the explorer.
-</p>
-<p>
-  By default, NXKit searches the following places for <span class="code">prod.keys</span> files:
-</p>
-<!-- TODO: single source of truth for this -->
-<!-- TODO: explain what `~` and `$CWD` mean (cross-platform, too) -->
-<ul>
-  <li><span class="code">~/.switch/prod.keys</span></li>
-  <li><span class="code">$CWD/prod.keys</span></li>
-</ul>
+  <p>
+    <span class="flex justify-between items-center">
+      {#if keyFile}
+        <Button onclick={resetKeys}>Clear selected keys</Button>
+      {/if}
+      <Button hidden={!!keyFile}>
+        <label for="prod-keys">Manually select keys</label>
+      </Button>
 
-<h5>Where do I get <span class="code">prod.keys</span>?</h5>
-<p>
-  You must extract the keys from your Switch, if you have an unpatched Switch you can use
-  <span class="code">Lockpick_RCM</span> to get them.
-</p>
+      <input hidden type="file" id="prod-keys" name="prod-keys" bind:this={input} bind:files />
+    </span>
+  </p>
 
-<style>
-  li {
-    margin-top: 1px;
-  }
+  <p>
+    Prod keys are required for creating NSPs with the NRO Forwarder, and also for reading the Switch's NAND partition in
+    the explorer.
+  </p>
+  <p>
+    By default, NXKit searches the following places for <Code>prod.keys</Code> files:
+  </p>
+  <!-- TODO: single source of truth for this -->
+  <!-- TODO: explain what `~` and `$CWD` mean (cross-platform, too) -->
+  <ul class="list-disc ml-4">
+    <li class="m-1"><Code>~/.switch/prod.keys</Code></li>
+    <li class="m-1"><Code>$CWD/prod.keys</Code></li>
+  </ul>
 
-  input#prod-keys {
-    display: none;
-  }
-
-  .manual {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-</style>
+  <h4 class="font-bold">Where do I get <Code>prod.keys</Code>?</h4>
+  <p>
+    You must extract the keys from your Switch, if you have an unpatched Switch you can use
+    <Code>Lockpick_RCM</Code> to get them.
+  </p>
+</TabContent>
