@@ -2,6 +2,7 @@ import path from 'node:path';
 import type { ConfigEnv, UserConfig } from 'vite';
 import { defineConfig } from 'vite';
 import wasm from 'vite-plugin-wasm';
+import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { pluginExposeRenderer } from './vite.base.config';
 
 // https://vitejs.dev/config
@@ -20,10 +21,10 @@ export default defineConfig((env) => {
       rollupOptions: {
         input: {
           window_main: path.join(root, 'src', 'window_main', 'index.html'),
-        }
-      }
+        },
+      },
     },
-    plugins: [pluginExposeRenderer(name), wasm()],
+    plugins: [pluginExposeRenderer(name), wasm(), svelte()],
     resolve: {
       preserveSymlinks: true,
     },

@@ -7,40 +7,14 @@
   <body>
     <h1>💖 NXKit</h1>
 
+    <div id="app"></div>
+
     <div>
       <p>
         Select your prod keys (if they're not in ~/.switch or cwd)
         <input type="file" name="keys" id="keys" />
       </p>
     </div>
-
-    <h3>Payload Injector</h3>
-
-    <span>Choose payload to inject</span>
-    <input type="file" name="rcm-payload" id="rcm-payload" />
-    <input type="submit" value="Inject" onclick="inject()" />
-    <pre id="inject-logs"></pre>
-
-    <hr />
-
-    <h3>NRO Forwarder</h3>
-
-    <form onsubmit="return false" style="display: flex; flex-direction: column">
-      <input type="text" name="id" id="nsp-id" placeholder="id" />
-      <input type="text" name="title" id="nsp-title" placeholder="title" />
-      <input type="text" name="author" id="nsp-author" placeholder="author" />
-      <input type="text" name="nroPath" id="nsp-nroPath" placeholder="sdmc:/switch/your_app.nro" />
-      <input type="submit" value="Generate NSP" onclick="generate()" />
-    </form>
-
-    <pre id="nsp-stdout"></pre>
-    <pre id="nsp-stderr"></pre>
-
-    <hr />
-
-    <h3>Nand Viewer</h3>
-    <span>Choose your rawnand.bin</span>
-    <input type="file" name="rawnand.bin" id="nand-file" onchange="openNand()" />
 
     <script type="module" src="/src/window_main/index.ts"></script>
   </body>
