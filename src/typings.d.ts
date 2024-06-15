@@ -18,12 +18,12 @@ declare module '*.png' {
   export default src;
 }
 
-declare module '*/exefs/main' {
+declare module '*.nso' {
   const src: string;
   export default src;
 }
 
-declare module '*/exefs/main.npdm' {
+declare module '*.npdm' {
   const src: string;
   export default src;
 }
