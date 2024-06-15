@@ -9,12 +9,21 @@ export function downloadFile(file: File) {
   window.URL.revokeObjectURL(url);
 }
 
-export async function readFile(file: File): Promise<Uint8Array> {
+export async function readFile(file: File, format: 'string'): Promise<string>;
+export async function readFile(file: File, format: 'arrayBuffer'): Promise<Uint8Array>;
+export async function readFile(file: File, format: 'string' | 'arrayBuffer'): Promise<string | Uint8Array> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = reject;
-    reader.onload = (event) => resolve(new Uint8Array(event.target.result as ArrayBuffer));
+    reader.onload = (event) =>
+      resolve(
+        format === 'arrayBuffer' ? new Uint8Array(event.target.result as ArrayBuffer) : (event.target.result as string)
+      );
 
-    reader.readAsArrayBuffer(file);
+    if (format === 'string') {
+      reader.readAsText(file);
+    } else {
+      reader.readAsArrayBuffer(file);
+    }
   });
 }

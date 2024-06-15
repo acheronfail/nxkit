@@ -1,27 +1,42 @@
 <script lang="ts">
-  import { keysFromUser } from '../browser/keys';
+  import ProdKeysNeeded from './ProdKeysNeeded.svelte';
+  import { keys } from './stores/keys.svelte';
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  async function openNand() {
-    const { files } = document.querySelector<HTMLInputElement>('#nand-file');
-    const [rawNand] = files;
-    if (!rawNand) return;
+  let files = $state<FileList | null>(null);
+  let nandFile = $derived(files?.[0]);
 
-    const userKeys = await keysFromUser().then((k) => k && new TextDecoder().decode(k));
-
-    const partitions = await window.nxkit.nandOpen(rawNand.path);
+  async function loadNand(nandPath: string) {
+    const partitions = await window.nxkit.nandOpen(nandPath);
     console.log(partitions);
 
+    // TODO: list partitions to choose
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     const userPartition = partitions.find((p) => p.name === 'USER')!.name;
-    await window.nxkit.nandMount(userPartition, userKeys);
+    await window.nxkit.nandMount(userPartition, $state.snapshot(keys.value));
 
+    // TODO: file explorer
     const entries = await window.nxkit.nandReaddir('/');
     console.log(entries);
 
     await window.nxkit.nandClose();
   }
+
+  $effect(() => {
+    if (nandFile) {
+      loadNand(nandFile.path);
+    }
+  });
 </script>
 
-<span>Choose your rawnand.bin</span>
-<input type="file" name="rawnand.bin" id="nand-file" onchange={openNand} />
+<ProdKeysNeeded />
+<div class="picker">
+  <button disabled={!keys.value}><label for="rawnand-file">Choose your rawnand.bin</label></button>
+  <input hidden type="file" name="rawnand-file" id="rawnand-file" bind:files />
+</div>
+
+<style>
+  .picker {
+    display: flex;
+    flex-direction: column;
+  }
+</style>

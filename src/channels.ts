@@ -2,10 +2,9 @@ import { IpcMainInvokeEvent } from 'electron';
 import { FSEntry } from './nand/fatfs/fs';
 import { PartitionEntry } from './nand/gpt';
 
-export interface NXKitTegraRcmSmashResult {
-  success: boolean;
-  stdout: string;
-  stderr: string;
+export interface ProdKeys {
+  location: string;
+  data: string;
 }
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
@@ -60,12 +59,12 @@ export type ChannelImplDefinition<C extends Channels> = {
       stderr: string;
     }
   >;
-  [Channels.findProdKeys]: ChannelImpl<() => string | null>;
+  [Channels.findProdKeys]: ChannelImpl<() => ProdKeys | null>;
 
   [Channels.NandOpen]: ChannelImpl<(nandPath: string) => PartitionEntry[]>;
   [Channels.NandClose]: ChannelImpl<() => void>;
 
-  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: string) => void>;
+  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => void>;
 
   [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
 }[C];

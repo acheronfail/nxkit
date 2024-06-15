@@ -3,6 +3,8 @@ import os from 'node:os';
 import path from 'node:path';
 import { Xtsn } from '../nand/xtsn';
 
+export type BisKeyId = 0 | 1 | 2 | 3;
+
 const PROD_KEYS_SEARCH_PATHS: string[] = [
   path.join(os.homedir(), '.switch', 'prod.keys'),
   path.join(process.cwd(), 'prod.keys'),
@@ -12,7 +14,7 @@ export async function findProdKeys(): Promise<Keys | null> {
   for (const filePath of PROD_KEYS_SEARCH_PATHS) {
     const text = await fs.readFile(filePath, 'utf-8');
     try {
-      return Keys.parseKeys(text);
+      return Keys.parseKeys(filePath, text);
     } catch (err) {
       console.log(`Failed to parse keys at ${filePath}: ${String(err)}`);
     }
@@ -22,9 +24,10 @@ export async function findProdKeys(): Promise<Keys | null> {
 }
 
 export class Keys {
-  static parseKeys(text: string): Keys | null {
+  static parseKeys(path: string, text: string): Keys | null {
     // TODO: validation of keys (zod?)
     return new Keys(
+      path,
       Object.fromEntries(
         text
           .trim()
@@ -34,9 +37,9 @@ export class Keys {
     );
   }
 
-  constructor(public readonly raw: RawKeys) {}
+  constructor(public readonly path: string, public readonly raw: RawKeys) {}
 
-  getBisKey(id: 0 | 1 | 2 | 3): { crypto: Buffer; tweak: Buffer } {
+  getBisKey(id: BisKeyId): { crypto: Buffer; tweak: Buffer } {
     const text = this.raw[`bis_key_0${id}`];
     return {
       crypto: Buffer.from(text.substring(0, 32), 'hex'),
@@ -44,7 +47,7 @@ export class Keys {
     };
   }
 
-  getXtsn(id: 0 | 1 | 2 | 3): Xtsn {
+  getXtsn(id: BisKeyId): Xtsn {
     const { crypto, tweak } = this.getBisKey(id);
     return new Xtsn(crypto, tweak);
   }

@@ -1,33 +1,34 @@
 <script lang="ts">
   import { downloadFile } from '../browser/file';
-  import { getKeys } from '../browser/keys';
   import { buildNsp, generateRandomId } from '../hacbrewpack/nsp';
+  import ProdKeysNeeded from './ProdKeysNeeded.svelte';
+  import { keys } from './stores/keys.svelte';
 
+  // TODO: image selection
   // TODO: dynamic ui for retroarch forwarding, including verification and/or auto-complete of fields, etc
   // TODO: choose mounted Switch SD card for path autocomplete and validation
 
-  let id = generateRandomId();
+  let id = $state(generateRandomId());
+  let title = $state('');
+  let author = $state('');
+  let nroPath = $state('');
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let stdout = $state('');
+  let stderr = $state('');
+
   async function generate() {
-    const { value: id } = document.querySelector<HTMLInputElement>('#nsp-id');
-    const { value: title } = document.querySelector<HTMLInputElement>('#nsp-title');
-    const { value: author } = document.querySelector<HTMLInputElement>('#nsp-author');
-    const { value: nroPath } = document.querySelector<HTMLInputElement>('#nsp-nroPath');
-    const keys = await getKeys();
-
     try {
       const result = await buildNsp({
         id,
         title,
         author,
-        keys,
+        keys: keys.value.data,
         nroPath,
         nroArgv: [],
       });
 
-      document.querySelector('#nsp-stdout').textContent = result.stdout;
-      document.querySelector('#nsp-stderr').textContent = result.stderr;
+      stdout = result.stdout;
+      stderr = result.stderr;
 
       if (result.exitCode !== 0) {
         alert(`Error generating NSP, please check the logs`);
@@ -37,18 +38,20 @@
         downloadFile(result.nsp);
       }
     } catch (err) {
+      console.error(err);
       alert(String(err));
     }
   }
 </script>
 
 <div style="display: flex; flex-direction: column">
-  <input type="text" name="id" id="nsp-id" placeholder="id" value={id} />
-  <input type="text" name="title" id="nsp-title" placeholder="title" />
-  <input type="text" name="author" id="nsp-author" placeholder="author" />
-  <input type="text" name="nroPath" id="nsp-nroPath" placeholder="sdmc:/switch/your_app.nro" />
-  <input type="submit" value="Generate NSP" onclick={generate} />
+  <input type="text" name="id" placeholder="id" bind:value={id} />
+  <input type="text" name="title" placeholder="title" bind:value={title} />
+  <input type="text" name="author" placeholder="author" bind:value={author} />
+  <input type="text" name="nroPath" placeholder="sdmc:/switch/your_app.nro" bind:value={nroPath} />
+  <ProdKeysNeeded />
+  <input type="submit" value="Generate NSP" disabled={!keys.value} onclick={generate} />
 </div>
 
-<pre id="nsp-stdout"></pre>
-<pre id="nsp-stderr"></pre>
+<pre>{stdout}</pre>
+<pre>{stderr}</pre>

@@ -68,12 +68,15 @@ app.on('ready', () => {
         });
       });
     },
-    [Channels.findProdKeys]: (_event) => findProdKeys().then((keys) => keys.toString()),
+    [Channels.findProdKeys]: (_event) => findProdKeys().then((keys) => ({ location: keys.path, data: keys.toString() })),
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),
     [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) =>
-      nand.mount(paritionName, keysFromUser ? Keys.parseKeys(keysFromUser) : await findProdKeys()),
+      nand.mount(
+        paritionName,
+        keysFromUser ? Keys.parseKeys(keysFromUser.location, keysFromUser.data) : await findProdKeys()
+      ),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
   };
 

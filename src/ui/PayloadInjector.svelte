@@ -30,7 +30,7 @@
       const [dev] = await findRCMDevices();
       if (!dev) return alert('No Switch found in RCM mode!');
 
-      await injectPayload(dev, await readFile(payload), (log) => (output += `${log}\n`));
+      await injectPayload(dev, await readFile(payload, 'arrayBuffer'), (log) => (output += `${log}\n`));
     }
   }
 </script>
