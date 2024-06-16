@@ -13,6 +13,7 @@
     if (keys.value) {
       settingsLabel = 'Settings';
     } else {
+      // TODO: would be nice to be able to put components in here
       settingsLabel = 'Settings ⚠️️';
     }
   });

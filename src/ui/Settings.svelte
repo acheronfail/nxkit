@@ -12,13 +12,11 @@
   $effect(() => {
     if (keyFile) {
       readFile(keyFile, 'string').then((data) => keys.setUserKeys({ location: keyFile.path, data }));
-    } else {
-      keys.setUserKeys(null);
     }
   });
 
-  function resetKeys(event: Event) {
-    event.preventDefault();
+  function resetKeys() {
+    keys.setUserKeys(null);
     files = null;
     input.value = '';
   }
@@ -37,7 +35,7 @@
 
   <p>
     <span class="flex justify-between items-center">
-      {#if keyFile}
+      {#if keys.userKeysSelected}
         <Button appearance="warning" onclick={resetKeys}>Clear selected keys</Button>
       {:else}
         <Button appearance="primary" for="prod-keys">Manually select keys</Button>

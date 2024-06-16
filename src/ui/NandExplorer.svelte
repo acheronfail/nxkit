@@ -37,7 +37,7 @@
   let files = $state<FileList | null>(null);
   let nandFile = $derived(files?.[0]);
   let loading = $state(false);
-  let disabled = $derived(loading || !keys.value);
+  let disabled = $derived(!keys.value || loading);
   let tooltip = $derived(loading ? 'Loading...' : disabled && 'Please select your prod.keys in Settings!');
 
   let partitions = $state<PartitionEntry[] | null>(null);

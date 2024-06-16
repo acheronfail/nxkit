@@ -10,6 +10,9 @@ function createKeyStore() {
   return {
     setMainKeys,
     setUserKeys,
+    get userKeysSelected() {
+      return keysFromUser !== null;
+    },
     get value() {
       return keysFromUser ?? keysFromMain;
     },
