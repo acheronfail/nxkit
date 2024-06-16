@@ -19,7 +19,7 @@
       name: partition.name,
       isDirectory: false,
       data: partition,
-      // TODO: what's the proper way to pass a svelte component like this? can I send props with it? (class:text-red)
+      // FIXME: get slots or snippets working to be able to style these and remove this cast
       icon: CircleStackIcon as any as Component,
     };
   }
@@ -32,6 +32,7 @@
   import FileTreeRoot from './utility/FileTreeRoot.svelte';
   import Code from './utility/Code.svelte';
   import { CircleStackIcon } from 'heroicons-svelte/24/outline';
+  import { ArrowDownTrayIcon } from 'heroicons-svelte/24/solid';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -53,6 +54,11 @@
     closePartition: () => {
       rootEntries = null;
       selectedPartition = null;
+    },
+    downloadFile: (file: FSFile) => {
+      // TODO: pick save location, have main copy it
+      console.log(file);
+      alert(`Coming soon!`);
     },
     reset: () => {
       loading = true;
@@ -95,10 +101,16 @@
         Currently exploring <strong>{selectedPartition.name}</strong>
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </p>
-      <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={openNandDirectory} />
+      <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={openNandDirectory}>
+        <div slot="file-extra" let:file>
+          <ArrowDownTrayIcon class="h-4 cursor-pointer hover:text-black" onclick={() => handlers.downloadFile(file)} />
+        </div>
+      </FileTreeRoot>
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
-      <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={onPartitionClick} />
+      <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={onPartitionClick}>
+        <div slot="file-extra"></div>
+      </FileTreeRoot>
     {:else}
       <p class="text-center">
         Choose your <Code>rawnand.bin</Code> file to begin!

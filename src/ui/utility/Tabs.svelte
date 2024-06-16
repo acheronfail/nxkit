@@ -11,7 +11,9 @@
   import { writable } from 'svelte/store';
   import { setContext } from 'svelte';
 
-  const tabContext = setContext<TabContext>(TabContextKey, { selected: writable(null) });
+  const tabContext = setContext<TabContext>(TabContextKey, {
+    selected: writable(null),
+  });
 
   function init(node: HTMLElement) {
     const destroy = tabContext.selected.subscribe((x) => {

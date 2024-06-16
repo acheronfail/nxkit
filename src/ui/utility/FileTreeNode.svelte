@@ -42,31 +42,32 @@
   let isLoading = $state(false);
   let children = $state<Node[] | null>(null);
 
-  const handlers = {
-    handleDirectoryOpen: () => {
-      isExpanded = expandedState[node.id] = !isExpanded;
-      const loadingTimer = setTimeout(() => (isLoading = true), 100);
+  const handleDirectoryOpen = () => {
+    isExpanded = expandedState[node.id] = !isExpanded;
+    const loadingTimer = setTimeout(() => (isLoading = true), 100);
 
-      // TODO: error handling
-      openDirectory(node.data)
-        .then((nodes) => (children = nodes))
-        .finally(() => {
-          clearTimeout(loadingTimer);
-          isLoading = false;
-        });
-    },
+    // TODO: error handling
+    openDirectory(node.data)
+      .then((nodes) => (children = nodes))
+      .finally(() => {
+        clearTimeout(loadingTimer);
+        isLoading = false;
+      });
   };
+
+  const handler = () => (node.isDirectory ? handleDirectoryOpen() : onFileClick?.(node.data));
 </script>
 
 <li class="odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
-  {#if node.isDirectory}
-    <div
-      class={itemClass}
-      role="button"
-      tabindex="0"
-      onkeypress={(e) => e.key === ' ' && handlers.handleDirectoryOpen()}
-      onclick={handlers.handleDirectoryOpen}
-    >
+  <div
+    class={itemClass}
+    class:text-slate-600={node === loadingFile}
+    role="button"
+    tabindex="0"
+    onkeypress={(e) => e.key === ' ' && handler()}
+    onclick={() => handler()}
+  >
+    {#if node.isDirectory}
       <span>
         {#if node.icon}
           <svelte:component this={node.icon} class="text-blue-300 {iconClass}" />
@@ -77,17 +78,7 @@
         {/if}
         {node.name}
       </span>
-    </div>
-  {:else}
-    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
-    <div
-      class={itemClass}
-      class:text-slate-600={node === loadingFile}
-      role={onFileClick ? 'button' : undefined}
-      tabindex={onFileClick ? 0 : -1}
-      onkeypress={(e) => e.key === ' ' && onFileClick(node.data)}
-      onclick={() => onFileClick(node.data)}
-    >
+    {:else}
       <span>
         {#if node.icon}
           <svelte:component this={node.icon} class={iconClass} />
@@ -98,17 +89,12 @@
         {/if}
         {node.name}
       </span>
-      <!-- FIXME: add actions -->
-      <!-- <span>
-        <Tooltip content="Download">
-          <ArrowDownTrayIcon
-            onclick={() => handlers.download(node)}
-            class="cursor-pointer h-6 p-1 hover:text-black inline-block"
-          />
-        </Tooltip>
-      </span> -->
-    </div>
-  {/if}
+      <!-- svelte-ignore slot_element_deprecated -->
+      <span>
+        <slot name="file-extra" file={node.data} />
+      </span>
+    {/if}
+  </div>
 </li>
 {#if isExpanded}
   {#if isLoading}

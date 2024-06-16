@@ -7,16 +7,7 @@
   import { keys } from '../ui/stores/keys.svelte';
   import { onMount } from 'svelte';
   import TabItem from '../ui/utility/TabItem.svelte';
-
-  let settingsLabel = $state('Settings');
-  $effect(() => {
-    if (keys.value) {
-      settingsLabel = 'Settings';
-    } else {
-      // TODO: would be nice to be able to put components in here
-      settingsLabel = 'Settings ⚠️️';
-    }
-  });
+  import { ExclamationTriangleIcon } from 'heroicons-svelte/24/outline';
 
   // TODO: be able to programmatically control selected tab
   // TODO: select tabs with `cmdCtrl+number`
@@ -31,17 +22,26 @@
 
 <h1 class="font-bold text-xl m-2 text-center">💖 NXKit</h1>
 <Tabs>
-  <TabItem title="Nro Forwarder" defaultOpen>
-    <NroForwarder />
+  <TabItem defaultOpen>
+    <span slot="label">Nro Forwarder</span>
+    <NroForwarder slot="content" />
   </TabItem>
-  <TabItem title="Payload Injector">
-    <PayloadInjector />
+  <TabItem>
+    <span slot="label">Payload Injector</span>
+    <PayloadInjector slot="content" />
   </TabItem>
-  <TabItem title="Nand Explorer">
-    <NandExplorer />
+  <TabItem>
+    <span slot="label">Nand Explorer</span>
+    <NandExplorer slot="content" />
   </TabItem>
-  <TabItem title={settingsLabel}>
-    <Settings />
+  <TabItem>
+    <span slot="label" class="flex flex-row justify-center items-center">
+      Settings
+      {#if !keys.value}
+        <ExclamationTriangleIcon class="pl-2 h-5 text-yellow-500" />
+      {/if}
+    </span>
+    <Settings slot="content" />
   </TabItem>
   <!-- TODO: tool to split/merge files to/from fat32 chunks -->
 </Tabs>

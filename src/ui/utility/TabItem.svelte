@@ -2,7 +2,6 @@
   import { getContext } from 'svelte';
   import { type TabContext, TabContextKey } from './Tabs.svelte';
 
-  export let title = 'Tab title';
   export let defaultOpen = false;
 
   // FIXME: hot reloads in Tab are broken with this...
@@ -26,12 +25,12 @@
     type="button"
     on:click={() => (open = true)}
   >
-    {title}
+    <slot name="label" />
   </button>
 
   {#if open}
     <div use:init>
-      <slot />
+      <slot name="content" />
     </div>
   {/if}
 </li>

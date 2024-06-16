@@ -17,6 +17,11 @@
 
 <ul class="select-none font-mono overflow-hidden m-2 border border-slate-900">
   {#each nodes as node}
-    <FileTreeNode {onFileClick} {openDirectory} {node} depth={1} />
+    <FileTreeNode {onFileClick} {openDirectory} {node} depth={1}>
+      <!-- svelte-ignore slot_element_deprecated -->
+      <div slot="file-extra" let:file>
+        <slot name="file-extra" {file} />
+      </div>
+    </FileTreeNode>
   {/each}
 </ul>

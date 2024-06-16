@@ -61,8 +61,9 @@
 
 <TabContent>
   <Tabs>
-    <TabItem title="Application" defaultOpen>
-      <TabContent>
+    <TabItem defaultOpen>
+      <span slot="label">Application</span>
+      <TabContent slot="content">
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
         <InputFile label="App Title" placeholder="NX Shell" bind:value={title} infoTooltip={descriptions.title} />
         <InputFile label="App Publisher" placeholder="joel16" bind:value={author} infoTooltip={descriptions.author} />
@@ -74,8 +75,9 @@
         />
       </TabContent>
     </TabItem>
-    <TabItem title="RetroArch ROM">
-      <TabContent>
+    <TabItem>
+      <span slot="label">RetroArch ROM</span>
+      <TabContent slot="content">
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
         <InputFile
           label="Game Title"
