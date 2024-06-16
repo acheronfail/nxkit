@@ -1,0 +1,26 @@
+{
+  "name": "haccrypto",
+  "version": "1.0.3",
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "main": "dist/index.esm.js",
+  "keywords": [
+    "switch",
+    "nx",
+    "haccrypto",
+    "nand",
+    "emmc"
+  ],
+  "scripts": {
+    "test": "vitest",
+    "build": "npm run clean && npm run build:cjs && npm run build:esm",
+    "build:cjs": "esbuild --outfile=dist/xtsn.cjs --format=cjs index.ts",
+    "build:esm": "esbuild --outfile=dist/xtsn.esm.js --format=esm index.ts",
+    "clean": "rm -rf dist"
+  },
+  "files": [
+    "README.md",
+    "dist/*",
+    "index.ts"
+  ]
+}

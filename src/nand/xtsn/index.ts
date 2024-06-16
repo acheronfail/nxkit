@@ -92,13 +92,23 @@ export class Xtsn {
     return data;
   }
 
-  // TODO: simplify this, since `sectorOffset` and `skippedBytes` can be represented with only a single argument (byte offset)
+  public encrypt(input: Buffer, byteOffset = 0, sectorSize = 0x200): Buffer {
+    const sectorOffset = Math.floor(byteOffset / sectorSize);
+    return this.doCrypt(input, sectorOffset, sectorSize, byteOffset % sectorSize, 'createCipheriv');
+  }
 
-  public encrypt(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0) {
+  public decrypt(input: Buffer, byteOffset = 0, sectorSize = 0x200): Buffer {
+    const sectorOffset = Math.floor(byteOffset / sectorSize);
+    return this.doCrypt(input, sectorOffset, sectorSize, byteOffset % sectorSize, 'createDecipheriv');
+  }
+
+  // Expose APIs that are compatible with the python haccrypto lib
+
+  public encryptHC(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0): Buffer {
     return this.doCrypt(input, sectorOffset, sectorSize, skippedBytes, 'createCipheriv');
   }
 
-  public decrypt(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0) {
+  public decryptHC(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0): Buffer {
     return this.doCrypt(input, sectorOffset, sectorSize, skippedBytes, 'createDecipheriv');
   }
 }

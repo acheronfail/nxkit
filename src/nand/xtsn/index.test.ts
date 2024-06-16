@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Xtsn } from './xtsn';
+import { Xtsn } from '.';
 
 function isAllZeros(buf: Buffer): boolean {
   for (const byte of buf) {
@@ -93,37 +93,51 @@ describe(Xtsn.name, () => {
     for (const [i, { sectorOffset, sectorSize, skippedBytes, expected }] of Object.entries(cases)) {
       test(`case[${i}]`, () => {
         const data = Buffer.alloc(32);
-        const crypt = xtsn.encrypt(data, sectorOffset, sectorSize, skippedBytes);
-        expect(crypt.toString('hex')).toEqual(expected);
+
+        // haccrypto interface
+        {
+          const crypt = xtsn.encryptHC(data, sectorOffset, sectorSize, skippedBytes);
+          expect(crypt.toString('hex')).toEqual(expected);
+          const clear = xtsn.decryptHC(crypt, sectorOffset, sectorSize, skippedBytes);
+          expect(isAllZeros(clear)).toBe(true);
+        }
+
+        // js interface
+        {
+          const crypt = xtsn.encrypt(data, sectorOffset * sectorSize + skippedBytes, sectorSize);
+          expect(crypt.toString('hex')).toEqual(expected);
+          const clear = xtsn.decrypt(crypt, sectorOffset * sectorSize + skippedBytes, sectorSize);
+          expect(isAllZeros(clear)).toBe(true);
+        }
       });
     }
   });
 
   test('read from start to end', () => {
     const zeroes = Buffer.alloc(0x4000 * 4);
-    const crypt = xtsn.encrypt(zeroes, 0);
-    const clear = xtsn.decrypt(crypt, 0);
+    const crypt = xtsn.encrypt(zeroes, 0, 0x4000);
+    const clear = xtsn.decrypt(crypt, 0, 0x4000);
     expect(isAllZeros(clear)).toBe(true);
   });
 
   test('read first half', () => {
     const zeroes = Buffer.alloc(0x4000 * 4);
-    const crypt = xtsn.encrypt(zeroes, 0);
-    const clear = xtsn.decrypt(crypt.subarray(0, 0x4000 * 2), 0);
+    const crypt = xtsn.encrypt(zeroes, 0, 0x4000);
+    const clear = xtsn.decrypt(crypt.subarray(0, 0x4000 * 2), 0, 0x4000);
     expect(isAllZeros(clear)).toBe(true);
   });
 
   test('read last half', () => {
     const zeroes = Buffer.alloc(0x4000 * 4);
-    const crypt = xtsn.encrypt(zeroes, 0);
-    const clear = xtsn.decrypt(crypt.subarray(0x4000 * 2), 0, undefined, 0x4000 * 2);
+    const crypt = xtsn.encrypt(zeroes, 0, 0x4000);
+    const clear = xtsn.decrypt(crypt.subarray(0x4000 * 2), 0x4000 * 2, 0x4000);
     expect(isAllZeros(clear)).toBe(true);
   });
 
   test('read middle half', () => {
     const zeroes = Buffer.alloc(0x4000 * 4);
-    const crypt = xtsn.encrypt(zeroes, 0);
-    const clear = xtsn.decrypt(crypt.subarray(0x4000, 0x4000 * 2), 0, undefined, 0x4000);
+    const crypt = xtsn.encrypt(zeroes, 0, 0x4000);
+    const clear = xtsn.decrypt(crypt.subarray(0x4000, 0x4000 * 2), 0x4000, 0x4000);
     expect(isAllZeros(clear)).toBe(true);
   });
 });

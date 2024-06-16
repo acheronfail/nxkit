@@ -43,7 +43,7 @@ export class XtsnLayer {
 
     const buf = Buffer.alloc(readSize, 0);
     fs.readSync(this.fd, buf, 0, readSize, alignedDiskOffset);
-    return this.xtsn.decrypt(buf, 0, this.sectorSize, offset - before).subarray(before, before + size);
+    return this.xtsn.decrypt(buf, offset - before, this.sectorSize).subarray(before, before + size);
   }
 
   // TODO: test writes
@@ -82,7 +82,7 @@ export class XtsnLayer {
       chunks.push(this.read(offset + data.byteLength, after));
     }
 
-    const enc = this.xtsn.encrypt(Buffer.concat(chunks), 0, this.sectorSize, diskOffset - before);
+    const enc = this.xtsn.encrypt(Buffer.concat(chunks), diskOffset - before, this.sectorSize);
     return fs.writeSync(this.fd, enc, 0, enc.byteLength, diskOffset + alignedPartOffset);
   }
 }
