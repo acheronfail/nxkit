@@ -17,6 +17,9 @@
     }
   });
 
+  // TODO: be able to programmatically control selected tab
+  // TODO: select tabs with `cmdCtrl+number`
+
   onMount(async () => {
     const keysFromMain = await window.nxkit.findProdKeys();
     if (keysFromMain) {

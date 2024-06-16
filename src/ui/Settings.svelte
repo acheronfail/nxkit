@@ -38,11 +38,10 @@
   <p>
     <span class="flex justify-between items-center">
       {#if keyFile}
-        <Button onclick={resetKeys}>Clear selected keys</Button>
+        <Button appearance="warning" onclick={resetKeys}>Clear selected keys</Button>
+      {:else}
+        <Button appearance="primary" for="prod-keys">Manually select keys</Button>
       {/if}
-      <Button hidden={!!keyFile}>
-        <label for="prod-keys">Manually select keys</label>
-      </Button>
 
       <input hidden type="file" id="prod-keys" name="prod-keys" bind:this={input} bind:files />
     </span>

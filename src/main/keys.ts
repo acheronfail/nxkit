@@ -12,11 +12,11 @@ const PROD_KEYS_SEARCH_PATHS: string[] = [
 
 export async function findProdKeys(): Promise<Keys | null> {
   for (const filePath of PROD_KEYS_SEARCH_PATHS) {
-    const text = await fs.readFile(filePath, 'utf-8');
     try {
+      const text = await fs.readFile(filePath, 'utf-8');
       return Keys.parseKeys(filePath, text);
     } catch (err) {
-      console.log(`Failed to parse keys at ${filePath}: ${String(err)}`);
+      console.log(`Failed to find keys at ${filePath}: ${String(err)}`);
     }
   }
 

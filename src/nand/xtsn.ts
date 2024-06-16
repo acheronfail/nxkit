@@ -92,6 +92,8 @@ export class Xtsn {
     return data;
   }
 
+  // TODO: simplify this, since `sectorOffset` and `skippedBytes` can be represented with only a single argument (byte offset)
+
   public encrypt(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0) {
     return this.doCrypt(input, sectorOffset, sectorSize, skippedBytes, 'createCipheriv');
   }

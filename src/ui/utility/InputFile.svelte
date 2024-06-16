@@ -1,7 +1,11 @@
 <script lang="ts">
+  import { Tooltip } from "@svelte-plugins/tooltips";
+  import { QuestionMarkCircleIcon } from "heroicons-svelte/24/outline";
+
   export let label: string;
   export let id = label.toLowerCase();
   export let files: FileList;
+  export let infoTooltip = '';
 </script>
 
 <div class="flex justify-between items-center">
@@ -12,5 +16,11 @@
     bind:files
     {...$$props}
   />
-  <!-- TODO: optional (?) with tooltip -->
+  {#if infoTooltip}
+    <span class="has-tooltip p-2 cursor-default hover:text-slate-400">
+      <Tooltip position='left' content={infoTooltip}>
+        <QuestionMarkCircleIcon class="h-6" />
+      </Tooltip>
+    </span>
+  {/if}
 </div>

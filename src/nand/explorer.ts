@@ -40,7 +40,8 @@ export async function open(nandPath: string): Promise<PartitionEntry[]> {
   const handle = await fsPromise.open(nandPath, 'r');
   nand.handle = handle;
 
-  return getPartitionTable(handle).partitions;
+  // NOTE: we don't support all the partitions right now, just the FAT32 ones
+  return getPartitionTable(handle).partitions.filter((part) => ['SAFE', 'SYSTEM', 'USER'].includes(part.name));
 }
 
 export async function mount(partitionName: string, keys: Keys) {
@@ -56,7 +57,7 @@ export async function mount(partitionName: string, keys: Keys) {
   const { bisKeyId } = NX_PARTITIONS[partition.type];
   const xtsn = bisKeyId ? keys.getXtsn(bisKeyId) : undefined;
 
-  // TODO: verify keys are correct before attempting to boot up fat32
+  // TODO: verify keys are correct before attempting to boot up fat32, perform a decryption test
   nand.fs = new Fat32FileSystem(
     await FatFs.create({
       diskio: new PartitionDriver({

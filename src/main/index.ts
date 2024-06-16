@@ -68,7 +68,8 @@ app.on('ready', () => {
         });
       });
     },
-    [Channels.findProdKeys]: (_event) => findProdKeys().then((keys) => ({ location: keys.path, data: keys.toString() })),
+    [Channels.findProdKeys]: (_event) =>
+      findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),

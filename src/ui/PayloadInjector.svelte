@@ -2,7 +2,7 @@
   import { readFile } from '../browser/file';
   import { findRCMDevices, injectPayload } from '../rcm/inject';
   import Button from './utility/Button.svelte';
-  import FileInput from './utility/FileInput.svelte';
+  import InputFile from './utility/InputFile.svelte';
   import TabContent from './utility/TabContent.svelte';
 
   // TODO: bundle in some payloads
@@ -36,11 +36,13 @@
 </script>
 
 <TabContent>
-  <p>
-    You can send payloads to a Switch in RCM mode directly.
-  </p>
+  <p>You can send payloads to a Switch in RCM mode directly.</p>
   <!-- TODO: description of how to enter RCM mode -->
-  <FileInput label="Payload" bind:files />
-  <Button disabled={!payload} onclick={inject}>Inject</Button>
+  <InputFile
+    label="Payload"
+    bind:files
+    infoTooltip="The payload to send to the Switch. E.g., tegraexplorer.bin, hekate.bin, etc"
+  />
+  <Button appearance="primary" size="large" disabled={!payload} onclick={inject}>Inject</Button>
   <pre id="inject-logs">{output}</pre>
 </TabContent>
