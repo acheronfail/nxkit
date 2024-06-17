@@ -7,6 +7,11 @@ export interface ProdKeys {
   data: string;
 }
 
+export enum NandError {
+  None,
+  InvalidProdKeys,
+}
+
 export interface ExposedPreloadAPIs extends NXKitBridge {
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
   findProdKeys: RendererChannelImpl[Channels.findProdKeys];
@@ -64,7 +69,7 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandOpen]: ChannelImpl<(nandPath: string) => PartitionEntry[]>;
   [Channels.NandClose]: ChannelImpl<() => void>;
 
-  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => void>;
+  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandError>;
 
   [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
 }[C];

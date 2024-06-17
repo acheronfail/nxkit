@@ -33,6 +33,7 @@
   import Code from './utility/Code.svelte';
   import { CircleStackIcon } from 'heroicons-svelte/24/outline';
   import { ArrowDownTrayIcon } from 'heroicons-svelte/24/solid';
+  import { NandError } from '../channels';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -79,7 +80,14 @@
 
   async function onPartitionClick(partition: PartitionEntry) {
     selectedPartition = partition;
-    await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
+    const error = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
+    switch (error) {
+      case NandError.None:
+        break;
+      case NandError.InvalidProdKeys:
+        return alert("Failed to read partition, please ensure you're using the right prod.keys!");
+    }
+
     rootEntries = await window.nxkit.nandReaddir('/');
   }
 </script>

@@ -6,6 +6,7 @@ import { BLOCK_SIZE, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS } from './constants';
 import { NandIo } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
+import { NandError } from '../channels';
 
 interface Nand {
   io: Io | null;
@@ -43,7 +44,7 @@ export async function open(nandPath: string): Promise<PartitionEntry[]> {
   });
 }
 
-export async function mount(partitionName: string, keys: Keys) {
+export async function mount(partitionName: string, keys: Keys): Promise<NandError> {
   if (!nand.io) throw new Error('No Nand has been opened yet!');
 
   const { partitions } = getPartitionTable(nand.io);
@@ -62,8 +63,7 @@ export async function mount(partitionName: string, keys: Keys) {
   if (typeof magicOffset === 'number' && magicBytes) {
     const data = nandIo.read(magicOffset, magicBytes.byteLength);
     if (!data.equals(magicBytes)) {
-      // TODO: have the frontend able to branch off this error type
-      throw new Error(`Failed to read partition, please ensure you're using the right prod.keys!`);
+      return NandError.InvalidProdKeys;
     }
   }
 
@@ -75,6 +75,8 @@ export async function mount(partitionName: string, keys: Keys) {
       }),
     })
   );
+
+  return NandError.None;
 }
 
 export async function readdir(path: string): Promise<FSEntry[]> {
