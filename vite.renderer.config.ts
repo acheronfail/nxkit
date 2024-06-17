@@ -17,7 +17,7 @@ export default defineConfig((env) => {
     assetsInclude: ['**/exefs/*'],
     base: './',
     build: {
-      outDir: `.vite/renderer/${name}`,
+      outDir: `.vite/${name}`,
       rollupOptions: {
         input: {
           window_main: path.join(root, 'src', 'window_main', 'index.html'),

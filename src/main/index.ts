@@ -23,9 +23,9 @@ if (require('electron-squirrel-startup')) {
 
 function loadWindow(window: BrowserWindow, name: string) {
   if (RENDERER_VITE_DEV_SERVER_URL) {
-    window.loadURL(`${RENDERER_VITE_DEV_SERVER_URL}/src/${name}/`);
+    window.loadURL(`${RENDERER_VITE_DEV_SERVER_URL}/src/${name}/index.html`);
   } else {
-    window.loadFile(path.join(__dirname, `../renderer/${RENDERER_VITE_NAME}/src/${name}/`));
+    window.loadFile(path.join(__dirname, `../${RENDERER_VITE_NAME}/src/${name}/index.html`));
   }
 }
 

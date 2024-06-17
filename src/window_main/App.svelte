@@ -20,7 +20,6 @@
   });
 </script>
 
-<h1 class="font-bold text-xl m-2 text-center">💖 NXKit</h1>
 <Tabs>
   <TabItem defaultOpen>
     <span slot="label">Nro Forwarder</span>
