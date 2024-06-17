@@ -34,6 +34,7 @@
   import { CircleStackIcon } from 'heroicons-svelte/24/outline';
   import { ArrowDownTrayIcon } from 'heroicons-svelte/24/solid';
   import { NandError } from '../channels';
+  import { Tooltip } from '@svelte-plugins/tooltips';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -49,17 +50,41 @@
   const handlers = {
     onNandChoose: async () => {
       if (nandFile) {
-        partitions = await window.nxkit.nandOpen(nandFile.path);
+        const result = await window.nxkit.nandOpen(nandFile.path);
+        switch (result.error) {
+          case NandError.None:
+            partitions = result.data;
+            break;
+          case NandError.InvalidPartitionTable:
+            return alert('Failed to read partition table, did you select a Nand dump?');
+          default:
+            return alert('An unknown error occurred when trying to open the Nand!');
+        }
       }
+    },
+    onPartitionChoose: async (partition: PartitionEntry) => {
+      selectedPartition = partition;
+      const { error } = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
+      switch (error) {
+        case NandError.None:
+          break;
+        case NandError.InvalidProdKeys:
+          return alert("Failed to read partition, please ensure you're using the right prod.keys!");
+        default:
+          return alert(`An unknown error occurred when trying to mount ${selectedPartition.name}!`);
+      }
+
+      rootEntries = await window.nxkit.nandReaddir('/');
     },
     closePartition: () => {
       rootEntries = null;
       selectedPartition = null;
     },
-    downloadFile: (file: FSFile) => {
-      // TODO: pick save location, have main copy it
-      console.log(file);
-      alert(`Coming soon!`);
+    openNandDirectory: async (dir: FSDirectory): Promise<Node<FSDirectory, FSFile>[]> => {
+      return window.nxkit.nandReaddir(dir.path).then((entries) => entries.map(entryToNode));
+    },
+    downloadFile: async (file: FSFile) => {
+      await window.nxkit.nandCopyFile(file.path);
     },
     reset: () => {
       loading = true;
@@ -73,23 +98,6 @@
       });
     },
   };
-
-  async function openNandDirectory(dir: FSDirectory): Promise<Node<FSDirectory, FSFile>[]> {
-    return window.nxkit.nandReaddir(dir.path).then((entries) => entries.map(entryToNode));
-  }
-
-  async function onPartitionClick(partition: PartitionEntry) {
-    selectedPartition = partition;
-    const error = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
-    switch (error) {
-      case NandError.None:
-        break;
-      case NandError.InvalidProdKeys:
-        return alert("Failed to read partition, please ensure you're using the right prod.keys!");
-    }
-
-    rootEntries = await window.nxkit.nandReaddir('/');
-  }
 </script>
 
 <Container>
@@ -109,14 +117,20 @@
         Currently exploring <strong>{selectedPartition.name}</strong>
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </p>
-      <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={openNandDirectory}>
-        <div slot="file-extra" let:file>
-          <ArrowDownTrayIcon class="h-4 cursor-pointer hover:text-black" onclick={() => handlers.downloadFile(file)} />
+      <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
+        <div slot="file-extra" let:file class="flex flex-row justify-end items-center gap-2">
+          <span class="font-mono">{file.sizeHuman}</span>
+          <Tooltip content="Download {file.name}" position="left">
+            <ArrowDownTrayIcon
+              class="h-4 cursor-pointer hover:text-black"
+              onclick={() => handlers.downloadFile(file)}
+            />
+          </Tooltip>
         </div>
       </FileTreeRoot>
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
-      <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={onPartitionClick}>
+      <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={handlers.onPartitionChoose}>
         <div slot="file-extra"></div>
       </FileTreeRoot>
     {:else}

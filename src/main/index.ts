@@ -29,7 +29,7 @@ function loadWindow(window: BrowserWindow, name: string) {
   }
 }
 
-const createMainWindow = () => {
+const createMainWindow = (): BrowserWindow => {
   const win = new BrowserWindow({
     width: 1600,
     height: 800,
@@ -49,12 +49,15 @@ const createMainWindow = () => {
   win.webContents.session.on('select-usb-device', (_event, details, callback) => {
     callback(details.deviceList.find((dev) => dev.vendorId === 0x0955)?.deviceId);
   });
+
+  return win;
 };
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
+  let mainWindow: BrowserWindow | undefined = undefined;
   const mainChannelImpl: MainChannelImpl = {
     [Channels.PreloadBrige]: async () => ({ isWindows: platform() === 'win32' }),
     [Channels.TegraRcmSmash]: async (event, payloadFilePath) => {
@@ -80,13 +83,14 @@ app.on('ready', () => {
         keysFromUser ? Keys.parseKeys(keysFromUser.location, keysFromUser.data) : await findProdKeys()
       ),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
+    [Channels.NandCopyFile]: async (_event, pathInNand) => mainWindow && nand.copyFile(pathInNand, mainWindow),
   };
 
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {
     ipcMain.handle(channel, impl);
   }
 
-  createMainWindow();
+  mainWindow = createMainWindow();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common

@@ -1,12 +1,15 @@
+import fs from 'node:fs';
+import { basename } from 'node:path';
+import { BrowserWindow, dialog } from 'electron';
 import * as FatFs from 'js-fatfs';
 import { PartitionDriver } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem } from './fatfs/fs';
 import { Keys } from '../main/keys';
-import { BLOCK_SIZE, PartitionEntry, getPartitionTable } from './gpt';
+import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS } from './constants';
 import { NandIo } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
-import { NandError } from '../channels';
+import { NandError, NandResult } from '../channels';
 
 interface Nand {
   io: Io | null;
@@ -30,21 +33,29 @@ export async function close() {
   }
 }
 
-export async function open(nandPath: string): Promise<PartitionEntry[]> {
+export async function open(nandPath: string): Promise<NandResult<PartitionEntry[]>> {
   if (nand.io) {
     await close();
   }
 
-  const io = await createIo(nandPath);
-  nand.io = io;
+  nand.io = await createIo(nandPath);
 
-  return getPartitionTable(io).partitions.filter((part) => {
+  let gpt: GptTable;
+  try {
+    gpt = getPartitionTable(nand.io);
+  } catch (err) {
+    return { error: NandError.InvalidPartitionTable };
+  }
+
+  const partitions = gpt.partitions.filter((part) => {
     // NOTE: we don't support all the partitions right now, just the FAT32 ones
-    return ['SAFE', 'SYSTEM', 'USER'].includes(part.name);
+    return ['PRODINFOF', 'SAFE', 'SYSTEM', 'USER'].includes(part.name);
   });
+
+  return { error: NandError.None, data: partitions };
 }
 
-export async function mount(partitionName: string, keys: Keys): Promise<NandError> {
+export async function mount(partitionName: string, keys: Keys): Promise<NandResult> {
   if (!nand.io) throw new Error('No Nand has been opened yet!');
 
   const { partitions } = getPartitionTable(nand.io);
@@ -55,7 +66,7 @@ export async function mount(partitionName: string, keys: Keys): Promise<NandErro
   const partEnd = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
 
   const { bisKeyId, magicOffset, magicBytes } = NX_PARTITIONS[partition.type];
-  const xtsn = bisKeyId ? keys.getXtsn(bisKeyId) : undefined;
+  const xtsn = typeof bisKeyId === 'number' ? keys.getXtsn(bisKeyId) : undefined;
 
   const nandIo = new NandIo(nand.io, partStart, partEnd, xtsn);
 
@@ -63,7 +74,7 @@ export async function mount(partitionName: string, keys: Keys): Promise<NandErro
   if (typeof magicOffset === 'number' && magicBytes) {
     const data = nandIo.read(magicOffset, magicBytes.byteLength);
     if (!data.equals(magicBytes)) {
-      return NandError.InvalidProdKeys;
+      return { error: NandError.InvalidProdKeys };
     }
   }
 
@@ -76,10 +87,26 @@ export async function mount(partitionName: string, keys: Keys): Promise<NandErro
     })
   );
 
-  return NandError.None;
+  return { error: NandError.None };
 }
 
-export async function readdir(path: string): Promise<FSEntry[]> {
+export async function readdir(fsPath: string): Promise<FSEntry[]> {
   if (!nand.fs) throw new Error('No partition mounted!');
-  return nand.fs.readdir(path);
+  return nand.fs.readdir(fsPath);
+}
+
+export async function copyFile(pathInNand: string, window: BrowserWindow): Promise<void> {
+  if (!nand.fs) throw new Error('No partition mounted!');
+
+  const result = await dialog.showSaveDialog(window, { defaultPath: basename(pathInNand) });
+  if (result.canceled) return;
+
+  const fd = fs.openSync(result.filePath, 'w+');
+  nand.fs.readFile(pathInNand, (chunk) => {
+    let bytesWritten = 0;
+    while (bytesWritten < chunk.byteLength) {
+      bytesWritten += fs.writeSync(fd, chunk, bytesWritten, chunk.byteLength - bytesWritten, null);
+    }
+  });
+  fs.closeSync(fd);
 }

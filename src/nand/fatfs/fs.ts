@@ -23,6 +23,39 @@ export class Fat32FileSystem {
     this.ff.free(this.fsHandle);
   }
 
+  /**
+   * Extract a file out of the FAT filesystem
+   * @param filePath path of file inside FAT filesystem
+   * @param onRead callback that's fired each time a chunk of the file is read
+   */
+  readFile(filePath: string, onRead: (chunk: Uint8Array) => void) {
+    const filePtr = this.ff.malloc(FatFs.sizeof_FIL);
+    check_result(this.ff.f_open(filePtr, filePath, FatFs.FA_READ));
+    const size = this.ff.f_size(filePtr);
+    const buff = this.ff.malloc(size);
+
+    const bytesReadPtr = this.ff.malloc(4);
+    this.ff.setValue(bytesReadPtr, 0, 'i32');
+
+    let offset = 0;
+    let bytesRead = Infinity;
+    do {
+      check_result(this.ff.f_read(filePtr, buff, size, bytesReadPtr));
+      bytesRead = this.ff.getValue(bytesReadPtr, 'i32');
+      onRead(this.ff.HEAPU8.slice(buff + offset, buff + offset + bytesRead));
+      offset += bytesRead;
+    } while (bytesRead > 0);
+
+    this.ff.free(bytesReadPtr);
+    this.ff.free(buff);
+    check_result(this.ff.f_close(filePtr));
+    this.ff.free(filePtr);
+  }
+
+  /**
+   * Read directory inside FAT filesystem
+   * @param dirPath path of directory inside FAT filesystem
+   */
   readdir(dirPath: string): FSEntry[] {
     const dir = this.ff.malloc(FatFs.sizeof_DIR);
     const fno = this.ff.malloc(FatFs.sizeof_FILINFO);

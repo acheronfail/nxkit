@@ -10,7 +10,12 @@ export interface ProdKeys {
 export enum NandError {
   None,
   InvalidProdKeys,
+  InvalidPartitionTable,
 }
+
+export type NandResult<T = void> =
+  | (T extends void ? { error: NandError.None } : { error: NandError.None; data: T })
+  | { error: Exclude<NandError, NandError.None> };
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
@@ -20,6 +25,7 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandClose: RendererChannelImpl[Channels.NandClose];
   nandMount: RendererChannelImpl[Channels.NandMountPartition];
   nandReaddir: RendererChannelImpl[Channels.NandReaddir];
+  nandCopyFile: RendererChannelImpl[Channels.NandCopyFile];
 }
 
 export interface NXKitBridge {
@@ -38,12 +44,12 @@ export enum Channels {
   NandOpen = 'nandOpen',
   /** Close nand disk image */
   NandClose = 'nandClose',
-
-  /** Read directory from mounted currently nand partition */
+  /** Read directory from currently mounted nand partition */
   NandMountPartition = 'NandMountPartition',
-
-  /** Read directory from mounted currently nand partition */
+  /** Read directory from currently mounted nand partition */
   NandReaddir = 'nandReaddir',
+  /** Copy a file out of the currently mounted nand partition */
+  NandCopyFile = 'nandCopyFile',
 }
 
 /**
@@ -66,12 +72,11 @@ export type ChannelImplDefinition<C extends Channels> = {
   >;
   [Channels.findProdKeys]: ChannelImpl<() => ProdKeys | null>;
 
-  [Channels.NandOpen]: ChannelImpl<(nandPath: string) => PartitionEntry[]>;
+  [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<PartitionEntry[]>>;
   [Channels.NandClose]: ChannelImpl<() => void>;
-
-  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandError>;
-
+  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
+  [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => void>;
 }[C];
 
 /**
