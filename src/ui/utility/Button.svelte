@@ -15,16 +15,16 @@
 <script lang="ts">
   import { Tooltip } from '@svelte-plugins/tooltips';
 
-  let { appearance = 'default', size = 'default', children, tooltip, ...rest }: Props = $props();
+  let { appearance = 'default', size = 'default', disabled = false, children, tooltip, ...rest }: Props = $props();
 
-  const disabledClasses = ['bg-slate-600', 'text-slate-400'];
   const innerClass = 'w-full h-full';
-  const buttonClass = `inline-block text-center ${disabledClasses.map((c) => `disabled:${c}`).join(' ')} focus:outline-none focus:ring-2 focus:ring-blue-500 text-white rounded`;
+  const buttonClass = `select-none inline-block text-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded`;
+  const disabledClass = `bg-slate-600 text-slate-400 hover:text-slate-400`;
   const appearanceClass: Record<Appearance, string> = {
-    primary: `bg-blue-500 ${rest.disabled ? '' : 'hover:bg-blue-700'} active:bg-blue-500`,
-    default: `bg-slate-700 ${rest.disabled ? '' : 'hover:bg-slate-500'} active:bg-slate-700`,
-    warning: `bg-orange-600 ${rest.disabled ? '' : 'hover:bg-orange-700'} active:bg-orange-600`,
-    danger: `bg-red-500 ${rest.disabled ? '' : 'hover:bg-red-700'} active:bg-red-500`,
+    primary: `text-white bg-blue-500 hover:bg-blue-700 active:bg-blue-500`,
+    default: `text-white bg-slate-700 hover:bg-slate-500 active:bg-slate-700`,
+    warning: `text-white bg-orange-600 hover:bg-orange-700 active:bg-orange-600`,
+    danger: `text-white bg-red-500 hover:bg-red-700 active:bg-red-500`,
   };
   const sizeClass: Record<Size, string> = {
     large: 'py-2 px-4 font-bold',
@@ -38,10 +38,8 @@
 {#if typeof rest.for === 'string'}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <label
-    onclick={rest.disabled ? preventDefault : rest.onclick}
-    class="{rest.disabled ? disabledClasses.join(' ') : ''} {appearanceClass[appearance]} {sizeClass[
-      size
-    ]} {buttonClass}"
+    onclick={disabled ? preventDefault : rest.onclick}
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass}"
     {...rest}
   >
     <Tooltip content={tooltip}>
@@ -50,7 +48,11 @@
     </Tooltip>
   </label>
 {:else}
-  <button class="{appearanceClass[appearance]} {sizeClass[size]} {buttonClass}" {...rest}>
+  <button
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass}"
+    {disabled}
+    {...rest}
+  >
     <Tooltip content={tooltip}>
       <!-- svelte-ignore slot_element_deprecated -->
       <div class={innerClass}><slot /></div>

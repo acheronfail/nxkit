@@ -1,14 +1,15 @@
 <script lang="ts">
+  import ImageCropper from 'svelte-easy-crop';
   import { downloadFile } from '../browser/file';
   import { buildNsp, generateRandomId } from '../hacbrewpack/nsp';
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
-  import TabContent from './utility/TabContent.svelte';
+  import Container from './utility/Container.svelte';
   import TabItem from './utility/TabItem.svelte';
   import Tabs from './utility/Tabs.svelte';
   import InputFile from './utility/InputText.svelte';
+  import InputImage, { type Image } from './utility/InputImage.svelte';
 
-  // TODO: image selection
   // TODO: choose mounted Switch SD card for path autocomplete and validation?
 
   const descriptions = {
@@ -24,19 +25,26 @@
   let author = $state('');
   let nroPath = $state('');
   let romPath = $state('');
+  let image = $state<Image | null>(null);
 
-  let disabled = $derived(!keys.value);
-  let tooltip = $derived(disabled && 'Please select your prod.keys in Settings!');
+  let disabled = $derived(!keys.value || !image);
+  let tooltip = $derived(
+    !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : null
+  );
 
   let stdout = $state('');
   let stderr = $state('');
 
   async function generate() {
     try {
+      const imageBlob = await image.toBlob();
+      const imageData = new Uint8Array(await imageBlob.arrayBuffer());
+
       const result = await buildNsp({
         id,
         title,
         author,
+        image: imageData,
         keys: keys.value.data,
         nroPath: `sdmc:${nroPath}`,
         nroArgv: [],
@@ -59,11 +67,12 @@
   }
 </script>
 
-<TabContent>
+<Container>
   <Tabs>
     <TabItem defaultOpen>
       <span slot="label">Application</span>
-      <TabContent slot="content">
+      <Container slot="content">
+        <InputImage onCropComplete={(fn) => (image = fn)} />
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
         <InputFile label="App Title" placeholder="NX Shell" bind:value={title} infoTooltip={descriptions.title} />
         <InputFile label="App Publisher" placeholder="joel16" bind:value={author} infoTooltip={descriptions.author} />
@@ -73,11 +82,12 @@
           bind:value={nroPath}
           infoTooltip={descriptions.nroPath}
         />
-      </TabContent>
+      </Container>
     </TabItem>
     <TabItem>
       <span slot="label">RetroArch ROM</span>
-      <TabContent slot="content">
+      <Container slot="content">
+        <InputImage onCropComplete={(fn) => (image = fn)} />
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
         <InputFile
           label="Game Title"
@@ -103,12 +113,12 @@
           bind:value={romPath}
           infoTooltip={descriptions.romPath}
         />
-      </TabContent>
+      </Container>
     </TabItem>
   </Tabs>
 
   <Button appearance="primary" size="large" onclick={generate} {disabled} {tooltip}>Generate NSP</Button>
-</TabContent>
+</Container>
 
 <pre>{stdout}</pre>
 <pre>{stderr}</pre>

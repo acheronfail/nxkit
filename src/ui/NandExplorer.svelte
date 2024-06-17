@@ -28,7 +28,7 @@
 <script lang="ts">
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
-  import TabContent from './utility/TabContent.svelte';
+  import Container from './utility/Container.svelte';
   import FileTreeRoot from './utility/FileTreeRoot.svelte';
   import Code from './utility/Code.svelte';
   import { CircleStackIcon } from 'heroicons-svelte/24/outline';
@@ -84,7 +84,7 @@
   }
 </script>
 
-<TabContent>
+<Container>
   <div class="flex flex-col">
     {#if nandFile}
       <Button appearance="warning" size="large" {disabled} {tooltip} onclick={handlers.reset}>Close Nand</Button>
@@ -117,4 +117,4 @@
       </p>
     {/if}
   </div>
-</TabContent>
+</Container>

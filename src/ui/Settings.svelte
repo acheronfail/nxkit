@@ -2,7 +2,7 @@
   import { keys } from './stores/keys.svelte';
   import { readFile } from '../browser/file';
   import Button from './utility/Button.svelte';
-  import TabContent from './utility/TabContent.svelte';
+  import Container from './utility/Container.svelte';
   import Code from './utility/Code.svelte';
 
   let input = $state<HTMLInputElement | null>(null);
@@ -22,7 +22,7 @@
   }
 </script>
 
-<TabContent>
+<Container>
   <h4 class="font-bold">Select Prod Keys</h4>
 
   <div class="flex gap-2">
@@ -64,4 +64,4 @@
     You must extract the keys from your Switch, if you have an unpatched Switch you can use
     <Code>Lockpick_RCM</Code> to get them.
   </p>
-</TabContent>
+</Container>

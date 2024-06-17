@@ -3,7 +3,7 @@
   import { findRCMDevices, injectPayload } from '../rcm/inject';
   import Button from './utility/Button.svelte';
   import InputFile from './utility/InputFile.svelte';
-  import TabContent from './utility/TabContent.svelte';
+  import Container from './utility/Container.svelte';
 
   // TODO: bundle in some payloads
   // TODO: fetch latest payloads
@@ -35,7 +35,7 @@
   }
 </script>
 
-<TabContent>
+<Container>
   <p>You can send payloads to a Switch in RCM mode directly.</p>
   <!-- TODO: description of how to enter RCM mode -->
   <InputFile
@@ -45,4 +45,4 @@
   />
   <Button appearance="primary" size="large" disabled={!payload} onclick={inject}>Inject</Button>
   <pre id="inject-logs">{output}</pre>
-</TabContent>
+</Container>
