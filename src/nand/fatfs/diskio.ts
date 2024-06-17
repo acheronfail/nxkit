@@ -1,24 +1,8 @@
 import * as FatFs from 'js-fatfs';
-import { Xtsn } from '../xtsn';
-import { XtsnLayer } from './layer';
+import { NandIo } from './layer';
 
 export interface PartitionDriverOptions {
-  /**
-   * File descriptor
-   */
-  fd: number;
-  /**
-   * Starting byte offset of the partition
-   */
-  partitionStartOffset: number;
-  /**
-   * Last byte offset of the partition
-   */
-  partitionEndOffset: number;
-  /**
-   * Cryptographic module used for encrypted partitions
-   */
-  xtsn?: Xtsn;
+  nandIo: NandIo;
   /**
    * Whether or not to treat the disk as readonly
    */
@@ -28,13 +12,13 @@ export interface PartitionDriverOptions {
 // eslint-disable-next-line import/namespace
 export class PartitionDriver implements FatFs.DiskIO {
   private readonly sectorSize: number;
-  private readonly xtsLayer: XtsnLayer;
+  private readonly nandIo: NandIo;
   private readonly readonly: boolean;
 
-  constructor(opts: PartitionDriverOptions) {
-    this.readonly = opts.readonly;
-    this.xtsLayer = new XtsnLayer(opts.fd, opts.partitionStartOffset, opts.partitionEndOffset, opts.xtsn);
-    const buf = this.xtsLayer.read(0, 16);
+  constructor({ readonly, nandIo }: PartitionDriverOptions) {
+    this.readonly = readonly;
+    this.nandIo = nandIo;
+    const buf = this.nandIo.read(0, 16);
     this.sectorSize = buf.readUInt16LE(11); // BPB_BytsPerSec
   }
 
@@ -53,7 +37,7 @@ export class PartitionDriver implements FatFs.DiskIO {
     const end = (sector + count) * this.sectorSize;
     const size = end - start;
 
-    ff.HEAPU8.set(this.xtsLayer.read(start, size), buff);
+    ff.HEAPU8.set(this.nandIo.read(start, size), buff);
     return FatFs.RES_OK;
   }
 
@@ -63,7 +47,7 @@ export class PartitionDriver implements FatFs.DiskIO {
     }
 
     const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);
-    this.xtsLayer.write(sector * this.sectorSize, data);
+    this.nandIo.write(sector * this.sectorSize, data);
     return FatFs.RES_OK;
   }
 
@@ -73,7 +57,7 @@ export class PartitionDriver implements FatFs.DiskIO {
         return FatFs.RES_OK;
       case FatFs.GET_SECTOR_COUNT:
         // Use `ff.setValue` to write an integer to the FatFs memory.
-        ff.setValue(buff, this.xtsLayer.size() / this.sectorSize, 'i32');
+        ff.setValue(buff, this.nandIo.size() / this.sectorSize, 'i32');
         return FatFs.RES_OK;
       case FatFs.GET_SECTOR_SIZE:
         ff.setValue(buff, this.sectorSize, 'i16');

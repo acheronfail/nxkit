@@ -33,6 +33,7 @@ const createMainWindow = () => {
   const win = new BrowserWindow({
     width: 1600,
     height: 800,
+    backgroundColor: '#1e293b',
     webPreferences: {
       preload: path.join(__dirname, 'preload.mjs'),
     },

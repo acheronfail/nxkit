@@ -1,18 +1,23 @@
-import fs from 'fs';
 import { Xtsn } from '../xtsn';
+import { Io } from './io';
 
-export class XtsnLayer {
+/**
+ * This is a class which allows reading partitions from Switch NAND dumps.
+ * It handles split dumps as well as combined dumps, and also when configured
+ * also handles decryption/encryption of reads/writes.
+ */
+export class NandIo {
   private readonly sectorSize = 0x4000;
 
   constructor(
-    private readonly fd: number,
+    private readonly io: Io,
     private readonly partitionStartOffset: number,
     private readonly partitionEndOffset: number,
     private readonly xtsn?: Xtsn
   ) {}
 
   public size(): number {
-    return fs.fstatSync(this.fd).size;
+    return this.io.size();
   }
 
   public read(offset: number, size: number): Buffer {
@@ -29,10 +34,17 @@ export class XtsnLayer {
     }
 
     if (!this.xtsn) {
-      const buf = Buffer.alloc(size, 0);
-      fs.readSync(this.fd, buf, 0, size, diskOffset);
-      return buf;
+      this.io.read(diskOffset, size);
     }
+
+    // In order to decrypt, we need to start at a 16 byte offset (it uses aes-based
+    // encryption which works in 128 bit chunks), so if we wanted to read `xxxx` in:
+    //  11112222333344xx xx55666677778888
+    //  BBBBBBBBBBBBBB     AAAAAAAAAAAAAA   B = before, A = after, ^ = offset
+    //                ^
+    // we need to get the offset of the start of the first 16 byte chunk, and the end of
+    // the second chunk. We then read both chunks and decrypt them, and return the
+    // desired bytes (discarding `before` and `after`)
 
     const before = offset % 16;
     let after = (offset + size) % 16;
@@ -41,12 +53,10 @@ export class XtsnLayer {
     const alignedDiskOffset = diskOffset - before;
     const readSize = before + size + after;
 
-    const buf = Buffer.alloc(readSize, 0);
-    fs.readSync(this.fd, buf, 0, readSize, alignedDiskOffset);
+    const buf = this.io.read(alignedDiskOffset, readSize);
     return this.xtsn.decrypt(buf, offset - before, this.sectorSize).subarray(before, before + size);
   }
 
-  // TODO: test writes
   public write(offset: number, data: Uint8Array): number {
     const diskOffset = this.partitionStartOffset + offset;
 
@@ -63,8 +73,16 @@ export class XtsnLayer {
     }
 
     if (!this.xtsn) {
-      return fs.writeSync(this.fd, data, 0, data.byteLength, diskOffset);
+      return this.io.write(diskOffset, Buffer.from(data));
     }
+
+    // In order to write to an arbitrary location, we need to know which 16 byte
+    // chunk(s) it's in, and we need to know their contents since the smallest
+    // increment we can encrypt is a 16 byte chunk. If we wanted to replace bytes
+    // `4455` with `xxxx`, it looks something like this:
+    //  1111222233334444 5555666677778888
+    //  BBBBBBBBBBBBBB^    AAAAAAAAAAAAAA   B = before, A = after, ^ = offset
+    //  xxxxxxxxxxxxxxWW WWyyyyyyyyyyyyyy   x = before chunk, y = after chunk, W = data to write
 
     const chunks: Uint8Array[] = [];
 
@@ -83,6 +101,6 @@ export class XtsnLayer {
     }
 
     const enc = this.xtsn.encrypt(Buffer.concat(chunks), diskOffset - before, this.sectorSize);
-    return fs.writeSync(this.fd, enc, 0, enc.byteLength, diskOffset + alignedPartOffset);
+    return this.io.write(diskOffset + alignedPartOffset, enc);
   }
 }

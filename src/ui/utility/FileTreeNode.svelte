@@ -101,7 +101,10 @@
     <svelte:self {openDirectory} node={loadingFile} depth={depth + 1} />
   {:else}
     {#each children as e}
-      <svelte:self {openDirectory} node={e} depth={depth + 1} />
+      <!-- svelte-ignore slot_element_deprecated -->
+      <svelte:self {openDirectory} node={e} depth={depth + 1}>
+        <slot slot="file-extra" name="file-extra" let:file {file} />
+      </svelte:self>
     {/each}
   {/if}
 {/if}

@@ -1,22 +1,19 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import fsPromise from 'fs/promises';
 import * as FatFs from 'js-fatfs';
 import { PartitionDriver } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem } from './fatfs/fs';
-import { FileHandle } from './types';
 import { Keys } from '../main/keys';
 import { BLOCK_SIZE, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS } from './constants';
-
-// TODO: support reading split dumps
+import { NandIo } from './fatfs/layer';
+import { Io, createIo } from './fatfs/io';
 
 interface Nand {
-  handle: FileHandle | null;
+  io: Io | null;
   fs: Fat32FileSystem | null;
 }
 
 const nand: Nand = {
-  handle: null,
+  io: null,
   fs: null,
 };
 
@@ -26,28 +23,30 @@ export async function close() {
     nand.fs = null;
   }
 
-  if (nand.handle) {
-    await nand.handle.close();
-    nand.handle = null;
+  if (nand.io) {
+    nand.io.close();
+    nand.io = null;
   }
 }
 
 export async function open(nandPath: string): Promise<PartitionEntry[]> {
-  if (nand.handle) {
+  if (nand.io) {
     await close();
   }
 
-  const handle = await fsPromise.open(nandPath, 'r');
-  nand.handle = handle;
+  const io = await createIo(nandPath);
+  nand.io = io;
 
-  // NOTE: we don't support all the partitions right now, just the FAT32 ones
-  return getPartitionTable(handle).partitions.filter((part) => ['SAFE', 'SYSTEM', 'USER'].includes(part.name));
+  return getPartitionTable(io).partitions.filter((part) => {
+    // NOTE: we don't support all the partitions right now, just the FAT32 ones
+    return ['SAFE', 'SYSTEM', 'USER'].includes(part.name);
+  });
 }
 
 export async function mount(partitionName: string, keys: Keys) {
-  if (!nand.handle) throw new Error('No Nand has been opened yet!');
+  if (!nand.io) throw new Error('No Nand has been opened yet!');
 
-  const { partitions } = getPartitionTable(nand.handle);
+  const { partitions } = getPartitionTable(nand.io);
   const partition = partitions.find((part) => part.name === partitionName);
   if (!partition) throw new Error(`No partition found with name: ${partitionName}`);
 
@@ -61,10 +60,7 @@ export async function mount(partitionName: string, keys: Keys) {
   nand.fs = new Fat32FileSystem(
     await FatFs.create({
       diskio: new PartitionDriver({
-        fd: nand.handle.fd,
-        partitionStartOffset: partStart,
-        partitionEndOffset: partEnd,
-        xtsn,
+        nandIo: new NandIo(nand.io, partStart, partEnd, xtsn),
         readonly: true,
       }),
     })

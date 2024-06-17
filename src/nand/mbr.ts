@@ -1,18 +1,12 @@
-import { readSync } from 'fs';
 import MBR from 'mbr';
-import { FileHandle } from './types';
+import { Io } from './fatfs/io';
 
 export interface EfiPartition {
   type: number;
   firstLBA: bigint;
 }
 
-export function findEfiPartition(handle: FileHandle): EfiPartition {
-  // read mbr
-  const buffer = Buffer.alloc(512);
-  readSync(handle.fd, buffer, 0, buffer.length, 0);
-
-  // find efi
-  const mbr = MBR.parse(buffer);
+export function findEfiPartition(io: Io): EfiPartition {
+  const mbr = MBR.parse(io.read(0, 512));
   return mbr.getEFIPart();
 }
