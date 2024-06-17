@@ -53,10 +53,20 @@ export async function mount(partitionName: string, keys: Keys) {
   const partStart = Number(partition.firstLBA) * BLOCK_SIZE;
   const partEnd = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
 
-  const { bisKeyId } = NX_PARTITIONS[partition.type];
+  const { bisKeyId, magicOffset, magicBytes } = NX_PARTITIONS[partition.type];
   const xtsn = bisKeyId ? keys.getXtsn(bisKeyId) : undefined;
 
-  // TODO: verify keys are correct before attempting to boot up fat32, perform a decryption test
+  const nandIo = new NandIo(nand.io, partStart, partEnd, xtsn);
+
+  // verify magic if present, as a way to verify we've got the right prod.keys
+  if (typeof magicOffset === 'number' && magicBytes) {
+    const data = nandIo.read(magicOffset, magicBytes.byteLength);
+    if (!data.equals(magicBytes)) {
+      // TODO: have the frontend able to branch off this error type
+      throw new Error(`Failed to read partition, please ensure you're using the right prod.keys!`);
+    }
+  }
+
   nand.fs = new Fat32FileSystem(
     await FatFs.create({
       diskio: new PartitionDriver({
