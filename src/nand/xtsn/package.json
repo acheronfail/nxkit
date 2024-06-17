@@ -16,6 +16,7 @@
     "build": "npm run clean && npm run build:cjs && npm run build:esm",
     "build:cjs": "esbuild --outfile=dist/xtsn.cjs --format=cjs index.ts",
     "build:esm": "esbuild --outfile=dist/xtsn.esm.js --format=esm index.ts",
+    "prepublish": "npm run build",
     "clean": "rm -rf dist"
   },
   "files": [
