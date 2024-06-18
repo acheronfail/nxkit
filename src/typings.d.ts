@@ -30,3 +30,21 @@ declare module 'gpt' {
   const mod: any;
   export default mod;
 }
+
+/*
+ * Misc
+ */
+
+interface TinfoilResponse {
+  data: TinfoilTitle[];
+}
+
+interface TinfoilTitle {
+  id: string;
+  name: string;
+  icon: string;
+  release_date: string;
+  publisher: string;
+  size: string;
+  user_rating: number;
+}

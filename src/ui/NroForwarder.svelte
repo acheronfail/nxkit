@@ -1,7 +1,8 @@
 <script lang="ts">
   import ImageCropper from 'svelte-easy-crop';
   import { downloadFile } from '../browser/file';
-  import { buildNsp, generateRandomId } from '../hacbrewpack/nsp';
+  import { buildNsp } from '../hacbrewpack/nsp';
+  import { generateTitleId } from '../hacbrewpack/id';
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
@@ -20,7 +21,7 @@
     romPath: 'TODO',
   };
 
-  let id = $state(generateRandomId());
+  let id = $state(generateTitleId());
   let title = $state('');
   let author = $state('');
   let nroPath = $state('');

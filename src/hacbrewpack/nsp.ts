@@ -40,8 +40,6 @@ export async function buildNsp(args: BuildNSPArgs): Promise<HacBrewPackResult> {
     controlNacp: new Uint8Array(nacp.buffer),
     keys: args.keys,
     fileName: args.fileName,
-    // FIXME: strip unnecessary metadata, convert to jpeg
-    // https://github.com/rlaphoenix/nton/blob/master/nton/main.py#L328
     image: args.image ?? (await fetchBinary(defaultImage)),
     logo: args.logo ?? (await fetchBinary(defaultLogo)),
     startupMovie: args.startupMovie ?? (await fetchBinary(defaultStartupMovie)),
@@ -54,8 +52,4 @@ export async function buildNsp(args: BuildNSPArgs): Promise<HacBrewPackResult> {
   worker.postMessage(message);
 
   return result;
-}
-
-export function generateRandomId() {
-  return ['01', ...new Array(10).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)), '0000'].join('');
 }

@@ -8,6 +8,7 @@ import { Channels, MainChannelImpl } from '../channels';
 import { findProdKeys, Keys, PROD_KEYS_SEARCH_PATHS } from './keys';
 import * as nand from '../nand/explorer';
 import automaticContextMenus from 'electron-context-menu';
+import { getResources } from '../resources';
 
 automaticContextMenus({});
 
@@ -64,14 +65,11 @@ app.on('ready', () => {
     [Channels.PreloadBrige]: async () => ({
       isWindows: platform() === 'win32',
     }),
-    [Channels.TegraRcmSmash]: async (event, payloadFilePath) => {
+    [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {
       return new Promise((resolve) => {
         // TODO: compile TegraRcmSmash ourselves
-        const exePath = app.isPackaged
-          ? path.join(process.resourcesPath, 'TegraRcmSmash.exe')
-          : path.join('vendor', 'TegraRcmSmash', 'TegraRcmSmash.exe');
-
-        cp.execFile(exePath, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
+        const { tegraRcmSmash } = getResources(app.isPackaged);
+        cp.execFile(tegraRcmSmash, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
           resolve({
             success: !err,
             stdout: stdout.trim(),

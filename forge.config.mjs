@@ -11,12 +11,24 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
+import cp from 'node:child_process';
+
+// *sigh*, the things we do for cjs<->esm incompatibilities...
+const extraResource = JSON.parse(
+  cp.execSync(
+    `npm exec tsx -- --eval "import('./src/resources').then(m => {
+      const extraResource = Object.values(m.getResources(false));
+      console.log(JSON.stringify(extraResource));
+    })"`,
+    { encoding: 'utf-8' },
+  ),
+);
 
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 const config = {
   packagerConfig: {
     asar: true,
-    extraResource: ['vendor/TegraRcmSmash/TegraRcmSmash.exe'],
+    extraResource,
   },
   rebuildConfig: {},
   makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin']), new MakerRpm({}), new MakerDeb({})],
