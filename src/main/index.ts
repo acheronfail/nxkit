@@ -31,11 +31,15 @@ const createMainWindow = (): BrowserWindow => {
   const win = new BrowserWindow({
     width: app.isPackaged ? 800 : 1600,
     height: 800,
+    show: false,
     backgroundColor: '#1e293b',
+    titleBarStyle: 'hiddenInset',
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
     },
   });
+
+  win.once('ready-to-show', () => win.show());
 
   loadWindow(win, 'window_main');
 
