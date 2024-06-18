@@ -7,7 +7,7 @@
   import { keys } from '../ui/stores/keys.svelte';
   import { onMount } from 'svelte';
   import TabItem from '../ui/utility/TabItem.svelte';
-  import { ExclamationTriangleIcon } from 'heroicons-svelte/24/outline';
+  import { ExclamationTriangleIcon } from 'heroicons-svelte/24/solid';
 
   // TODO: be able to programmatically control selected tab
   // TODO: select tabs with `cmdCtrl+number`
