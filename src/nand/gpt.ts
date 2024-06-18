@@ -11,19 +11,27 @@ export interface PartitionEntry {
   attr: bigint;
 }
 
+/**
+ * https://github.com/jhermsmeier/node-gpt/blob/89036390dd401a295566ffdc7ca422f1f075f0af/lib/gpt.js#L15
+ */
 export interface GptTable {
+  blockSize: number;
+  backupLBA: bigint;
   partitions: PartitionEntry[];
+  verify(): boolean;
+  verifyHeader(): boolean;
+  verifyTable(): boolean;
+  writeBackupFromPrimary(): Buffer;
 }
 
 export const BLOCK_SIZE = 512;
 
 export function getPartitionTable(io: Io): GptTable {
   const efiPart = findEfiPartition(io);
-  return readPrimaryGpt(io, BLOCK_SIZE, efiPart);
+  const primaryGpt = readPrimaryGpt(io, BLOCK_SIZE, efiPart);
+  return primaryGpt;
 }
 
-// TODO: ability to format partitions
-// TODO: also read backup gpt, and verify both
 function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTable {
   const gpt = new GPT({ blockSize });
 
@@ -51,4 +59,14 @@ function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTa
   gpt.parseTable(tableBuffer, gpt.blockSize, gpt.tableSize);
 
   return gpt;
+}
+
+// TODO: support repairing the backup gpt
+function _readBackupGpt(io: Io, primaryGpt: GptTable): GptTable {
+  const backupGpt = new GPT({ blockSize: primaryGpt.blockSize });
+  const offset = (Number(primaryGpt.backupLBA) - 32) * primaryGpt.blockSize;
+  const buffer = io.read(offset, 33 * primaryGpt.blockSize);
+  backupGpt.parseBackup(buffer);
+
+  return backupGpt;
 }
