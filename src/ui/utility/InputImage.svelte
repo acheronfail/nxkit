@@ -40,7 +40,6 @@
     }
   }
 
-  // TODO: allow parent to extract cropped image
   // TODO: svelte-easy-crop logs heaps of errors on zoom
 
   function createImageElement(src: string): Promise<HTMLImageElement> {
@@ -56,8 +55,7 @@
     if (!imageDataUrl) throw new Error('Cannot extract cropped image without an image!');
 
     const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 256;
+    canvas.width = canvas.height = 256;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) throw new Error('Failed to get canvas 2d context');
@@ -96,7 +94,7 @@
     {:else}
       <label
         for="image-input"
-        class="nro256 {imageBoxClass} h-full flex flex-col p-6 text-center justify-center items-center cursor-pointer hover:dark:bg-slate-700"
+        class="nro256 {imageBoxClass} border-dashed h-full flex flex-col p-6 text-center justify-center items-center cursor-pointer hover:dark:bg-slate-700"
       >
         Please select an NRO file or an image
       </label>

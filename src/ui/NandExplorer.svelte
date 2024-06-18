@@ -4,11 +4,18 @@
   import type { Node } from './utility/FileTreeNode.svelte';
   import { onMount } from 'svelte';
 
+  function isPartitionDisabled(partition: PartitionEntry): boolean {
+    // NOTE: currently all non FAT partitions are disabled, since we don't support
+    // mounting them (yet!)
+    return !['USER', 'SAFE', 'SYSTEM', 'PRODINFOF'].includes(partition.name);
+  }
+
   function partitionToNode(partition: PartitionEntry): Node<PartitionEntry, never> {
     return {
       id: partition.type,
       name: partition.name,
       isDirectory: false,
+      isDisabled: isPartitionDisabled(partition),
       data: partition,
     };
   }
@@ -96,7 +103,7 @@
   <div class="m-2">
     {#if rootEntries}
       <p class="text-center">
-        Currently exploring <strong>{selectedPartition.name}</strong>
+        Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </p>
       <FileExplorer {rootEntries} />
@@ -104,7 +111,11 @@
       <p class="text-center">Choose a partition to explore</p>
       <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={handlers.onPartitionChoose}>
         <CircleStackIcon slot="icon" let:iconClass class="text-red-300 {iconClass}" />
-        <div slot="file-extra"></div>
+        <div slot="file-extra" let:file>
+          {#if isPartitionDisabled(file)}
+            unsupported
+          {/if}
+        </div>
       </FileTreeRoot>
     {:else}
       <p class="text-center">

@@ -2,11 +2,4 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  margin: auto;
-  padding: 2rem;
-  max-width: 1000px;
-}
-
 /* TODO: verify light mode styling */

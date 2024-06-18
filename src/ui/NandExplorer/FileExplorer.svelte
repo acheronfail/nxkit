@@ -17,7 +17,7 @@
 </script>
 
 <script lang="ts">
-  import { Tooltip } from '@svelte-plugins/tooltips';
+  import Tooltip from '../utility/Tooltip.svelte';
 
   import { ArrowDownTrayIcon, EllipsisHorizontalCircleIcon } from 'heroicons-svelte/24/outline';
   import FileTreeRoot from '../utility/FileTreeRoot.svelte';
@@ -26,6 +26,9 @@
 
   let { rootEntries }: Props = $props();
 
+  // TODO: actions: rename, delete, download entire directory
+  // TODO:  native right click menu?
+  // TODO:  copy/paste?
   const handlers = {
     onDirActions: (dir: FSDirectory) => {
       alert('TODO dir actions');
@@ -47,18 +50,19 @@
 <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
   <ActionButtons slot="dir-extra" let:dir>
     <ActionButton onclick={() => handlers.onDirActions(dir)}>
-      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:text-black" />
+      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
     </ActionButton>
   </ActionButtons>
   <ActionButtons slot="file-extra" let:file>
     <span class="font-mono">{file.sizeHuman}</span>
-    <Tooltip content="Download {file.name}" position="left">
-      <ActionButton onclick={() => handlers.downloadFile(file)}>
-        <ArrowDownTrayIcon class="h-4 cursor-pointer hover:text-black" />
+    <Tooltip placement="left">
+      <ActionButton slot="content" onclick={() => handlers.downloadFile(file)}>
+        <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
       </ActionButton>
+      <span slot="tooltip">Download {file.name}</span>
     </Tooltip>
     <ActionButton onclick={() => handlers.onFileActions(file)}>
-      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:text-black" />
+      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
     </ActionButton>
   </ActionButtons>
 </FileTreeRoot>

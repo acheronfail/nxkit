@@ -19,6 +19,9 @@
   let payload = $derived(files?.[0]);
   let output = $state('');
 
+  let disabled = $derived(!payload);
+  let tooltip = $derived(disabled && 'Please select a payload!');
+
   async function inject() {
     output = '';
 
@@ -35,14 +38,19 @@
   }
 </script>
 
+<!-- svelte-ignore slot_element_deprecated -->
 <Container>
-  <p>You can send payloads to a Switch in RCM mode directly.</p>
-  <!-- TODO: description of how to enter RCM mode -->
-  <InputFile
-    label="Payload"
-    bind:files
-    infoTooltip="The payload to send to the Switch. E.g., tegraexplorer.bin, hekate.bin, etc"
-  />
-  <Button appearance="primary" size="large" disabled={!payload} onclick={inject}>Inject</Button>
-  <pre id="inject-logs">{output}</pre>
+  <div class="flex flex-col gap-2">
+    <p>You can send payloads to a Switch in RCM mode directly.</p>
+    <!-- TODO: description of how to enter RCM mode -->
+    <InputFile label="Payload" bind:files>
+      <div slot="infoTooltip" class="text-sm w-60">
+        The payload to send to the Switch. E.g.,
+        <span class="font-mono">tegraexplorer.bin</span>,
+        <span class="font-mono">hekate.bin</span>, etc
+      </div>
+    </InputFile>
+    <Button appearance="primary" size="large" {tooltip} {disabled} onclick={inject}>Inject</Button>
+    <pre id="inject-logs">{output}</pre>
+  </div>
 </Container>

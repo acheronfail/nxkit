@@ -1,0 +1,108 @@
+<script lang="ts" context="module">
+  import { type Placement } from '@floating-ui/dom';
+
+  export interface Props {
+    placement?: Placement;
+  }
+</script>
+
+<script lang="ts">
+  import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
+  import { onMount } from 'svelte';
+
+  let { placement }: Props = $props();
+
+  let referenceEl = $state<HTMLElement | null>(null);
+  let tooltipEl = $state<HTMLElement | null>(null);
+  let arrowEl = $state<HTMLElement | null>(null);
+  let hidden = $state(true);
+
+  const offsetPx = 10;
+  const arrowSizePx = 5;
+
+  function update() {
+    if (!referenceEl || !tooltipEl || !arrowEl) return;
+
+    computePosition(referenceEl, tooltipEl, {
+      placement,
+      middleware: [offset(offsetPx), flip(), shift({ padding: 5 }), arrow({ element: arrowEl })],
+    }).then(({ x, y, placement, middlewareData }) => {
+      Object.assign(tooltipEl.style, {
+        left: `${x}px`,
+        top: `${y}px`,
+      });
+
+      const placementSide = placement.split('-')[0];
+      const staticSide = {
+        top: 'bottom',
+        right: 'left',
+        bottom: 'top',
+        left: 'right',
+      }[placementSide];
+
+      if (middlewareData.arrow) {
+        const { x: arrowX, y: arrowY } = middlewareData.arrow;
+        const rotation = {
+          top: '-45',
+          right: '45',
+          bottom: '135',
+          left: '-135',
+        }[placementSide];
+
+        Object.assign(arrowEl.style, {
+          left: arrowX != null ? `${arrowX}px` : '',
+          top: arrowY != null ? `${arrowY}px` : '',
+          right: '',
+          bottom: '',
+          transform: `rotate(${rotation}deg)`,
+          [staticSide]: `${-arrowSizePx}px`,
+        });
+      }
+    });
+  }
+
+  function show() {
+    if ($$slots.tooltip) {
+      update();
+      tooltipEl.style.display = 'block';
+    }
+  }
+
+  function hide() {
+    if ($$slots.tooltip) {
+      tooltipEl.style.display = '';
+    }
+  }
+
+  onMount(() => {
+    tooltipEl.style.display = hidden ? '' : 'block';
+    if (!hidden) update();
+  });
+
+  const c = {
+    bg: 'bg-slate-900',
+    fill: 'fill-slate-900',
+    border: 'border-slate-600',
+    stroke: 'stroke-slate-600',
+  };
+</script>
+
+<!-- svelte-ignore slot_element_deprecated -->
+{#if $$slots.content}
+  <span bind:this={referenceEl} role="tooltip" onmouseenter={show} onmouseleave={hide} onfocus={show} onblur={hide}>
+    <slot name="content" />
+  </span>
+
+  <div bind:this={tooltipEl} class="hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
+    {#if $$slots.tooltip}
+      <slot name="tooltip" />
+    {/if}
+    <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
+      <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
+        <polygon points="0 0, 0 {arrowSizePx}, {arrowSizePx}, {arrowSizePx}, 0" class={c.fill} />
+        <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
+        <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
+      </svg>
+    </div>
+  </div>
+{/if}

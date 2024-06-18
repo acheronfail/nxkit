@@ -73,46 +73,39 @@
       <span slot="label">Application</span>
       <Container slot="content">
         <InputImage onCropComplete={(fn) => (image = fn)} />
-        <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
-        <InputFile label="App Title" placeholder="NX Shell" bind:value={title} infoTooltip={descriptions.title} />
-        <InputFile label="App Publisher" placeholder="joel16" bind:value={author} infoTooltip={descriptions.author} />
-        <InputFile
-          label="NRO Path"
-          placeholder="/switch/NX-Shell.nro"
-          bind:value={nroPath}
-          infoTooltip={descriptions.nroPath}
-        />
+        <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
+          <div slot="infoTooltip">{descriptions.id}</div>
+        </InputFile>
+        <InputFile label="App Title" placeholder="NX Shell" bind:value={title}>
+          <div slot="infoTooltip">{descriptions.title}</div>
+        </InputFile>
+        <InputFile label="App Publisher" placeholder="joel16" bind:value={author}>
+          <div slot="infoTooltip">{descriptions.author}</div>
+        </InputFile>
+        <InputFile label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
+          <div slot="infoTooltip">{descriptions.nroPath}</div>
+        </InputFile>
       </Container>
     </TabItem>
     <TabItem>
       <span slot="label">RetroArch ROM</span>
       <Container slot="content">
         <InputImage onCropComplete={(fn) => (image = fn)} />
-        <InputFile label="App ID" placeholder="01..........0000" bind:value={id} infoTooltip={descriptions.id} />
-        <InputFile
-          label="Game Title"
-          placeholder="Kirby's Adventure"
-          bind:value={title}
-          infoTooltip={descriptions.title}
-        />
-        <InputFile
-          label="Game Publisher"
-          placeholder="Nintendo"
-          bind:value={author}
-          infoTooltip={descriptions.author}
-        />
-        <InputFile
-          label="Core Path"
-          placeholder="/retroarch/cores/nestopia_libretro_libnx.nro"
-          bind:value={nroPath}
-          infoTooltip={descriptions.nroPath}
-        />
-        <InputFile
-          label="ROM Path"
-          placeholder="/roms/nes/Kirby's Adventure.zip"
-          bind:value={romPath}
-          infoTooltip={descriptions.romPath}
-        />
+        <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
+          <div slot="infoTooltip">{descriptions.id}</div>
+        </InputFile>
+        <InputFile label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
+          <div slot="infoTooltip">{descriptions.title}</div>
+        </InputFile>
+        <InputFile label="Game Publisher" placeholder="Nintendo" bind:value={author}>
+          <div slot="infoTooltip">{descriptions.author}</div>
+        </InputFile>
+        <InputFile label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
+          <div slot="infoTooltip">{descriptions.nroPath}</div>
+        </InputFile>
+        <InputFile label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
+          <div slot="infoTooltip">{descriptions.romPath}</div>
+        </InputFile>
       </Container>
     </TabItem>
   </Tabs>

@@ -21,6 +21,7 @@
 </script>
 
 <Tabs>
+  <!-- TODO: tool to split/merge files to/from fat32 chunks -->
   <TabItem defaultOpen>
     <span slot="label">Nro Forwarder</span>
     <NroForwarder slot="content" />
@@ -42,5 +43,4 @@
     </span>
     <Settings slot="content" />
   </TabItem>
-  <!-- TODO: tool to split/merge files to/from fat32 chunks -->
 </Tabs>

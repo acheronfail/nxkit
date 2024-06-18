@@ -1,5 +1,6 @@
 <script context="module" lang="ts">
   import type { Snippet } from 'svelte';
+  import Tooltip from './Tooltip.svelte';
 
   export type Appearance = 'primary' | 'default' | 'warning' | 'danger';
   export type Size = 'large' | 'default' | 'inline';
@@ -13,8 +14,6 @@
 </script>
 
 <script lang="ts">
-  import { Tooltip } from '@svelte-plugins/tooltips';
-
   let { appearance = 'default', size = 'default', disabled = false, children, tooltip, ...rest }: Props = $props();
 
   const innerClass = 'w-full h-full';
@@ -35,6 +34,7 @@
   const preventDefault = (e: Event) => e.preventDefault();
 </script>
 
+<!-- svelte-ignore slot_element_deprecated -->
 {#if typeof rest.for === 'string'}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <label
@@ -42,10 +42,16 @@
     class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass}"
     {...rest}
   >
-    <Tooltip content={tooltip}>
-      <!-- svelte-ignore slot_element_deprecated -->
-      <div class={innerClass}><slot /></div>
-    </Tooltip>
+    {#if tooltip}
+      <Tooltip>
+        <span slot="tooltip" class="text-white">{tooltip}</span>
+        <div slot="content" class={innerClass}><slot /></div>
+      </Tooltip>
+    {:else}
+      <Tooltip>
+        <div slot="content" class={innerClass}><slot /></div>
+      </Tooltip>
+    {/if}
   </label>
 {:else}
   <button
@@ -53,9 +59,15 @@
     {disabled}
     {...rest}
   >
-    <Tooltip content={tooltip}>
-      <!-- svelte-ignore slot_element_deprecated -->
-      <div class={innerClass}><slot /></div>
-    </Tooltip>
+    {#if tooltip}
+      <Tooltip>
+        <span slot="tooltip" class="text-white">{tooltip}</span>
+        <div slot="content" class={innerClass}><slot /></div>
+      </Tooltip>
+    {:else}
+      <Tooltip>
+        <div slot="content" class={innerClass}><slot /></div>
+      </Tooltip>
+    {/if}
   </button>
 {/if}

@@ -3,6 +3,7 @@
     id: string;
     name: string;
     isDirectory: IsDirectory;
+    isDisabled?: boolean;
     data?: IsDirectory extends true ? DirData : FileData;
   }
 
@@ -10,6 +11,7 @@
     id: 'LOADING',
     name: 'Loading...',
     isDirectory: false,
+    isDisabled: true,
   };
 
   interface CommonProps<FileData = any, DirData = any> {
@@ -30,8 +32,7 @@
   import { FolderOpenIcon } from 'heroicons-svelte/24/solid';
 
   const iconClass = 'inline-block h-4';
-  const itemClass =
-    'pr-2 flex justify-between items-center hover:dark:bg-slate-600 focus:outline-none focus:bg-blue-500';
+  const itemClass = 'pr-2 flex justify-between items-center focus:outline-none';
 
   // Record<id, isExpanded>
   const expandedState: Record<string, boolean> = {};
@@ -66,11 +67,14 @@
 <li class="odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
   <div
     class={itemClass}
-    class:text-slate-600={node === loadingFile}
-    role="button"
-    tabindex="0"
-    onkeypress={(e) => e.key === ' ' && handler()}
-    onclick={() => handler()}
+    class:text-slate-500={node.isDisabled}
+    class:focus:bg-blue-500={!node.isDisabled}
+    class:hover:dark:bg-slate-600={!node.isDisabled}
+    role={node.isDisabled ? '' : 'button'}
+    tabIndex={node.isDisabled ? -1 : 0}
+    aria-disabled={node.isDisabled}
+    onkeypress={!node.isDisabled ? (e) => e.key === ' ' && handler() : undefined}
+    onclick={!node.isDisabled ? () => handler() : undefined}
   >
     {#if node.isDirectory}
       <span>

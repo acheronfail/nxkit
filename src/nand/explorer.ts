@@ -47,12 +47,7 @@ export async function open(nandPath: string): Promise<NandResult<PartitionEntry[
     return { error: NandError.InvalidPartitionTable };
   }
 
-  const partitions = gpt.partitions.filter((part) => {
-    // NOTE: we don't support all the partitions right now, just the FAT32 ones
-    return ['PRODINFOF', 'SAFE', 'SYSTEM', 'USER'].includes(part.name);
-  });
-
-  return { error: NandError.None, data: partitions };
+  return { error: NandError.None, data: gpt.partitions };
 }
 
 export async function mount(partitionName: string, keys: Keys): Promise<NandResult> {
