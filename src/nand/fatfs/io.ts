@@ -25,7 +25,7 @@ export async function createIo(nandPath: string): Promise<Io> {
       entries
         .filter((name) => name.startsWith(prefix) && /\.\d\d$/.test(name))
         .map((name) => join(dir, name))
-        .sort()
+        .sort(),
     );
   }
 

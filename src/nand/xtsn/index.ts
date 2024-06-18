@@ -13,7 +13,10 @@
 import crypto from 'node:crypto';
 
 export class Xtsn {
-  constructor(private readonly cryptoKey: Buffer, private readonly tweakKey: Buffer) {
+  constructor(
+    private readonly cryptoKey: Buffer,
+    private readonly tweakKey: Buffer,
+  ) {
     this.cryptoKey = cryptoKey;
     this.tweakKey = tweakKey;
   }
@@ -50,7 +53,7 @@ export class Xtsn {
     sectorOffset: number,
     sectorSize: number,
     skippedBytes: number,
-    method: 'createCipheriv' | 'createDecipheriv'
+    method: 'createCipheriv' | 'createDecipheriv',
   ) {
     const data = Buffer.from(input);
     let currentOffset = 0;

@@ -32,12 +32,15 @@ export class Keys {
         text
           .trim()
           .split('\n')
-          .map((line) => line.split('=').map((s) => s.trim()))
-      )
+          .map((line) => line.split('=').map((s) => s.trim())),
+      ),
     );
   }
 
-  constructor(public readonly path: string, public readonly raw: RawKeys) {}
+  constructor(
+    public readonly path: string,
+    public readonly raw: RawKeys,
+  ) {}
 
   getBisKey(id: BisKeyId): { crypto: Buffer; tweak: Buffer } {
     const text = this.raw[`bis_key_0${id}`];

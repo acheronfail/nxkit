@@ -17,7 +17,7 @@ export async function readFile(file: File, format: 'string' | 'arrayBuffer'): Pr
     reader.onerror = reject;
     reader.onload = (event) =>
       resolve(
-        format === 'arrayBuffer' ? new Uint8Array(event.target.result as ArrayBuffer) : (event.target.result as string)
+        format === 'arrayBuffer' ? new Uint8Array(event.target.result as ArrayBuffer) : (event.target.result as string),
       );
 
     if (format === 'string') {

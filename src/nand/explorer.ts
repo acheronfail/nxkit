@@ -79,7 +79,7 @@ export async function mount(partitionName: string, keys: Keys): Promise<NandResu
         nandIo: new NandIo(nand.io, partStart, partEnd, xtsn),
         readonly: true,
       }),
-    })
+    }),
   );
 
   return { error: NandError.None };
@@ -93,7 +93,9 @@ export async function readdir(fsPath: string): Promise<FSEntry[]> {
 export async function copyFile(pathInNand: string, window: BrowserWindow): Promise<void> {
   if (!nand.fs) throw new Error('No partition mounted!');
 
-  const result = await dialog.showSaveDialog(window, { defaultPath: basename(pathInNand) });
+  const result = await dialog.showSaveDialog(window, {
+    defaultPath: basename(pathInNand),
+  });
   if (result.canceled) return;
 
   const fd = fs.openSync(result.filePath, 'w+');

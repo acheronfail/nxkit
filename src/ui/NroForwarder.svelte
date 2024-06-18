@@ -29,7 +29,7 @@
 
   let disabled = $derived(!keys.value || !image);
   let tooltip = $derived(
-    !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : null
+    !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : null,
   );
 
   let stdout = $state('');

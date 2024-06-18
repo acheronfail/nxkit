@@ -13,7 +13,7 @@ export class NandIo {
     private readonly io: Io,
     private readonly partitionStartOffset: number,
     private readonly partitionEndOffset: number,
-    private readonly xtsn?: Xtsn
+    private readonly xtsn?: Xtsn,
   ) {}
 
   public size(): number {

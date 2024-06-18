@@ -14,7 +14,7 @@ const p = (
   name: string,
   bisKeyId?: NxPartition['bisKeyId'],
   magicOffset?: NxPartition['magicOffset'],
-  magicBytes?: string
+  magicBytes?: string,
 ): NxPartition => ({
   name,
   bisKeyId,

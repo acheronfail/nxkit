@@ -109,7 +109,7 @@ export async function injectPayload(dev: USBDevice, payload: Uint8Array, logCall
         value: 0x00,
         index: 0x00,
       },
-      vulnerabilityLength
+      vulnerabilityLength,
     )
     .catch(() => {
       /* ignored because the Switch doesn't respond to this packet */

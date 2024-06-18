@@ -6,7 +6,13 @@ export function check_result(r: number) {
   if (r !== FatFs.FR_OK) throw new Error(`FatFs error: ${r}`);
 }
 
-export type FSFile = { type: 'f'; name: string; path: string; size: number; sizeHuman: string };
+export type FSFile = {
+  type: 'f';
+  name: string;
+  path: string;
+  size: number;
+  sizeHuman: string;
+};
 export type FSDirectory = { type: 'd'; name: string; path: string };
 export type FSEntry = FSFile | FSDirectory;
 

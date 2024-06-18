@@ -8,7 +8,9 @@
 
   export type Props<FileData = any, DirData = any> = DirData extends never
     ? CommonProps & { openDirectory?: undefined }
-    : CommonProps & { openDirectory: (dir: DirData) => Promise<Node<FileData, DirData>[]> };
+    : CommonProps & {
+        openDirectory: (dir: DirData) => Promise<Node<FileData, DirData>[]>;
+      };
 </script>
 
 <script lang="ts">

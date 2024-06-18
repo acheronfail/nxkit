@@ -62,7 +62,9 @@ const createMainWindow = (): BrowserWindow => {
 app.on('ready', () => {
   let mainWindow: BrowserWindow | undefined = undefined;
   const mainChannelImpl: MainChannelImpl = {
-    [Channels.PreloadBrige]: async () => ({ isWindows: platform() === 'win32' }),
+    [Channels.PreloadBrige]: async () => ({
+      isWindows: platform() === 'win32',
+    }),
     [Channels.TegraRcmSmash]: async (event, payloadFilePath) => {
       return new Promise((resolve) => {
         // TODO: compile TegraRcmSmash ourselves
@@ -71,7 +73,11 @@ app.on('ready', () => {
           : path.join('vendor', 'TegraRcmSmash', 'TegraRcmSmash.exe');
 
         cp.execFile(exePath, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
-          resolve({ success: !err, stdout: stdout.trim(), stderr: stderr.trim() });
+          resolve({
+            success: !err,
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+          });
         });
       });
     },
@@ -83,7 +89,7 @@ app.on('ready', () => {
     [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) =>
       nand.mount(
         paritionName,
-        keysFromUser ? Keys.parseKeys(keysFromUser.location, keysFromUser.data) : await findProdKeys()
+        keysFromUser ? Keys.parseKeys(keysFromUser.location, keysFromUser.data) : await findProdKeys(),
       ),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
     [Channels.NandCopyFile]: async (_event, pathInNand) => mainWindow && nand.copyFile(pathInNand, mainWindow),

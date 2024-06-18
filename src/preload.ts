@@ -35,5 +35,5 @@ invoke(Channels.PreloadBrige).then((bridge) =>
     nandMount: (partName, keys) => invoke(Channels.NandMountPartition, partName, keys),
     nandReaddir: (path) => invoke(Channels.NandReaddir, path),
     nandCopyFile: (pathInNand) => invoke(Channels.NandCopyFile, pathInNand),
-  })
+  }),
 );

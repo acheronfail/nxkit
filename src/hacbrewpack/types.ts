@@ -1,4 +1,4 @@
-import { VideoCapture } from "@tootallnate/nacp";
+import { VideoCapture } from '@tootallnate/nacp';
 
 export enum StartupUserAccount {
   Disabled,
