@@ -1,6 +1,6 @@
 import type { ConfigEnv, UserConfig } from 'vite';
 import { defineConfig, mergeConfig } from 'vite';
-import { getBuildConfig, getBuildDefine, external, esmodule, pluginHotRestart } from './vite.base.config';
+import { getBuildConfig, getBuildDefine, external, pluginHotRestart } from './vite.base.config';
 
 // https://vitejs.dev/config
 export default defineConfig((env) => {
@@ -8,12 +8,17 @@ export default defineConfig((env) => {
   const { forgeConfigSelf } = forgeEnv;
   const define = getBuildDefine(forgeEnv);
 
+  if (!forgeConfigSelf.entry) {
+    throw new Error('Failed to config forge config entrypoint for main!');
+  }
+
+  const { entry } = forgeConfigSelf;
   const config: UserConfig = {
     build: {
       lib: {
-        entry: forgeConfigSelf.entry!,
+        entry,
         fileName: () => 'main.js',
-        formats: [esmodule ? 'es' : 'cjs'],
+        formats: ['es'],
       },
       rollupOptions: {
         external,

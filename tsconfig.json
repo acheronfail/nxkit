@@ -1,8 +1,8 @@
 {
-  "include": ["forge.env.d.ts", "src/**/*.ts", "src/**/*.svelte"],
+  "include": ["forge.env.d.ts", "src/**/*.ts"],
   "compilerOptions": {
     "target": "ESNext",
-    "module": "CommonJS",
+    "module": "ESNext",
     "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,

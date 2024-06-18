@@ -1,4 +1,9 @@
-import type { ForgeConfig } from '@electron-forge/shared-types';
+/**
+ * This file can't be `.mts`, because of a limitation in electron-forge:
+ * - https://github.com/electron/forge/blob/620a6ae48a6805846d7125fc28bef874ed7a8b37/packages/api/core/src/util/forge-config.ts#L116
+ * - https://github.com/gulpjs/interpret/blob/c09bf70bc73d020b9d387223e7b74708687fdb47/index.js#L70
+ */
+
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
@@ -7,7 +12,8 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
-const config: ForgeConfig = {
+/** @type {import('@electron-forge/shared-types').ForgeConfig} */
+const config = {
   packagerConfig: {
     asar: true,
     extraResource: ['vendor/TegraRcmSmash/TegraRcmSmash.exe'],

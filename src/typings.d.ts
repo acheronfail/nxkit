@@ -1,19 +1,6 @@
+/// <reference types="vite/client" />
+
 declare module '*.exe' {
-  const src: string;
-  export default src;
-}
-
-declare module '*.gif' {
-  const src: string;
-  export default src;
-}
-
-declare module '*.jpg' {
-  const src: string;
-  export default src;
-}
-
-declare module '*.png' {
   const src: string;
   export default src;
 }
@@ -28,12 +15,9 @@ declare module '*.npdm' {
   export default src;
 }
 
-declare module '*?worker' {
-  const workerConstructor: {
-    new (options?: { name?: string }): Worker;
-  };
-  export default workerConstructor;
-}
+/*
+ * Types for untyped packages
+ */
 
 declare module 'mbr' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

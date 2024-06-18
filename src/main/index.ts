@@ -11,12 +11,7 @@ import automaticContextMenus from 'electron-context-menu';
 
 automaticContextMenus({});
 
-// TODO: fix typescript here
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
 const require = createRequire(import.meta.url);
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -34,11 +29,11 @@ function loadWindow(window: BrowserWindow, name: string) {
 
 const createMainWindow = (): BrowserWindow => {
   const win = new BrowserWindow({
-    width: 1600,
+    width: app.isPackaged ? 800 : 1600,
     height: 800,
     backgroundColor: '#1e293b',
     webPreferences: {
-      preload: path.join(__dirname, 'preload.mjs'),
+      preload: path.join(__dirname, 'preload.cjs'),
     },
   });
 
