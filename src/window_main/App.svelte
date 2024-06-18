@@ -13,7 +13,7 @@
   // TODO: select tabs with `cmdCtrl+number`
 
   onMount(async () => {
-    const keysFromMain = await window.nxkit.findProdKeys();
+    const keysFromMain = await window.nxkit.keysFind();
     if (keysFromMain) {
       keys.setMainKeys(keysFromMain);
     }

@@ -15,7 +15,7 @@ declare global {
 }
 
 function invoke<C extends Channels>(channel: C, ...args: ChannelImplDefinition<C>[0]): ChannelImplDefinition<C>[1] {
-  return ipcRenderer.invoke(channel, ...args);
+  return ipcRenderer.invoke(channel.toString(), ...args);
 }
 
 function exposeInMainWorld<K extends ExposedAPIs>(key: K, value: Window[K]) {
@@ -28,7 +28,8 @@ invoke(Channels.PreloadBrige).then((bridge) =>
   exposeInMainWorld(ExposedAPIs.Bridge, {
     ...bridge,
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
-    findProdKeys: () => invoke(Channels.findProdKeys),
+    keysFind: () => invoke(Channels.ProdKeysFind),
+    keysSearchPaths: () => invoke(Channels.ProdKeysSearchPaths),
 
     nandOpen: (nandPath) => invoke(Channels.NandOpen, nandPath),
     nandClose: () => invoke(Channels.NandClose),

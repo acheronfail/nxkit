@@ -5,7 +5,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Channels, MainChannelImpl } from '../channels';
-import { findProdKeys, Keys } from './keys';
+import { findProdKeys, Keys, PROD_KEYS_SEARCH_PATHS } from './keys';
 import * as nand from '../nand/explorer';
 import automaticContextMenus from 'electron-context-menu';
 
@@ -80,8 +80,9 @@ app.on('ready', () => {
         });
       });
     },
-    [Channels.findProdKeys]: (_event) =>
+    [Channels.ProdKeysFind]: (_event) =>
       findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
+    [Channels.ProdKeysSearchPaths]: async (_event) => PROD_KEYS_SEARCH_PATHS,
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),

@@ -19,7 +19,8 @@ export type NandResult<T = void> =
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
-  findProdKeys: RendererChannelImpl[Channels.findProdKeys];
+  keysFind: RendererChannelImpl[Channels.ProdKeysFind];
+  keysSearchPaths: RendererChannelImpl[Channels.ProdKeysSearchPaths];
 
   nandOpen: RendererChannelImpl[Channels.NandOpen];
   nandClose: RendererChannelImpl[Channels.NandClose];
@@ -36,20 +37,21 @@ export interface NXKitBridge {
  * List of all IPC channels between main and renderer processes.
  */
 export enum Channels {
-  PreloadBrige = 'bridge',
-  TegraRcmSmash = 'tegraRcmSmash',
-  findProdKeys = 'findProdKeys',
+  PreloadBrige,
+  TegraRcmSmash,
+  ProdKeysFind,
+  ProdKeysSearchPaths,
 
   /** Open nand disk image */
-  NandOpen = 'nandOpen',
+  NandOpen,
   /** Close nand disk image */
-  NandClose = 'nandClose',
+  NandClose,
   /** Read directory from currently mounted nand partition */
-  NandMountPartition = 'NandMountPartition',
+  NandMountPartition,
   /** Read directory from currently mounted nand partition */
-  NandReaddir = 'nandReaddir',
+  NandReaddir,
   /** Copy a file out of the currently mounted nand partition */
-  NandCopyFile = 'nandCopyFile',
+  NandCopyFile,
 }
 
 /**
@@ -70,7 +72,8 @@ export type ChannelImplDefinition<C extends Channels> = {
       stderr: string;
     }
   >;
-  [Channels.findProdKeys]: ChannelImpl<() => ProdKeys | null>;
+  [Channels.ProdKeysFind]: ChannelImpl<() => ProdKeys | null>;
+  [Channels.ProdKeysSearchPaths]: ChannelImpl<() => string[]>;
 
   [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<PartitionEntry[]>>;
   [Channels.NandClose]: ChannelImpl<() => void>;

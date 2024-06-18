@@ -22,6 +22,7 @@ export function getPartitionTable(io: Io): GptTable {
   return readPrimaryGpt(io, BLOCK_SIZE, efiPart);
 }
 
+// TODO: ability to format partitions
 // TODO: also read backup gpt, and verify both
 function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTable {
   const gpt = new GPT({ blockSize });
