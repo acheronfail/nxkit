@@ -1,17 +1,8 @@
 <script lang="ts" context="module">
-  import type { FSDirectory, FSEntry, FSFile } from '../nand/fatfs/fs';
+  import type { FSEntry } from '../nand/fatfs/fs';
   import type { PartitionEntry } from '../nand/gpt';
   import type { Node } from './utility/FileTreeNode.svelte';
-  import type { Component } from 'svelte';
-
-  function entryToNode(entry: FSEntry): Node<FSDirectory, FSFile> {
-    return {
-      id: entry.path,
-      name: entry.name,
-      isDirectory: entry.type === 'd',
-      data: entry,
-    };
-  }
+  import { onMount } from 'svelte';
 
   function partitionToNode(partition: PartitionEntry): Node<PartitionEntry, never> {
     return {
@@ -19,8 +10,6 @@
       name: partition.name,
       isDirectory: false,
       data: partition,
-      // FIXME: get slots or snippets working to be able to style these and remove this cast
-      icon: CircleStackIcon as any as Component,
     };
   }
 </script>
@@ -32,9 +21,8 @@
   import FileTreeRoot from './utility/FileTreeRoot.svelte';
   import Code from './utility/Code.svelte';
   import { CircleStackIcon } from 'heroicons-svelte/24/outline';
-  import { ArrowDownTrayIcon } from 'heroicons-svelte/24/solid';
   import { NandError } from '../channels';
-  import { Tooltip } from '@svelte-plugins/tooltips';
+  import FileExplorer from './NandExplorer/FileExplorer.svelte';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -80,12 +68,6 @@
       rootEntries = null;
       selectedPartition = null;
     },
-    openNandDirectory: async (dir: FSDirectory): Promise<Node<FSDirectory, FSFile>[]> => {
-      return window.nxkit.nandReaddir(dir.path).then((entries) => entries.map(entryToNode));
-    },
-    downloadFile: async (file: FSFile) => {
-      await window.nxkit.nandCopyFile(file.path);
-    },
     reset: () => {
       loading = true;
       window.nxkit.nandClose().finally(() => {
@@ -117,20 +99,11 @@
         Currently exploring <strong>{selectedPartition.name}</strong>
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </p>
-      <FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
-        <div slot="file-extra" let:file class="flex flex-row justify-end items-center gap-2">
-          <span class="font-mono">{file.sizeHuman}</span>
-          <Tooltip content="Download {file.name}" position="left">
-            <ArrowDownTrayIcon
-              class="h-4 cursor-pointer hover:text-black"
-              onclick={() => handlers.downloadFile(file)}
-            />
-          </Tooltip>
-        </div>
-      </FileTreeRoot>
+      <FileExplorer {rootEntries} />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
       <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={handlers.onPartitionChoose}>
+        <CircleStackIcon slot="icon" let:iconClass class="text-red-300 {iconClass}" />
         <div slot="file-extra"></div>
       </FileTreeRoot>
     {:else}

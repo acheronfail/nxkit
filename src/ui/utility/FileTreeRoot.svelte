@@ -17,11 +17,13 @@
 
 <ul class="select-none font-mono overflow-hidden m-2 border border-slate-900">
   {#each nodes as node}
-    <FileTreeNode {onFileClick} {openDirectory} {node} depth={1}>
+    <FileTreeNode {onFileClick} {openDirectory} {node} iconSlotPresent={$$slots.icon} depth={1}>
       <!-- svelte-ignore slot_element_deprecated -->
-      <div slot="file-extra" let:file>
-        <slot name="file-extra" {file} />
-      </div>
+      <span slot="icon" let:iconClass let:node><slot name="icon" {iconClass} {node} /></span>
+      <!-- svelte-ignore slot_element_deprecated -->
+      <span slot="dir-extra" let:dir><slot name="dir-extra" {dir} /></span>
+      <!-- svelte-ignore slot_element_deprecated -->
+      <span slot="file-extra" let:file><slot name="file-extra" {file} /></span>
     </FileTreeNode>
   {/each}
 </ul>

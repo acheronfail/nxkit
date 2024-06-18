@@ -1,12 +1,9 @@
 <script context="module" lang="ts">
-  import type { Component } from 'svelte';
-
   export interface Node<FileData = any, DirData = any, IsDirectory extends boolean = boolean> {
     id: string;
     name: string;
     isDirectory: IsDirectory;
     data?: IsDirectory extends true ? DirData : FileData;
-    icon?: Component;
   }
 
   const loadingFile: Node = {
@@ -20,6 +17,7 @@
     depth: number;
     isExpanded?: boolean;
     onFileClick?: (data: FileData) => void;
+    iconSlotPresent?: boolean;
   }
 
   export type Props<FileData = any, DirData = any> = DirData extends never
@@ -38,7 +36,14 @@
   // Record<id, isExpanded>
   const expandedState: Record<string, boolean> = {};
 
-  let { node, depth, onFileClick, openDirectory, isExpanded = expandedState[node.id] ?? false }: Props = $props();
+  let {
+    node,
+    depth,
+    onFileClick,
+    openDirectory,
+    isExpanded = expandedState[node.id] ?? false,
+    iconSlotPresent = false,
+  }: Props = $props();
   let isLoading = $state(false);
   let children = $state<Node[] | null>(null);
 
@@ -69,8 +74,9 @@
   >
     {#if node.isDirectory}
       <span>
-        {#if node.icon}
-          <svelte:component this={node.icon} class="text-blue-300 {iconClass}" />
+        <!-- svelte-ignore slot_element_deprecated -->
+        {#if iconSlotPresent}
+          <slot name="icon" {node} {iconClass} />
         {:else if isExpanded}
           <FolderOpenIcon class="text-blue-300 {iconClass}" />
         {:else}
@@ -78,10 +84,15 @@
         {/if}
         {node.name}
       </span>
+      <!-- svelte-ignore slot_element_deprecated -->
+      <span>
+        <slot name="dir-extra" dir={node.data} />
+      </span>
     {:else}
       <span>
-        {#if node.icon}
-          <svelte:component this={node.icon} class={iconClass} />
+        <!-- svelte-ignore slot_element_deprecated -->
+        {#if iconSlotPresent}
+          <slot name="icon" {node} {iconClass} />
         {:else if node === loadingFile}
           <ClockIcon class={iconClass} />
         {:else}
@@ -103,6 +114,7 @@
     {#each children as e}
       <!-- svelte-ignore slot_element_deprecated -->
       <svelte:self {openDirectory} node={e} depth={depth + 1}>
+        <slot slot="dir-extra" name="dir-extra" let:dir {dir} />
         <slot slot="file-extra" name="file-extra" let:file {file} />
       </svelte:self>
     {/each}
