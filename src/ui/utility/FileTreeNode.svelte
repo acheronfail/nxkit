@@ -54,9 +54,9 @@
     isExpanded = expandedState[node.id] = !isExpanded;
     const loadingTimer = setTimeout(() => (isLoading = true), 100);
 
-    // TODO: error handling
     openDirectory(node.data)
       .then((nodes) => (children = nodes))
+      .catch((err) => alert(`Failed to open "${node.id}": ${String(err)}`))
       .finally(() => {
         clearTimeout(loadingTimer);
         isLoading = false;

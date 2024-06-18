@@ -44,7 +44,7 @@
     <p>You can send payloads to a Switch in RCM mode directly.</p>
     <!-- TODO: description of how to enter RCM mode -->
     <InputFile label="Payload" bind:files>
-      <div slot="infoTooltip" class="text-sm w-60">
+      <div slot="infoTooltip" class="text-sm w-60 text-center">
         The payload to send to the Switch. E.g.,
         <span class="font-mono">tegraexplorer.bin</span>,
         <span class="font-mono">hekate.bin</span>, etc

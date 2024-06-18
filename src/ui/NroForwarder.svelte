@@ -13,12 +13,16 @@
 
   // TODO: choose mounted Switch SD card for path autocomplete and validation?
 
+  const nroPathDesc = (name: string) => `File path to the ${name} NRO file on the Nintendo Switch SD card.`;
   const descriptions = {
-    id: 'TODO',
-    title: 'TODO',
-    author: 'TODO',
-    nroPath: 'TODO',
-    romPath: 'TODO',
+    id: `A hexadecimal id for the title. This value isn't shown in the UI, but it makes sure titles don't conflict with each other.`,
+    title: 'The name which is displayed on the Nintendo Switch home screen.',
+    author: `Name of the publisher displayed in the title's details screen.`,
+    nroPath: {
+      app: nroPathDesc("homebrew application's"),
+      rom: nroPathDesc("RetroArch core's"),
+    },
+    romPath: "File path to the game's ROM file on the Nintendo Switch SD card",
   };
 
   let id = $state(generateTitleId());
@@ -66,6 +70,8 @@
       alert(String(err));
     }
   }
+
+  const tooltipClass = 'w-60 text-center';
 </script>
 
 <Container>
@@ -73,39 +79,39 @@
     <TabItem defaultOpen>
       <span slot="label">Application</span>
       <Container slot="content">
-        <InputImage onCropComplete={(fn) => (image = fn)} />
+        <InputImage onCropComplete={(img) => (image = img)} />
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
-          <div slot="infoTooltip">{descriptions.id}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.id}</div>
         </InputFile>
         <InputFile label="App Title" placeholder="NX Shell" bind:value={title}>
-          <div slot="infoTooltip">{descriptions.title}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.title}</div>
         </InputFile>
         <InputFile label="App Publisher" placeholder="joel16" bind:value={author}>
-          <div slot="infoTooltip">{descriptions.author}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.author}</div>
         </InputFile>
         <InputFile label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
-          <div slot="infoTooltip">{descriptions.nroPath}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.nroPath.app}</div>
         </InputFile>
       </Container>
     </TabItem>
     <TabItem>
       <span slot="label">RetroArch ROM</span>
       <Container slot="content">
-        <InputImage onCropComplete={(fn) => (image = fn)} />
+        <InputImage onCropComplete={(img) => (image = img)} />
         <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
-          <div slot="infoTooltip">{descriptions.id}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.id}</div>
         </InputFile>
         <InputFile label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
-          <div slot="infoTooltip">{descriptions.title}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.title}</div>
         </InputFile>
         <InputFile label="Game Publisher" placeholder="Nintendo" bind:value={author}>
-          <div slot="infoTooltip">{descriptions.author}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.author}</div>
         </InputFile>
         <InputFile label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
-          <div slot="infoTooltip">{descriptions.nroPath}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.nroPath.rom}</div>
         </InputFile>
         <InputFile label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
-          <div slot="infoTooltip">{descriptions.romPath}</div>
+          <div slot="infoTooltip" class={tooltipClass}>{descriptions.romPath}</div>
         </InputFile>
       </Container>
     </TabItem>

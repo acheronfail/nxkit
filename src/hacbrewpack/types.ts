@@ -18,7 +18,7 @@ export enum LogoType {
 
 export interface BuildNSPArgs {
   /**
-   * TODO: warnings (and attempted checked against db) of conflicts
+   * Title id
    */
   id: string;
   /**
