@@ -7,6 +7,9 @@ import path from 'node:path';
 import { Channels, MainChannelImpl } from '../channels';
 import { findProdKeys, Keys } from './keys';
 import * as nand from '../nand/explorer';
+import automaticContextMenus from 'electron-context-menu';
+
+automaticContextMenus({});
 
 // TODO: fix typescript here
 // eslint-disable-next-line @typescript-eslint/ban-ts-comment

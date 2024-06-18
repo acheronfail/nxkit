@@ -49,6 +49,7 @@
     "@floating-ui/dom": "^1.6.5",
     "@tootallnate/nacp": "^0.0.1",
     "@tootallnate/nro": "^0.1.0",
+    "electron-context-menu": "^4.0.0",
     "electron-squirrel-startup": "^1.0.1",
     "gpt": "^3.0.0",
     "heroicons-svelte": "^2.0.0",
