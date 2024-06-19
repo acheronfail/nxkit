@@ -4,12 +4,12 @@ import { BrowserWindow, dialog } from 'electron';
 import * as FatFs from 'js-fatfs';
 import { PartitionDriver } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem } from './fatfs/fs';
-import { Keys } from '../main/keys';
+import { resolveKeys } from '../main/keys';
 import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS } from './constants';
 import { NandIo } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
-import { NandError, NandResult } from '../channels';
+import { NandError, NandResult, ProdKeys } from '../channels';
 
 interface Nand {
   io: Io | null;
@@ -50,8 +50,15 @@ export async function open(nandPath: string): Promise<NandResult<PartitionEntry[
   return { error: NandError.None, data: gpt.partitions };
 }
 
-export async function mount(partitionName: string, keys: Keys): Promise<NandResult> {
-  if (!nand.io) throw new Error('No Nand has been opened yet!');
+export async function mount(partitionName: string, keysFromUser?: ProdKeys): Promise<NandResult> {
+  const keys = await resolveKeys(keysFromUser);
+  if (!keys) {
+    return { error: NandError.NoProdKeys };
+  }
+
+  if (!nand.io) {
+    return { error: NandError.NoNandOpened };
+  }
 
   const { partitions } = getPartitionTable(nand.io);
   const partition = partitions.find((part) => part.name === partitionName);
@@ -85,18 +92,23 @@ export async function mount(partitionName: string, keys: Keys): Promise<NandResu
   return { error: NandError.None };
 }
 
-export async function readdir(fsPath: string): Promise<FSEntry[]> {
-  if (!nand.fs) throw new Error('No partition mounted!');
-  return nand.fs.readdir(fsPath);
+export async function readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
+  return { error: NandError.None, data: nand.fs.readdir(fsPath) };
 }
 
-export async function copyFile(pathInNand: string, window: BrowserWindow): Promise<void> {
-  if (!nand.fs) throw new Error('No partition mounted!');
+export async function copyFile(pathInNand: string, window: BrowserWindow): Promise<NandResult> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
 
   const result = await dialog.showSaveDialog(window, {
     defaultPath: basename(pathInNand),
   });
-  if (result.canceled) return;
+  if (result.canceled) return { error: NandError.None };
 
   const fd = fs.openSync(result.filePath, 'w+');
   nand.fs.readFile(pathInNand, (chunk) => {
@@ -106,10 +118,16 @@ export async function copyFile(pathInNand: string, window: BrowserWindow): Promi
     }
   });
   fs.closeSync(fd);
+
+  return { error: NandError.None };
 }
 
-export async function format(partitionName: string, keys: Keys): Promise<NandResult> {
-  await mount(partitionName, keys);
+export async function format(partitionName: string, keysFromUser?: ProdKeys): Promise<NandResult> {
+  await mount(partitionName, keysFromUser);
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
   try {
     nand.fs.format();
     return { error: NandError.None };

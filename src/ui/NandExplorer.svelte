@@ -16,7 +16,7 @@
   let nandFile = $derived(files?.[0]);
   let loading = $state(false);
   let disabled = $derived(!keys.value || loading);
-  let tooltip = $derived(loading ? 'Loading...' : disabled && 'Please select your prod.keys in Settings!');
+  let tooltip = $derived(loading ? 'Loading...' : disabled ? 'Please select your prod.keys in Settings!' : undefined);
 
   let partitions = $state<PartitionEntry[] | null>(null);
   let selectedPartition = $state<PartitionEntry | null>(null);
@@ -49,7 +49,10 @@
           return alert(`An unknown error occurred when trying to mount ${selectedPartition.name}!`);
       }
 
-      rootEntries = await window.nxkit.nandReaddir('/');
+      const result = await window.nxkit.nandReaddir('/');
+      if (result.error === NandError.None) {
+        rootEntries = result.data;
+      }
     },
     closePartition: () => {
       rootEntries = null;
@@ -63,7 +66,7 @@
         partitions = null;
         selectedPartition = null;
         files = null;
-        input.value = '';
+        if (input) input.value = '';
       });
     },
   };
@@ -89,7 +92,7 @@
   </div>
 
   <div class="m-2">
-    {#if rootEntries}
+    {#if rootEntries && selectedPartition}
       <p class="text-center">
         Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
       </p>

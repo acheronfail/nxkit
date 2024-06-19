@@ -54,7 +54,7 @@
     isExpanded = expandedState[node.id] = !isExpanded;
     const loadingTimer = setTimeout(() => (isLoading = true), 100);
 
-    openDirectory(node.data)
+    openDirectory?.(node.data)
       .then((nodes) => (children = nodes))
       .catch((err) => alert(`Failed to open "${node.id}": ${String(err)}`))
       .finally(() => {
@@ -117,7 +117,7 @@
 {#if isExpanded}
   {#if isLoading}
     <svelte:self {openDirectory} node={loadingFile} depth={depth + 1} />
-  {:else}
+  {:else if children}
     {#each children as e}
       <!-- svelte-ignore slot_element_deprecated -->
       <svelte:self {openDirectory} node={e} depth={depth + 1}>

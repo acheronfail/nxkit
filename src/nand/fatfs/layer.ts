@@ -34,7 +34,7 @@ export class NandIo {
     }
 
     if (!this.xtsn) {
-      this.io.read(diskOffset, size);
+      return this.io.read(diskOffset, size);
     }
 
     // In order to decrypt, we need to start at a 16 byte offset (it uses aes-based

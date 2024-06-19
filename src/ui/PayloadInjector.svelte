@@ -20,7 +20,7 @@
   //  - select `Install Driver`
 
   let output = $state('');
-  let payloads = $state<FSFile[]>(null);
+  let payloads = $state<FSFile[] | null>(null);
 
   async function updatePayloads() {
     payloads = await window.nxkit.payloadsFind();

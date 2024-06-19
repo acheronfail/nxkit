@@ -10,8 +10,11 @@ export interface ProdKeys {
 export enum NandError {
   None,
   Unknown,
+  NoProdKeys,
   InvalidProdKeys,
   InvalidPartitionTable,
+  NoNandOpened,
+  NoPartitionMounted,
 }
 
 export type NandResult<T = void> =
@@ -79,7 +82,7 @@ export enum Channels {
  * Utility type to assist in defining IPC channel type definitions.
  */
 // eslint-disable-next-line @typescript-eslint/ban-types
-type ChannelImpl<F extends (...args: unknown[]) => unknown> = [Parameters<F>, Promise<ReturnType<F>>];
+type ChannelImpl<F extends (...args: never[]) => unknown> = [Parameters<F>, Promise<ReturnType<F>>];
 
 /**
  * List of all IPC channel type definitions.
@@ -107,8 +110,8 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<PartitionEntry[]>>;
   [Channels.NandClose]: ChannelImpl<() => void>;
   [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
-  [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
-  [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => void>;
+  [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;
+  [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => NandResult>;
   [Channels.NandFormatPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
 }[C];
 

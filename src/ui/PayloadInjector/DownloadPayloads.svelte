@@ -39,10 +39,14 @@
   ];
 
   let selectedPayloadKey = $state<string | undefined>();
-  let selectedPayload = $derived<PayloadOption | undefined>(payloadOptions[selectedPayloadKey]);
+  let selectedPayload = $derived<PayloadOption | undefined>(
+    selectedPayloadKey ? payloadOptions[selectedPayloadKey] : undefined,
+  );
 
   function downloadPayload() {
-    window.nxkit.openLink(selectedPayload.link);
+    if (selectedPayload) {
+      window.nxkit.openLink(selectedPayload.link);
+    }
   }
 </script>
 

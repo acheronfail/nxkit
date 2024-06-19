@@ -4,8 +4,8 @@ import cp from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { Channels, MainChannelImpl, ProdKeys } from '../channels';
-import { findProdKeys, Keys } from './keys';
+import { Channels, MainChannelImpl, NandError } from '../channels';
+import { findProdKeys } from './keys';
 import * as nand from '../nand/explorer';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
@@ -63,10 +63,6 @@ const createMainWindow = (): BrowserWindow => {
   return win;
 };
 
-async function resolveKeys(keysFromUser?: ProdKeys): Promise<Keys> {
-  return keysFromUser ? Keys.parseKeys(keysFromUser.location, keysFromUser.data) : await findProdKeys();
-}
-
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
@@ -110,12 +106,16 @@ app.on('ready', () => {
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),
-    [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) =>
-      nand.mount(paritionName, await resolveKeys(keysFromUser)),
+    [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) => nand.mount(paritionName, keysFromUser),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
-    [Channels.NandCopyFile]: async (_event, pathInNand) => mainWindow && nand.copyFile(pathInNand, mainWindow),
-    [Channels.NandFormatPartition]: async (_event, partName, keysFromUser) =>
-      nand.format(partName, await resolveKeys(keysFromUser)),
+    [Channels.NandCopyFile]: async (_event, pathInNand) => {
+      if (!mainWindow) {
+        return { error: NandError.Unknown };
+      }
+
+      return nand.copyFile(pathInNand, mainWindow);
+    },
+    [Channels.NandFormatPartition]: async (_event, partName, keysFromUser) => nand.format(partName, keysFromUser),
   };
 
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {

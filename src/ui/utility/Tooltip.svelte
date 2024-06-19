@@ -28,6 +28,8 @@
       placement,
       middleware: [offset(offsetPx), flip(), shift({ padding: 5 }), arrow({ element: arrowEl })],
     }).then(({ x, y, placement, middlewareData }) => {
+      if (!referenceEl || !tooltipEl || !arrowEl) return;
+
       Object.assign(tooltipEl.style, {
         left: `${x}px`,
         top: `${y}px`,
@@ -39,7 +41,7 @@
         right: 'left',
         bottom: 'top',
         left: 'right',
-      }[placementSide];
+      }[placementSide]!;
 
       if (middlewareData.arrow) {
         const { x: arrowX, y: arrowY } = middlewareData.arrow;

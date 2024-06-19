@@ -1,3 +1,5 @@
+# TODO: svelte ui tests: @testing-library/svelte + jsdom + vite config + setup nxkit stubs
+
 _default:
   just -l
 

@@ -51,7 +51,7 @@
     });
   }
 
-  async function extractCroppedImage(crop: CropArea): Promise<Blob | null> {
+  async function extractCroppedImage(crop: CropArea): Promise<Blob> {
     if (!imageDataUrl) throw new Error('Cannot extract cropped image without an image!');
 
     const canvas = document.createElement('canvas');
@@ -66,11 +66,23 @@
     const image = await createImageElement(imageDataUrl);
     ctx.drawImage(image, crop.x, crop.y, crop.width, crop.height, 0, 0, canvas.width, canvas.height);
 
-    return await new Promise<Blob | null>((res) => canvas.toBlob(res, `image/jpeg`, 0.95));
+    return await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob(
+        (blob) => {
+          if (blob) {
+            resolve(blob);
+          } else {
+            reject(new Error('An unknown error occurred when producing image'));
+          }
+        },
+        `image/jpeg`,
+        0.95,
+      );
+    });
   }
 
   function reset() {
-    input.value = '';
+    if (input) input.value = '';
     files = null;
     imageDataUrl = null;
     onCropComplete?.(null);

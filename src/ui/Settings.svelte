@@ -23,9 +23,9 @@
   });
 
   function resetKeys() {
-    keys.setUserKeys(null);
+    keys.setUserKeys(undefined);
     files = null;
-    input.value = '';
+    if (input) input.value = '';
   }
 </script>
 

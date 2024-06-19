@@ -86,7 +86,9 @@ export async function injectPayload(dev: USBDevice, payload: Uint8Array, logCall
   await dev.claimInterface(0);
 
   const deviceID = await dev.transferIn(1, 16);
-  logCallback(`Device ID: ${bufferToHex(deviceID.data)}`);
+  if (deviceID.data) {
+    logCallback(`Device ID: ${bufferToHex(deviceID.data)}`);
+  }
 
   const rcmPayload = createRCMPayload(payload);
   logCallback('Sending payload...');

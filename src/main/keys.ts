@@ -3,8 +3,20 @@ import { Xtsn } from '../nand/xtsn';
 import { RawKeys, RawKeysSchema } from './keys.types';
 import { getResources } from '../resources';
 import { app } from 'electron';
+import { ProdKeys } from '../channels';
 
 export type BisKeyId = 0 | 1 | 2 | 3;
+
+export async function resolveKeys(keysFromUser?: ProdKeys): Promise<Keys | null> {
+  if (keysFromUser) {
+    const parsed = Keys.parseKeys(keysFromUser.location, keysFromUser.data);
+    if (parsed) {
+      return parsed;
+    }
+  }
+
+  return findProdKeys();
+}
 
 export async function findProdKeys(): Promise<Keys | null> {
   for (const filePath of getResources(app.isPackaged).prodKeysSearchPaths) {

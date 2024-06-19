@@ -19,7 +19,7 @@ const p = (
   name,
   bisKeyId,
   magicOffset,
-  magicBytes: magicBytes && Buffer.from(magicBytes),
+  magicBytes: magicBytes ? Buffer.from(magicBytes) : undefined,
 });
 
 // TODO: support BOOT0 and BOOT1 ?

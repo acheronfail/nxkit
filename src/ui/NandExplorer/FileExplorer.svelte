@@ -23,6 +23,7 @@
   import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
+  import { NandError } from 'src/channels';
 
   let { rootEntries }: Props = $props();
 
@@ -42,7 +43,14 @@
       await window.nxkit.nandCopyFile(file.path);
     },
     openNandDirectory: async (dir: FSDirectory): Promise<Node<FSDirectory, FSFile>[]> => {
-      return window.nxkit.nandReaddir(dir.path).then((entries) => entries.map(entryToNode));
+      return window.nxkit.nandReaddir(dir.path).then((result) => {
+        if (result.error === NandError.None) {
+          return result.data.map(entryToNode);
+        }
+
+        console.error(`Failed to readdir: ${result.error}`);
+        return [];
+      });
     },
   };
 </script>

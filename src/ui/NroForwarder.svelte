@@ -34,7 +34,7 @@
 
   let disabled = $derived(!keys.value || !image);
   let tooltip = $derived(
-    !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : null,
+    !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : undefined,
   );
 
   let stdout = $state('');
@@ -42,6 +42,14 @@
 
   async function generate() {
     try {
+      if (!image) {
+        throw new Error('Cannot generate an NSP without an image!');
+      }
+
+      if (!keys.value) {
+        throw new Error('Cannot generate an NSP without prod.keys!');
+      }
+
       const imageBlob = await image.toBlob();
       const imageData = new Uint8Array(await imageBlob.arrayBuffer());
 

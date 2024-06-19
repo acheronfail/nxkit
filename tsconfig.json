@@ -12,6 +12,7 @@
     "outDir": "dist",
     "noEmit": true,
     "moduleResolution": "node",
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "strict": true
   }
 }
