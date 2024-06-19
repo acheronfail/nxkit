@@ -2,15 +2,11 @@
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { Channels, ChannelImplDefinition, ExposedPreloadAPIs } from './channels';
-
-enum ExposedAPIs {
-  Bridge = 'nxkit',
-}
+import { Channels, ChannelImplDefinition, ExposedPreloadAPIs, NXKitBridgeKey, NXKitBridgeKeyType } from './channels';
 
 declare global {
   interface Window {
-    [ExposedAPIs.Bridge]: ExposedPreloadAPIs;
+    [NXKitBridgeKey]: ExposedPreloadAPIs;
   }
 }
 
@@ -18,14 +14,14 @@ function invoke<C extends Channels>(channel: C, ...args: ChannelImplDefinition<C
   return ipcRenderer.invoke(channel.toString(), ...args);
 }
 
-function exposeInMainWorld<K extends ExposedAPIs>(key: K, value: Window[K]) {
+function exposeInMainWorld<K extends NXKitBridgeKeyType>(key: K, value: Window[K]) {
   contextBridge.exposeInMainWorld(key, value);
 }
 
 // -----------------------------------------------------------------------------
 
 invoke(Channels.PreloadBrige).then((bridge) =>
-  exposeInMainWorld(ExposedAPIs.Bridge, {
+  exposeInMainWorld(NXKitBridgeKey, {
     ...bridge,
     openLink: (link) => invoke(Channels.OpenLink, link),
 

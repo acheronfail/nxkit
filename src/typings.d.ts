@@ -1,5 +1,9 @@
 /// <reference types="vite/client" />
 
+/*
+ * Imported as URLs by vite
+ */
+
 declare module '*.exe' {
   const src: string;
   export default src;

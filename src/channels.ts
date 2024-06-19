@@ -41,6 +41,8 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandFormatPartition: RendererChannelImpl[Channels.NandFormatPartition];
 }
 
+export const NXKitBridgeKey = 'nxkit';
+export type NXKitBridgeKeyType = typeof NXKitBridgeKey;
 export interface NXKitBridge {
   isWindows: boolean;
   isLinux: boolean;

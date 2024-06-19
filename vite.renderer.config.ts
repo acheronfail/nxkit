@@ -5,6 +5,8 @@ import wasm from 'vite-plugin-wasm';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { pluginExposeRenderer } from './vite.base.config';
 
+export const assetsInclude = ['**/exefs/*'];
+
 // https://vitejs.dev/config
 export default defineConfig((env) => {
   const forgeEnv = env as ConfigEnv<'renderer'>;
@@ -14,7 +16,7 @@ export default defineConfig((env) => {
   return {
     root,
     mode,
-    assetsInclude: ['**/exefs/*'],
+    assetsInclude,
     base: './',
     build: {
       outDir: `.vite/${name}`,

@@ -82,7 +82,7 @@
   const tooltipClass = 'w-60 text-center';
 </script>
 
-<Container class="gap-4">
+<Container class="gap-4" data-testid="nro-forwarder">
   <Tabs>
     <TabItem defaultOpen>
       <span slot="label">Application</span>

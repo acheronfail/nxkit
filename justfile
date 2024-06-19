@@ -1,5 +1,3 @@
-# TODO: svelte ui tests: @testing-library/svelte + jsdom + vite config + setup nxkit stubs
-
 _default:
   just -l
 
@@ -23,7 +21,7 @@ test:
 
 # runs vitest in watch mode
 testw:
-  npm exec vitest
+  npm run test:vitest
 
 # formats all code
 format:

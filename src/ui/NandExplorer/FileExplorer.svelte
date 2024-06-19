@@ -23,7 +23,7 @@
   import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
-  import { NandError } from 'src/channels';
+  import { NandError } from '../../channels';
 
   let { rootEntries }: Props = $props();
 
