@@ -15,6 +15,10 @@ setup:
 # Dev Scripts
 #
 
+# start the app in dev mode
+dev *args:
+  npm start -- -- {{args}}
+
 # runs all tests and checks
 test:
   npm run test

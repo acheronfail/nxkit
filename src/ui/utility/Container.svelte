@@ -3,14 +3,17 @@
 
   export interface Props extends HTMLAttributes<HTMLDivElement> {
     class?: string;
+    fillContainer?: boolean;
   }
 </script>
 
 <script lang="ts">
-  let { class: cls, ...rest }: Props = $props();
+  let { class: cls, fillContainer, ...rest }: Props = $props();
+
+  const fillClass = fillContainer ? 'h-full w-full' : '';
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
-<div class="flex flex-col gap-px gap-3 my-2 h-full w-full {cls}" {...rest}>
+<div class="flex flex-col gap-px gap-3 my-2 {fillClass} {cls}" {...rest}>
   <slot />
 </div>

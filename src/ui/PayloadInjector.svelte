@@ -9,6 +9,7 @@
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
   import Tooltip from './utility/Tooltip.svelte';
   import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
+  import LogOutput from './utility/LogOutput.svelte';
 
   // TODO: description of how to enter RCM mode
   // TODO: doc linux udev: `SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"` @ `/etc/udev/rules.d/50-switch.rules`
@@ -53,7 +54,7 @@
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
-<Container>
+<Container fillContainer>
   <div class="flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
@@ -82,6 +83,8 @@
       </div>
     {/if}
 
-    <pre id="inject-logs">{output}</pre>
+    {#if output}
+      <LogOutput title="Payload Injection Log" bind:output />
+    {/if}
   </div>
 </Container>

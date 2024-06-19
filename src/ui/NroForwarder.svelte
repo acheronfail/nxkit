@@ -10,6 +10,7 @@
   import Tabs from './utility/Tabs.svelte';
   import InputFile from './utility/InputText.svelte';
   import InputImage, { type Image } from './utility/InputImage.svelte';
+  import LogOutput from './utility/LogOutput.svelte';
 
   // TODO: choose mounted Switch SD card for path autocomplete and validation?
 
@@ -128,5 +129,5 @@
   <Button class="mt-4" appearance="primary" size="large" onclick={generate} {disabled} {tooltip}>Generate NSP</Button>
 </Container>
 
-<pre>{stdout}</pre>
-<pre>{stderr}</pre>
+{#if stdout}<LogOutput title="Standard Out" bind:output={stdout} />{/if}
+{#if stderr}<LogOutput title="Standard Err" bind:output={stderr} />{/if}

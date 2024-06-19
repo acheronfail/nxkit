@@ -3,3 +3,8 @@
 @tailwind utilities;
 
 /* TODO: verify light mode styling */
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #0f172a rgba(0, 0, 0, 0);
+}
