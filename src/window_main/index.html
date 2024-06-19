@@ -1,16 +1,16 @@
 <!doctype html>
-<html>
+<html class="h-full w-full">
   <head>
     <meta charset="UTF-8" />
     <title>🎮️ NXKit</title>
   </head>
-  <body class="bg-white dark:bg-slate-800 text-white font-sans">
+  <body class="bg-white dark:bg-slate-800 text-white font-sans h-full w-full flex flex-col">
     <h1 class="font-bold text-2xl text-center pt-2" style="-webkit-app-region: drag">
       <span class="bg-gradient-to-br from-red-500 to-yellow-500 bg-clip-text text-transparent box-decoration-clone">
         NXKit
       </span>
     </h1>
-    <div id="app" class="max-w-screen-lg m-auto py-2 px-4"></div>
+    <div id="app" class="max-w-screen-lg grow py-2 px-4 flex flex-col"></div>
     <script type="module" src="/src/window_main/index.ts"></script>
   </body>
 </html>

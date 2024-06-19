@@ -4,7 +4,7 @@
   import Tooltip from './Tooltip.svelte';
 
   export type Appearance = 'primary' | 'default' | 'warning' | 'danger';
-  export type Size = 'large' | 'default' | 'inline';
+  export type Size = 'large' | 'default' | 'inline' | 'small';
 
   export interface Props extends HTMLAttributes<HTMLElement> {
     appearance?: Appearance;
@@ -32,6 +32,7 @@
     large: 'py-2 px-4 font-bold',
     default: 'py-1 px-2 font-bold',
     inline: 'px-1',
+    small: 'px-1 text-xs',
   };
 
   const preventDefault = (e: Event) => e.preventDefault();

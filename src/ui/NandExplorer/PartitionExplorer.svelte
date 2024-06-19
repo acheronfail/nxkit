@@ -1,6 +1,6 @@
 <script lang="ts" context="module">
   import type { PartitionEntry } from '../../nand/gpt';
-  import type { Node } from '../utility/FileTreeNode.svelte';
+  import type { Node } from '../utility/FileTree/FileTreeNode.svelte';
   import prettyBytes from 'pretty-bytes';
 
   export interface Props {
@@ -31,10 +31,10 @@
 
 <script lang="ts">
   import { CircleStackIcon, XCircleIcon } from 'heroicons-svelte/24/solid';
-  import FileTreeRoot from '../utility/FileTreeRoot.svelte';
-  import ActionButtons from './ActionButtons.svelte';
+  import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
+  import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import Tooltip from '../utility/Tooltip.svelte';
-  import ActionButton from './ActionButton.svelte';
+  import ActionButton from '../utility/FileTree/ActionButton.svelte';
 
   let { partitions = $bindable(), onPartitionChoose }: Props = $props();
 

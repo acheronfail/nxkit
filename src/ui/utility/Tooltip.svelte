@@ -55,7 +55,7 @@
           right: '',
           bottom: '',
           transform: `rotate(${rotation}deg)`,
-          [staticSide]: `${-arrowSizePx}px`,
+          [staticSide]: `${-arrowSizePx - 1}px`,
         });
       }
     });
@@ -84,6 +84,7 @@
     fill: 'fill-slate-900',
     border: 'border-slate-600',
     stroke: 'stroke-slate-600',
+    strokeBg: 'stroke-slate-900',
   };
 </script>
 
@@ -99,7 +100,10 @@
     {/if}
     <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
       <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
-        <polygon points="0 0, 0 {arrowSizePx}, {arrowSizePx}, {arrowSizePx}, 0" class={c.fill} />
+        <polygon
+          points="1 1, 1 {arrowSizePx - 1}, {arrowSizePx - 1}, {arrowSizePx - 1}, 1"
+          class="{c.strokeBg} {c.fill}"
+        />
         <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
         <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
       </svg>

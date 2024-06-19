@@ -74,7 +74,7 @@
   const tooltipClass = 'w-60 text-center';
 </script>
 
-<Container>
+<Container class="gap-4">
   <Tabs>
     <TabItem defaultOpen>
       <span slot="label">Application</span>

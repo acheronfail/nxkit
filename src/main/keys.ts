@@ -1,18 +1,13 @@
 import fs from 'node:fs/promises';
-import os from 'node:os';
-import path from 'node:path';
 import { Xtsn } from '../nand/xtsn';
 import { RawKeys, RawKeysSchema } from './keys.types';
+import { getResources } from '../resources';
+import { app } from 'electron';
 
 export type BisKeyId = 0 | 1 | 2 | 3;
 
-export const PROD_KEYS_SEARCH_PATHS: string[] = [
-  path.resolve(os.homedir(), '.switch', 'prod.keys'),
-  path.resolve(process.cwd(), 'prod.keys'),
-];
-
 export async function findProdKeys(): Promise<Keys | null> {
-  for (const filePath of PROD_KEYS_SEARCH_PATHS) {
+  for (const filePath of getResources(app.isPackaged).prodKeysSearchPaths) {
     try {
       const text = await fs.readFile(filePath, 'utf-8');
       return Keys.parseKeys(filePath, text);

@@ -1,8 +1,8 @@
 <script lang="ts" context="module">
   import type { FSDirectory, FSEntry, FSFile } from '../../nand/fatfs/fs';
-  import type { Node } from '../utility/FileTreeNode.svelte';
+  import type { Node } from '../utility/FileTree/FileTreeNode.svelte';
 
-  function entryToNode(entry: FSEntry): Node<FSDirectory, FSFile> {
+  export function entryToNode(entry: FSEntry): Node<FSDirectory, FSFile> {
     return {
       id: entry.path,
       name: entry.name,
@@ -20,9 +20,9 @@
   import Tooltip from '../utility/Tooltip.svelte';
 
   import { ArrowDownTrayIcon, EllipsisHorizontalCircleIcon } from 'heroicons-svelte/24/outline';
-  import FileTreeRoot from '../utility/FileTreeRoot.svelte';
-  import ActionButton from './ActionButton.svelte';
-  import ActionButtons from './ActionButtons.svelte';
+  import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
+  import ActionButton from '../utility/FileTree/ActionButton.svelte';
+  import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
 
   let { rootEntries }: Props = $props();
 

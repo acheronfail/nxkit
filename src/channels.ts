@@ -1,5 +1,5 @@
 import { IpcMainInvokeEvent } from 'electron';
-import { FSEntry } from './nand/fatfs/fs';
+import { FSEntry, FSFile } from './nand/fatfs/fs';
 import { PartitionEntry } from './nand/gpt';
 
 export interface ProdKeys {
@@ -20,6 +20,11 @@ export type NandResult<T = void> =
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
+
+  payloadsOpenDirectory: RendererChannelImpl[Channels.PayloadsOpenDirectory];
+  payloadsReadFile: RendererChannelImpl[Channels.PayloadsReadFile];
+  payloadsFind: RendererChannelImpl[Channels.PayloadsFind];
+
   keysFind: RendererChannelImpl[Channels.ProdKeysFind];
   keysSearchPaths: RendererChannelImpl[Channels.ProdKeysSearchPaths];
 
@@ -33,6 +38,8 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
 
 export interface NXKitBridge {
   isWindows: boolean;
+  isLinux: boolean;
+  isOsx: boolean;
 }
 
 /**
@@ -40,7 +47,13 @@ export interface NXKitBridge {
  */
 export enum Channels {
   PreloadBrige,
+
   TegraRcmSmash,
+
+  PayloadsOpenDirectory,
+  PayloadsReadFile,
+  PayloadsFind,
+
   ProdKeysFind,
   ProdKeysSearchPaths,
 
@@ -69,6 +82,7 @@ type ChannelImpl<F extends (...args: unknown[]) => unknown> = [Parameters<F>, Pr
  */
 export type ChannelImplDefinition<C extends Channels> = {
   [Channels.PreloadBrige]: ChannelImpl<() => NXKitBridge>;
+
   [Channels.TegraRcmSmash]: ChannelImpl<
     (payloadPath: string) => {
       success: boolean;
@@ -76,6 +90,11 @@ export type ChannelImplDefinition<C extends Channels> = {
       stderr: string;
     }
   >;
+
+  [Channels.PayloadsOpenDirectory]: ChannelImpl<() => void>;
+  [Channels.PayloadsReadFile]: ChannelImpl<(payloadPath: string) => Uint8Array>;
+  [Channels.PayloadsFind]: ChannelImpl<() => FSFile[]>;
+
   [Channels.ProdKeysFind]: ChannelImpl<() => ProdKeys | null>;
   [Channels.ProdKeysSearchPaths]: ChannelImpl<() => string[]>;
 

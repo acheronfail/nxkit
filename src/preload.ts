@@ -28,6 +28,11 @@ invoke(Channels.PreloadBrige).then((bridge) =>
   exposeInMainWorld(ExposedAPIs.Bridge, {
     ...bridge,
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
+
+    payloadsOpenDirectory: () => invoke(Channels.PayloadsOpenDirectory),
+    payloadsReadFile: (payloadPath) => invoke(Channels.PayloadsReadFile, payloadPath),
+    payloadsFind: () => invoke(Channels.PayloadsFind),
+
     keysFind: () => invoke(Channels.ProdKeysFind),
     keysSearchPaths: () => invoke(Channels.ProdKeysSearchPaths),
 

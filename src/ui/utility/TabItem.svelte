@@ -29,7 +29,7 @@
   </button>
 
   {#if open}
-    <div use:init>
+    <div class="w-full h-full" use:init>
       <slot name="content" />
     </div>
   {/if}

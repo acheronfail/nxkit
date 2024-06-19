@@ -1,16 +1,15 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import { platform } from 'node:os';
 import cp from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Channels, MainChannelImpl, ProdKeys } from '../channels';
-import { findProdKeys, Keys, PROD_KEYS_SEARCH_PATHS } from './keys';
+import { findProdKeys, Keys } from './keys';
 import * as nand from '../nand/explorer';
+import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
-
-automaticContextMenus({});
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -19,6 +18,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 if (require('electron-squirrel-startup')) {
   app.quit();
 }
+
+automaticContextMenus({});
 
 function loadWindow(window: BrowserWindow, name: string) {
   if (RENDERER_VITE_DEV_SERVER_URL) {
@@ -64,15 +65,22 @@ async function resolveKeys(keysFromUser?: ProdKeys): Promise<Keys> {
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
+  const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
+
   let mainWindow: BrowserWindow | undefined = undefined;
   const mainChannelImpl: MainChannelImpl = {
-    [Channels.PreloadBrige]: async () => ({
-      isWindows: platform() === 'win32',
-    }),
+    [Channels.PreloadBrige]: async () => {
+      const plat = platform();
+      return {
+        isWindows: plat === 'win32',
+        isLinux: plat === 'linux',
+        isOsx: plat === 'darwin',
+      };
+    },
     [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {
       return new Promise((resolve) => {
         // TODO: compile TegraRcmSmash ourselves
-        const { tegraRcmSmash } = getResources(app.isPackaged);
+
         cp.execFile(tegraRcmSmash, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
           resolve({
             success: !err,
@@ -82,9 +90,14 @@ app.on('ready', () => {
         });
       });
     },
+
+    [Channels.PayloadsOpenDirectory]: async (_event) => shell.showItemInFolder(payloadDirectory),
+    [Channels.PayloadsReadFile]: (_event, payloadPath) => payloads.readPayload(payloadPath),
+    [Channels.PayloadsFind]: (_event) => payloads.findPayloads(),
+
     [Channels.ProdKeysFind]: (_event) =>
       findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
-    [Channels.ProdKeysSearchPaths]: async (_event) => PROD_KEYS_SEARCH_PATHS,
+    [Channels.ProdKeysSearchPaths]: async (_event) => prodKeysSearchPaths,
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),
