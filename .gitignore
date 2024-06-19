@@ -90,3 +90,6 @@ typings/
 
 # Electron-Forge
 out/
+
+# NXKit
+precommit.diff
