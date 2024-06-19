@@ -8,8 +8,8 @@
   import { entryToNode } from './NandExplorer/FileExplorer.svelte';
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
   import Tooltip from './utility/Tooltip.svelte';
+  import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
 
-  // TODO: provide the ability to download hekate and tegra automatically into it
   // TODO: description of how to enter RCM mode
   // TODO: doc linux udev: `SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"` @ `/etc/udev/rules.d/50-switch.rules`
   // TODO: doc windows usb driver install:
@@ -19,14 +19,18 @@
   //  - select `libusbK`
   //  - select `Install Driver`
 
+  let output = $state('');
   let payloads = $state<FSFile[]>(null);
 
-  // TODO: auto-refresh when files are added to the directory?
-  onMount(async () => {
+  async function updatePayloads() {
     payloads = await window.nxkit.payloadsFind();
-  });
+  }
 
-  let output = $state('');
+  onMount(() => {
+    updatePayloads();
+    window.addEventListener('focus', updatePayloads);
+    return () => window.removeEventListener('focus', updatePayloads);
+  });
 
   const handlers = {
     openPayloadDir: () => window.nxkit.payloadsOpenDirectory(),
@@ -66,12 +70,14 @@
           </Tooltip>
         </ActionButtons>
       </FileTreeRoot>
-      <p class="text-center">
+      <DownloadPayloads />
+      <div class="text-center">
         <Button onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
-      </p>
+      </div>
     {:else}
       <div class="h-full flex flex-col gap-2 justify-center items-center">
-        <p>No payloads found!</p>
+        <h3 class="font-bold">No payloads found!</h3>
+        <DownloadPayloads />
         <Button appearance="primary" onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
       </div>
     {/if}

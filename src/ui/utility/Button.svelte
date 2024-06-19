@@ -17,10 +17,18 @@
 </script>
 
 <script lang="ts">
-  let { appearance = 'default', size = 'default', disabled = false, children, tooltip, ...rest }: Props = $props();
+  let {
+    appearance = 'default',
+    size = 'default',
+    disabled = false,
+    children,
+    tooltip,
+    class: cls,
+    ...rest
+  }: Props = $props();
 
   const innerClass = 'w-full h-full';
-  const buttonClass = `select-none inline-block text-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded`;
+  const buttonClass = `select-none text-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded`;
   const disabledClass = `bg-slate-600 text-slate-400 hover:text-slate-400`;
   const appearanceClass: Record<Appearance, string> = {
     primary: `text-white bg-blue-500 hover:bg-blue-700 active:bg-blue-500`,
@@ -31,7 +39,7 @@
   const sizeClass: Record<Size, string> = {
     large: 'py-2 px-4 font-bold',
     default: 'py-1 px-2 font-bold',
-    inline: 'px-1',
+    inline: 'px-2 text-sm',
     small: 'px-1 text-xs',
   };
 
@@ -43,7 +51,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <label
     onclick={disabled ? preventDefault : rest.onclick}
-    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass}"
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
     {...rest}
   >
     {#if tooltip}
@@ -59,7 +67,7 @@
   </label>
 {:else}
   <button
-    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass}"
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
     {disabled}
     {...rest}
   >

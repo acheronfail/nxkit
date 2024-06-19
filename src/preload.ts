@@ -27,6 +27,8 @@ function exposeInMainWorld<K extends ExposedAPIs>(key: K, value: Window[K]) {
 invoke(Channels.PreloadBrige).then((bridge) =>
   exposeInMainWorld(ExposedAPIs.Bridge, {
     ...bridge,
+    openLink: (link) => invoke(Channels.OpenLink, link),
+
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
 
     payloadsOpenDirectory: () => invoke(Channels.PayloadsOpenDirectory),

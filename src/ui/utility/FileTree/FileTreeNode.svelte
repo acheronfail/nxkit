@@ -70,7 +70,8 @@
   <div
     class={itemClass}
     class:text-slate-500={node.isDisabled}
-    class:focus:bg-blue-500={!node.isDisabled}
+    class:focus:bg-blue-600={!node.isDisabled}
+    class:focus:hover:bg-blue-500={!node.isDisabled}
     class:hover:dark:bg-slate-600={!node.isDisabled}
     role={node.isDisabled ? '' : 'button'}
     tabIndex={node.isDisabled ? -1 : 0}

@@ -21,11 +21,11 @@ if (require('electron-squirrel-startup')) {
 
 automaticContextMenus({});
 
-function loadWindow(window: BrowserWindow, name: string) {
+function loadWindow(window: BrowserWindow, name: string, params?: URLSearchParams) {
   if (RENDERER_VITE_DEV_SERVER_URL) {
-    window.loadURL(`${RENDERER_VITE_DEV_SERVER_URL}/src/${name}/index.html`);
+    window.loadURL(`${RENDERER_VITE_DEV_SERVER_URL}/src/${name}/index.html?${params}`);
   } else {
-    window.loadFile(path.join(__dirname, `../${RENDERER_VITE_NAME}/src/${name}/index.html`));
+    window.loadFile(path.join(__dirname, `../${RENDERER_VITE_NAME}/src/${name}/index.html?${params}`));
   }
 }
 
@@ -43,7 +43,13 @@ const createMainWindow = (): BrowserWindow => {
 
   win.once('ready-to-show', () => win.show());
 
-  loadWindow(win, 'window_main');
+  const params = new URLSearchParams();
+  const match = /--tab[= ](\S+)/.exec(process.argv.slice(2).join(' '));
+  if (match) {
+    params.set('tab', match[1]);
+  }
+
+  loadWindow(win, 'window_main', params);
 
   if (!app.isPackaged) {
     win.webContents.openDevTools();
@@ -77,6 +83,9 @@ app.on('ready', () => {
         isOsx: plat === 'darwin',
       };
     },
+
+    [Channels.OpenLink]: async (_event, link) => shell.openExternal(link),
+
     [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {
       return new Promise((resolve) => {
         // TODO: compile TegraRcmSmash ourselves

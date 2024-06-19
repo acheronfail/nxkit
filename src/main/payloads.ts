@@ -21,16 +21,18 @@ export async function findPayloads(): Promise<FSFile[]> {
 
   const payloads = await fs.readdir(payloadDirectory);
   return Promise.all(
-    payloads.map(async (name) => {
-      const path = join(payloadDirectory, name);
-      const stat = await fs.stat(path);
-      return {
-        name,
-        path,
-        size: stat.size,
-        sizeHuman: prettyBytes(stat.size),
-        type: 'f',
-      };
-    }),
+    payloads
+      .filter((name) => name.endsWith('.bin'))
+      .map(async (name) => {
+        const path = join(payloadDirectory, name);
+        const stat = await fs.stat(path);
+        return {
+          name,
+          path,
+          size: stat.size,
+          sizeHuman: prettyBytes(stat.size),
+          type: 'f',
+        };
+      }),
   );
 }

@@ -3,6 +3,7 @@
 
   export interface Props {
     placement?: Placement;
+    disabled?: boolean;
   }
 </script>
 
@@ -10,7 +11,7 @@
   import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
   import { onMount } from 'svelte';
 
-  let { placement }: Props = $props();
+  let { placement, disabled = false }: Props = $props();
 
   let referenceEl = $state<HTMLElement | null>(null);
   let tooltipEl = $state<HTMLElement | null>(null);
@@ -62,20 +63,20 @@
   }
 
   function show() {
-    if ($$slots.tooltip) {
+    if ($$slots.tooltip && tooltipEl) {
       update();
       tooltipEl.style.display = 'block';
     }
   }
 
   function hide() {
-    if ($$slots.tooltip) {
+    if ($$slots.tooltip && tooltipEl) {
       tooltipEl.style.display = '';
     }
   }
 
   onMount(() => {
-    tooltipEl.style.display = hidden ? '' : 'block';
+    if (tooltipEl) tooltipEl.style.display = hidden ? '' : 'block';
     if (!hidden) update();
   });
 
@@ -94,19 +95,21 @@
     <slot name="content" />
   </span>
 
-  <div bind:this={tooltipEl} class="hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
-    {#if $$slots.tooltip}
-      <slot name="tooltip" />
-    {/if}
-    <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
-      <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
-        <polygon
-          points="1 1, 1 {arrowSizePx - 1}, {arrowSizePx - 1}, {arrowSizePx - 1}, 1"
-          class="{c.strokeBg} {c.fill}"
-        />
-        <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
-        <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
-      </svg>
+  {#if !disabled}
+    <div bind:this={tooltipEl} class="hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
+      {#if $$slots.tooltip}
+        <slot name="tooltip" />
+      {/if}
+      <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
+        <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
+          <polygon
+            points="1 1, 1 {arrowSizePx - 1}, {arrowSizePx - 1}, {arrowSizePx - 1}, 1"
+            class="{c.strokeBg} {c.fill}"
+          />
+          <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
+          <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
+        </svg>
+      </div>
     </div>
-  </div>
+  {/if}
 {/if}

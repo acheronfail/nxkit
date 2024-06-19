@@ -9,6 +9,7 @@
   import type { FSEntry } from '../nand/fatfs/fs';
   import type { PartitionEntry } from '../nand/gpt';
   import { onMount } from 'svelte';
+  import Tooltip from './utility/Tooltip.svelte';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -71,9 +72,17 @@
 <Container>
   <div class="flex flex-col">
     {#if nandFile}
-      <Button appearance="warning" size="large" {disabled} {tooltip} onclick={handlers.reset}>Close Nand</Button>
+      <Button appearance="warning" size="large" {disabled} {tooltip} onclick={handlers.reset}>Close NAND</Button>
     {:else}
-      <Button appearance="primary" size="large" for="rawnand-file" {disabled} {tooltip}>Choose your rawnand.bin</Button>
+      <Tooltip>
+        <p slot="tooltip" class="text-center w-96">
+          Choose either a complete dump <Code>rawnand.bin</Code>
+          <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
+        </p>
+        <Button slot="content" appearance="primary" size="large" class="block" for="rawnand-file" {disabled} {tooltip}>
+          Choose your rawnand.bin
+        </Button>
+      </Tooltip>
     {/if}
 
     <input hidden id="rawnand-file" type="file" bind:files bind:this={input} onchange={handlers.onNandChoose} />
@@ -83,8 +92,10 @@
     {#if rootEntries}
       <p class="text-center">
         Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
-        <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </p>
+      <div class="text-center">
+        <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
+      </div>
       <FileExplorer {rootEntries} />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>

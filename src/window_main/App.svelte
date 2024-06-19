@@ -12,6 +12,8 @@
   // TODO: be able to programmatically control selected tab
   // TODO: select tabs with `cmdCtrl+number`
 
+  const defaultOpen = new URLSearchParams(window.location.search).get('tab');
+
   onMount(async () => {
     const keysFromMain = await window.nxkit.keysFind();
     if (keysFromMain) {
@@ -22,19 +24,19 @@
 
 <Tabs fillContainer>
   <!-- TODO: tool to split/merge files to/from fat32 chunks -->
-  <TabItem defaultOpen>
-    <span slot="label">Nro Forwarder</span>
+  <TabItem defaultOpen={!defaultOpen || defaultOpen === 'forwarder'}>
+    <span slot="label">NRO Forwarder</span>
     <NroForwarder slot="content" />
   </TabItem>
-  <TabItem>
+  <TabItem defaultOpen={defaultOpen === 'injector'}>
     <span slot="label">Payload Injector</span>
     <PayloadInjector slot="content" />
   </TabItem>
-  <TabItem>
-    <span slot="label">Nand Explorer</span>
+  <TabItem defaultOpen={defaultOpen === 'explorer'}>
+    <span slot="label">NAND Explorer</span>
     <NandExplorer slot="content" />
   </TabItem>
-  <TabItem>
+  <TabItem defaultOpen={defaultOpen === 'settings'}>
     <span slot="label" class="flex flex-row justify-center items-center">
       Settings
       {#if !keys.value}

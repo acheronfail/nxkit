@@ -19,6 +19,8 @@ export type NandResult<T = void> =
   | { error: Exclude<NandError, NandError.None> };
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
+  openLink: RendererChannelImpl[Channels.OpenLink];
+
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
 
   payloadsOpenDirectory: RendererChannelImpl[Channels.PayloadsOpenDirectory];
@@ -47,6 +49,8 @@ export interface NXKitBridge {
  */
 export enum Channels {
   PreloadBrige,
+
+  OpenLink,
 
   TegraRcmSmash,
 
@@ -82,6 +86,8 @@ type ChannelImpl<F extends (...args: unknown[]) => unknown> = [Parameters<F>, Pr
  */
 export type ChannelImplDefinition<C extends Channels> = {
   [Channels.PreloadBrige]: ChannelImpl<() => NXKitBridge>;
+
+  [Channels.OpenLink]: ChannelImpl<(link: string) => void>;
 
   [Channels.TegraRcmSmash]: ChannelImpl<
     (payloadPath: string) => {

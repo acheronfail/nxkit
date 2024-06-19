@@ -117,7 +117,7 @@
     </TabItem>
   </Tabs>
 
-  <Button appearance="primary" size="large" onclick={generate} {disabled} {tooltip}>Generate NSP</Button>
+  <Button class="mt-4" appearance="primary" size="large" onclick={generate} {disabled} {tooltip}>Generate NSP</Button>
 </Container>
 
 <pre>{stdout}</pre>
