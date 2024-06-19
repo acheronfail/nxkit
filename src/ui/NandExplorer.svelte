@@ -8,7 +8,6 @@
   import PartitionExplorer from './NandExplorer/PartitionExplorer.svelte';
   import type { FSEntry } from '../nand/fatfs/fs';
   import type { PartitionEntry } from '../nand/gpt';
-  import { onMount } from 'svelte';
   import Tooltip from './utility/Tooltip.svelte';
 
   let input = $state<HTMLInputElement | null>(null);

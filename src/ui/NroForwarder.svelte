@@ -1,5 +1,4 @@
 <script lang="ts">
-  import ImageCropper from 'svelte-easy-crop';
   import { downloadFile } from '../browser/file';
   import { buildNsp } from '../hacbrewpack/nsp';
   import { generateTitleId } from '../hacbrewpack/id';
