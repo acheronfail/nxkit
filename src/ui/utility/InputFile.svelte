@@ -1,11 +1,10 @@
 <script lang="ts" context="module">
-  export interface Props {
+  import type { HTMLInputAttributes } from 'svelte/elements';
+
+  export interface Props extends HTMLInputAttributes {
     id?: string;
     label: string;
     files: FileList;
-
-    // TODO: restrict this to HTMLInput props
-    [key: string]: any;
   }
 </script>
 

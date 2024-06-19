@@ -1,35 +1,14 @@
-<script lang="ts" context="module">
-  import type { FSEntry } from '../nand/fatfs/fs';
-  import type { PartitionEntry } from '../nand/gpt';
-  import type { Node } from './utility/FileTreeNode.svelte';
-  import { onMount } from 'svelte';
-
-  function isPartitionDisabled(partition: PartitionEntry): boolean {
-    // NOTE: currently all non FAT partitions are disabled, since we don't support
-    // mounting them (yet!)
-    return !['USER', 'SAFE', 'SYSTEM', 'PRODINFOF'].includes(partition.name);
-  }
-
-  function partitionToNode(partition: PartitionEntry): Node<PartitionEntry, never> {
-    return {
-      id: partition.type,
-      name: partition.name,
-      isDirectory: false,
-      isDisabled: isPartitionDisabled(partition),
-      data: partition,
-    };
-  }
-</script>
-
 <script lang="ts">
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
-  import FileTreeRoot from './utility/FileTreeRoot.svelte';
   import Code from './utility/Code.svelte';
-  import { CircleStackIcon } from 'heroicons-svelte/24/outline';
   import { NandError } from '../channels';
   import FileExplorer from './NandExplorer/FileExplorer.svelte';
+  import PartitionExplorer from './NandExplorer/PartitionExplorer.svelte';
+  import type { FSEntry } from '../nand/fatfs/fs';
+  import type { PartitionEntry } from '../nand/gpt';
+  import { onMount } from 'svelte';
 
   let input = $state<HTMLInputElement | null>(null);
   let files = $state<FileList | null>(null);
@@ -109,14 +88,7 @@
       <FileExplorer {rootEntries} />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
-      <FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={handlers.onPartitionChoose}>
-        <CircleStackIcon slot="icon" let:iconClass class="text-red-300 {iconClass}" />
-        <div slot="file-extra" let:file>
-          {#if isPartitionDisabled(file)}
-            unsupported
-          {/if}
-        </div>
-      </FileTreeRoot>
+      <PartitionExplorer bind:partitions onPartitionChoose={handlers.onPartitionChoose} />
     {:else}
       <p class="text-center">
         Choose your <Code>rawnand.bin</Code> file to begin!

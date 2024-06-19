@@ -24,13 +24,18 @@ export class Fat32FileSystem {
     check_result(this.ff.f_mount(this.fsHandle, '', 1));
   }
 
-  // TODO: ability to format partitions
-  // https://github.com/eliboa/NxNandManager/blob/6204efa9d4ace30e7debdeff718c82fda39f1b09/NxNandManager/NxPartition.cpp#L429
-  // https://github.com/irori/js-fatfs/blob/2d8ad4f56b39ae3cee569976245d25ed2ba09e8d/src/fatfs.test.ts#L42
-
   close() {
     check_result(this.ff.f_unmount(''));
     this.ff.free(this.fsHandle);
+  }
+
+  format() {
+    // TODO: ability to format partitions
+    // https://github.com/eliboa/NxNandManager/blob/6204efa9d4ace30e7debdeff718c82fda39f1b09/NxNandManager/NxPartition.cpp#L429
+    // https://github.com/irori/js-fatfs/blob/2d8ad4f56b39ae3cee569976245d25ed2ba09e8d/src/fatfs.test.ts#L42
+    //
+    // Currently waiting on support in `js-fatfs`: https://github.com/irori/js-fatfs/issues/3
+    throw new Error('TODO: unimplemented');
   }
 
   /**

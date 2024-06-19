@@ -1,12 +1,14 @@
 <script lang="ts" context="module">
-  export interface Props {
+  import type { HTMLAttributes } from 'svelte/elements';
+
+  export interface Props extends HTMLAttributes<HTMLElement> {
     disabled?: boolean;
     onclick: () => void;
   }
 </script>
 
 <script lang="ts">
-  let { onclick, disabled = false }: Props = $props();
+  let { onclick, disabled = false, ...rest }: Props = $props();
 
   function handler(e: Event) {
     e.stopPropagation();
@@ -20,7 +22,13 @@
     <slot />
   </span>
 {:else}
-  <span role="button" tabindex="0" onkeypress={(e) => e.key === ' ' && handler(e)} onclick={(e) => handler(e)}>
+  <span
+    role="button"
+    tabindex="0"
+    onkeypress={(e) => e.key === ' ' && handler(e)}
+    onclick={(e) => handler(e)}
+    {...rest}
+  >
     <slot />
   </span>
 {/if}

@@ -107,3 +107,13 @@ export async function copyFile(pathInNand: string, window: BrowserWindow): Promi
   });
   fs.closeSync(fd);
 }
+
+export async function format(partitionName: string, keys: Keys): Promise<NandResult> {
+  await mount(partitionName, keys);
+  try {
+    nand.fs.format();
+    return { error: NandError.None };
+  } catch (err) {
+    return { error: NandError.Unknown };
+  }
+}

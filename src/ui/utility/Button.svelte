@@ -1,16 +1,19 @@
 <script context="module" lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
   import Tooltip from './Tooltip.svelte';
 
   export type Appearance = 'primary' | 'default' | 'warning' | 'danger';
   export type Size = 'large' | 'default' | 'inline';
-  export type Props = {
+
+  export interface Props extends HTMLAttributes<HTMLElement> {
     appearance?: Appearance;
     size?: Size;
     tooltip?: string;
     children: Snippet;
-    [other: string]: any;
-  };
+    disabled?: boolean;
+    for?: string;
+  }
 </script>
 
 <script lang="ts">

@@ -9,6 +9,7 @@ export interface ProdKeys {
 
 export enum NandError {
   None,
+  Unknown,
   InvalidProdKeys,
   InvalidPartitionTable,
 }
@@ -27,6 +28,7 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandMount: RendererChannelImpl[Channels.NandMountPartition];
   nandReaddir: RendererChannelImpl[Channels.NandReaddir];
   nandCopyFile: RendererChannelImpl[Channels.NandCopyFile];
+  nandFormatPartition: RendererChannelImpl[Channels.NandFormatPartition];
 }
 
 export interface NXKitBridge {
@@ -52,6 +54,8 @@ export enum Channels {
   NandReaddir,
   /** Copy a file out of the currently mounted nand partition */
   NandCopyFile,
+  /** Reformat nand partition */
+  NandFormatPartition,
 }
 
 /**
@@ -80,6 +84,7 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => FSEntry[]>;
   [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => void>;
+  [Channels.NandFormatPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
 }[C];
 
 /**
