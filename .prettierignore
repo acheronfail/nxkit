@@ -1,3 +1,4 @@
 .vite/
 vendor/
 node_modules/
+dist/
