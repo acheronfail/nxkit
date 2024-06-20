@@ -15,7 +15,6 @@
   let nandFile = $derived(files?.[0]);
   let loading = $state(false);
   let disabled = $derived(!keys.value || loading);
-  let tooltip = $derived(loading ? 'Loading...' : disabled ? 'Please select your prod.keys in Settings!' : undefined);
 
   let partitions = $state<PartitionEntry[] | null>(null);
   let selectedPartition = $state<PartitionEntry | null>(null);
@@ -73,19 +72,29 @@
 
 <Container>
   <div class="flex flex-col">
-    {#if nandFile}
-      <Button appearance="warning" size="large" {disabled} {tooltip} onclick={handlers.reset}>Close NAND</Button>
-    {:else}
-      <Tooltip>
-        <p slot="tooltip" class="text-center w-96">
+    <Tooltip>
+      <p slot="tooltip" class="text-center w-96">
+        {#if !keys.value}
+          Please select your prod.keys in Settings!
+        {:else if loading}
+          Loading...
+        {:else}
           Choose either a complete dump <Code>rawnand.bin</Code>
           <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
-        </p>
-        <Button slot="content" appearance="primary" size="large" class="block" for="rawnand-file" {disabled} {tooltip}>
-          Choose your rawnand.bin
-        </Button>
-      </Tooltip>
-    {/if}
+        {/if}
+      </p>
+      <span slot="content" class="block">
+        {#if nandFile}
+          <Button class="w-full block" appearance="warning" size="large" {disabled} onclick={handlers.reset}>
+            Close NAND
+          </Button>
+        {:else}
+          <Button class="w-full block" appearance="primary" size="large" for="rawnand-file" {disabled}>
+            Choose your rawnand.bin
+          </Button>
+        {/if}
+      </span>
+    </Tooltip>
 
     <input hidden id="rawnand-file" type="file" bind:files bind:this={input} onchange={handlers.onNandChoose} />
   </div>

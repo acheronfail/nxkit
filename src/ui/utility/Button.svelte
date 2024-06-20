@@ -42,15 +42,13 @@
     inline: 'px-2 text-sm',
     small: 'px-1 text-xs',
   };
-
-  const preventDefault = (e: Event) => e.preventDefault();
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
 {#if typeof rest.for === 'string'}
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
   <label
-    onclick={disabled ? preventDefault : rest.onclick}
+    onclick={(e) => (disabled ? e.preventDefault() : rest.onclick?.(e))}
     class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
     {...rest}
   >
