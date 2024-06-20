@@ -16,8 +16,6 @@
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
-{#if $selectedPanel === panel}
-  <div class="grow flex flex-col px-4 {propClass}">
-    <slot />
-  </div>
-{/if}
+<div class:hidden={$selectedPanel !== panel} class="grow flex flex-col px-4 {propClass}">
+  <slot />
+</div>

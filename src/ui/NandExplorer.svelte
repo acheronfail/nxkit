@@ -20,8 +20,6 @@
 
   let { nandFilePath, partitionName }: Props = $props();
 
-  // FIXME: when navigating away, state is lost (probably fixing Tabs component is best way)
-
   let input = $state<HTMLInputElement | null>(null);
   let loading = $state(false);
   let disabled = $derived(!keys.value || loading);

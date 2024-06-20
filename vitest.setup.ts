@@ -13,7 +13,7 @@ window[NXKitBridgeKey] = {
   isLinux: false,
   isOsx: false,
   keysFind: vi.fn(),
-  keysSearchPaths: vi.fn(),
+  keysSearchPaths: vi.fn().mockResolvedValue(['path1', 'path2']),
   nandClose: vi.fn(),
   nandCopyFile: vi.fn(),
   nandFormatPartition: vi.fn(),
