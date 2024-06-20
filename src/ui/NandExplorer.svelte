@@ -1,3 +1,10 @@
+<script lang="ts" context="module">
+  export interface Props {
+    nandFilePath?: string;
+    partitionName?: string;
+  }
+</script>
+
 <script lang="ts">
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
@@ -9,10 +16,13 @@
   import type { FSEntry } from '../nand/fatfs/fs';
   import type { PartitionEntry } from '../nand/gpt';
   import Tooltip from './utility/Tooltip.svelte';
+  import { onMount } from 'svelte';
+
+  let { nandFilePath, partitionName }: Props = $props();
+
+  // FIXME: when navigating away, state is lost (probably fixing Tabs component is best way)
 
   let input = $state<HTMLInputElement | null>(null);
-  let files = $state<FileList | null>(null);
-  let nandFile = $derived(files?.[0]);
   let loading = $state(false);
   let disabled = $derived(!keys.value || loading);
 
@@ -20,10 +30,33 @@
   let selectedPartition = $state<PartitionEntry | null>(null);
   let rootEntries = $state<FSEntry[] | null>(null);
 
+  // handle initial props
+  onMount(async () => {
+    // if a nand path was already set, try to open it
+    if (nandFilePath) {
+      await handlers.openNand();
+    }
+
+    // if a partition name was given, try to find it and mount it
+    if (partitionName) {
+      const part = partitions?.find((part) => part.name === partitionName);
+      if (part) {
+        handlers.onPartitionChoose(part);
+      }
+    }
+
+    // clear partition name now since we don't need it anymore
+    partitionName = undefined;
+  });
+
   const handlers = {
-    onNandChoose: async () => {
-      if (nandFile) {
-        const result = await window.nxkit.nandOpen(nandFile.path);
+    onNandChoose: async (newNandPath: string | undefined) => {
+      nandFilePath = newNandPath;
+      await handlers.openNand();
+    },
+    openNand: async () => {
+      if (nandFilePath) {
+        const result = await window.nxkit.nandOpen(nandFilePath);
         switch (result.error) {
           case NandError.None:
             partitions = result.data;
@@ -31,20 +64,24 @@
           case NandError.InvalidPartitionTable:
             return alert('Failed to read partition table, did you select a Nand dump?');
           default:
+            console.log(result);
             return alert('An unknown error occurred when trying to open the Nand!');
         }
       }
     },
     onPartitionChoose: async (partition: PartitionEntry) => {
       selectedPartition = partition;
-      const { error } = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
-      switch (error) {
-        case NandError.None:
-          break;
-        case NandError.InvalidProdKeys:
-          return alert("Failed to read partition, please ensure you're using the right prod.keys!");
-        default:
-          return alert(`An unknown error occurred when trying to mount ${selectedPartition.name}!`);
+      {
+        const result = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
+        switch (result.error) {
+          case NandError.None:
+            break;
+          case NandError.InvalidProdKeys:
+            return alert("Failed to read partition, please ensure you're using the right prod.keys!");
+          default:
+            console.log(result);
+            return alert(`An unknown error occurred when trying to mount ${selectedPartition.name}!`);
+        }
       }
 
       const result = await window.nxkit.nandReaddir('/');
@@ -63,7 +100,7 @@
         rootEntries = null;
         partitions = null;
         selectedPartition = null;
-        files = null;
+        nandFilePath = undefined;
         if (input) input.value = '';
       });
     },
@@ -78,13 +115,15 @@
           Please select your prod.keys in Settings!
         {:else if loading}
           Loading...
+        {:else if nandFilePath}
+          Currently exploring <Code>{nandFilePath}</Code>
         {:else}
           Choose either a complete dump <Code>rawnand.bin</Code>
           <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
         {/if}
       </p>
       <span slot="content" class="block">
-        {#if nandFile}
+        {#if nandFilePath}
           <Button class="w-full block" appearance="warning" size="large" {disabled} onclick={handlers.reset}>
             Close NAND
           </Button>
@@ -96,7 +135,13 @@
       </span>
     </Tooltip>
 
-    <input hidden id="rawnand-file" type="file" bind:files bind:this={input} onchange={handlers.onNandChoose} />
+    <input
+      hidden
+      id="rawnand-file"
+      type="file"
+      bind:this={input}
+      onchange={(e) => handlers.onNandChoose(e.currentTarget.files?.[0].path)}
+    />
   </div>
 
   <div data-testid="explorer-wrapper" class="flex flex-col grow">

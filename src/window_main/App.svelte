@@ -12,7 +12,9 @@
   // TODO: be able to programmatically control selected tab
   // TODO: select tabs with `cmdCtrl+number`
 
-  const defaultOpen = new URLSearchParams(window.location.search).get('tab');
+  const params = new URLSearchParams(window.location.search);
+  const [nandFilePath, partitionName] = params.get('rawnand')?.split(':') ?? [];
+  const defaultOpen = params.get('tab');
 
   onMount(async () => {
     const keysFromMain = await window.nxkit.keysFind();
@@ -40,7 +42,7 @@
   </TabItem>
   <TabItem defaultOpen={defaultOpen === 'explorer'}>
     <span slot="label">NAND Explorer</span>
-    <NandExplorer slot="content" />
+    <NandExplorer slot="content" {nandFilePath} {partitionName} />
   </TabItem>
   <TabItem defaultOpen={defaultOpen === 'settings'}>
     <span slot="label" class="flex flex-row justify-center items-center">

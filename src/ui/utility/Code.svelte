@@ -3,7 +3,7 @@
 </script>
 
 <span
-  class={`font-mono align-text-bottom text-xs border rounded p-1 dark:border-slate-900 dark:bg-slate-700 ${className}`}
+  class={`font-mono break-words align-text-bottom text-xs border rounded p-1 dark:border-slate-900 dark:bg-slate-700 ${className}`}
   {...props}
 >
   <slot />

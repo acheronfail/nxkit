@@ -18,7 +18,7 @@
   let { nodes, onFileClick, openDirectory, class: cls = '' }: Props = $props();
 </script>
 
-<ul class="select-none font-mono m-2 border border-slate-900 {cls}">
+<ul class="select-none font-mono m-2 border border-slate-900 bg-slate-900 {cls}">
   {#each nodes as node}
     <FileTreeNode {onFileClick} {openDirectory} {node} iconSlotPresent={$$slots.icon} depth={1}>
       <!-- svelte-ignore slot_element_deprecated -->

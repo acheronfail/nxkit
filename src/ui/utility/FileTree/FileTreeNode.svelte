@@ -33,9 +33,6 @@
   import { FolderIcon, DocumentIcon, ClockIcon } from 'heroicons-svelte/24/outline';
   import { FolderOpenIcon } from 'heroicons-svelte/24/solid';
 
-  const iconClass = 'inline-block h-4';
-  const itemClass = 'pr-2 flex justify-between items-center focus:outline-none';
-
   // Record<id, isExpanded>
   const expandedState: Record<string, boolean> = {};
 
@@ -64,9 +61,12 @@
   };
 
   const handler = () => (node.isDirectory ? handleDirectoryOpen() : onFileClick?.(node.data));
+
+  const iconClass = 'inline-block h-4';
+  const itemClass = 'pr-2 flex justify-between items-center focus:outline-none';
 </script>
 
-<li class="odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
+<li class="dark:bg-slate-800 odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
   <div
     class={itemClass}
     class:text-slate-500={node.isDisabled}
