@@ -13,6 +13,7 @@
 
   export interface Props {
     rootEntries: FSEntry[];
+    class?: string;
   }
 </script>
 
@@ -25,7 +26,7 @@
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import { NandError } from '../../channels';
 
-  let { rootEntries }: Props = $props();
+  let { rootEntries, class: cls = '' }: Props = $props();
 
   // TODO: actions: rename, delete, download entire directory
   // TODO:  native right click menu?
@@ -55,7 +56,7 @@
   };
 </script>
 
-<FileTreeRoot nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
+<FileTreeRoot class={cls} nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
   <ActionButtons slot="dir-extra" let:dir>
     <ActionButton onclick={() => handlers.onDirActions(dir)}>
       <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />

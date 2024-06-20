@@ -16,7 +16,7 @@
 </script>
 
 <li
-  class="w-full overflow-hidden focus-within:z-10 focus-within:ring-2 focus-within:ring-blue-500 border first:border-l border-l-0 first:rounded-l-lg last:rounded-r-lg border-slate-200 dark:border-slate-900"
+  class="w-full overflow-hidden focus-within:z-40 focus-within:ring-2 focus-within:ring-blue-500 border first:border-l border-l-0 first:rounded-l-lg last:rounded-r-lg border-slate-200 dark:border-slate-900"
   role="presentation"
 >
   <button
@@ -29,7 +29,7 @@
   </button>
 
   {#if open}
-    <div class="w-full h-full" use:init>
+    <div class="grow flex flex-col w-full h-full" use:init>
       <slot name="content" />
     </div>
   {/if}

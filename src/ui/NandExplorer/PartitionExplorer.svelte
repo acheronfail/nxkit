@@ -6,6 +6,7 @@
   export interface Props {
     partitions: PartitionEntry[];
     onPartitionChoose: (partition: PartitionEntry) => void;
+    class?: string;
   }
 
   function getPartitionSize(partition: PartitionEntry): string {
@@ -36,7 +37,7 @@
   import Tooltip from '../utility/Tooltip.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
 
-  let { partitions = $bindable(), onPartitionChoose }: Props = $props();
+  let { partitions = $bindable(), onPartitionChoose, class: cls = '' }: Props = $props();
 
   let handlers = {
     format: async (partition: PartitionEntry) => {
@@ -47,7 +48,7 @@
   };
 </script>
 
-<FileTreeRoot nodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
+<FileTreeRoot class={cls} nodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
   <CircleStackIcon slot="icon" let:iconClass class="text-red-300 {iconClass}" />
   <ActionButtons slot="file-extra" let:file>
     {#if isPartitionDisabled(file)}

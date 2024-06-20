@@ -54,11 +54,11 @@
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
-<Container fillContainer>
-  <div class="flex flex-col gap-2 h-full">
+<Container fillContainer data-testid="injector">
+  <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
-      <FileTreeRoot nodes={payloads.map(entryToNode)}>
+      <FileTreeRoot class="overflow-auto" nodes={payloads.map(entryToNode)}>
         <ActionButtons slot="file-extra" let:file>
           <span>{file.sizeHuman}</span>
           <Tooltip placement="left">
@@ -71,12 +71,14 @@
           </Tooltip>
         </ActionButtons>
       </FileTreeRoot>
-      <DownloadPayloads />
-      <div class="text-center">
-        <Button onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
+      <div class="grow flex flex-col gap-1">
+        <DownloadPayloads />
+        <div class="text-center">
+          <Button onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
+        </div>
       </div>
     {:else}
-      <div class="h-full flex flex-col gap-2 justify-center items-center">
+      <div class="grow flex flex-col gap-2 justify-center items-center">
         <h3 class="font-bold">No payloads found!</h3>
         <DownloadPayloads />
         <Button appearance="primary" onclick={handlers.openPayloadDir}>Open Payload Folder</Button>

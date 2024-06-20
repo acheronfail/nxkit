@@ -4,6 +4,7 @@
   interface CommonProps<FileData = any, DirData = any> {
     nodes: Node<FileData, DirData>[];
     onFileClick?: (data: FileData) => void;
+    class?: string;
   }
 
   export type Props<FileData = any, DirData = any> = DirData extends never
@@ -14,10 +15,10 @@
 </script>
 
 <script lang="ts">
-  let { nodes, onFileClick, openDirectory }: Props = $props();
+  let { nodes, onFileClick, openDirectory, class: cls = '' }: Props = $props();
 </script>
 
-<ul class="select-none font-mono overflow-hidden m-2 border border-slate-900">
+<ul class="select-none font-mono m-2 border border-slate-900 {cls}">
   {#each nodes as node}
     <FileTreeNode {onFileClick} {openDirectory} {node} iconSlotPresent={$$slots.icon} depth={1}>
       <!-- svelte-ignore slot_element_deprecated -->

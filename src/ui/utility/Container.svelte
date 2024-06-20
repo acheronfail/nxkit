@@ -14,6 +14,6 @@
 </script>
 
 <!-- svelte-ignore slot_element_deprecated -->
-<div class="flex flex-col gap-px gap-3 my-2 {fillClass} {cls}" {...rest}>
+<div class="grow flex flex-col gap-px gap-3 py-2 {fillClass} {cls}" {...rest}>
   <slot />
 </div>

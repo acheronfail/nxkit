@@ -70,7 +70,7 @@
   };
 </script>
 
-<Container>
+<Container fillContainer data-testid="nandexplorer">
   <div class="flex flex-col">
     <Tooltip>
       <p slot="tooltip" class="text-center w-96">
@@ -99,7 +99,7 @@
     <input hidden id="rawnand-file" type="file" bind:files bind:this={input} onchange={handlers.onNandChoose} />
   </div>
 
-  <div class="m-2">
+  <div data-testid="explorer-wrapper" class="flex flex-col grow">
     {#if rootEntries && selectedPartition}
       <p class="text-center">
         Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
@@ -107,10 +107,14 @@
       <div class="text-center">
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </div>
-      <FileExplorer {rootEntries} />
+      <FileExplorer class="overflow-auto grow h-0" {rootEntries} />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
-      <PartitionExplorer bind:partitions onPartitionChoose={handlers.onPartitionChoose} />
+      <PartitionExplorer
+        class="overflow-auto grow h-0"
+        bind:partitions
+        onPartitionChoose={handlers.onPartitionChoose}
+      />
     {:else}
       <p class="text-center">
         Choose your <Code>rawnand.bin</Code> file to begin!
