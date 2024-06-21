@@ -49,20 +49,24 @@
 </script>
 
 <FileTreeRoot class={cls} nodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
-  <CircleStackIcon slot="icon" let:iconClass class="text-red-300 {iconClass}" />
-  <ActionButtons slot="file-extra" let:file>
-    {#if isPartitionDisabled(file)}
-      <span>unsupported</span>
-    {:else}
-      <span>
-        {getPartitionSize(file)}
-        <Tooltip placement="left">
-          <span slot="tooltip">Format {(file as PartitionEntry).name}</span>
-          <ActionButton class="hidden" slot="content" onclick={() => handlers.format(file)}>
-            <XCircleIcon class="h-4 cursor-pointer hover:fill-slate-900 hover:stroke-2" />
-          </ActionButton>
-        </Tooltip>
-      </span>
-    {/if}
-  </ActionButtons>
+  {#snippet icon({ iconClass })}
+    <CircleStackIcon class="text-red-300 {iconClass}" />
+  {/snippet}
+  {#snippet fileExtra(file)}
+    <ActionButtons>
+      {#if isPartitionDisabled(file)}
+        <span>unsupported</span>
+      {:else}
+        <span>
+          {getPartitionSize(file)}
+          <Tooltip placement="left">
+            <span slot="tooltip">Format {(file as PartitionEntry).name}</span>
+            <ActionButton class="hidden" slot="content" onclick={() => handlers.format(file)}>
+              <XCircleIcon class="h-4 cursor-pointer hover:fill-slate-900 hover:stroke-2" />
+            </ActionButton>
+          </Tooltip>
+        </span>
+      {/if}
+    </ActionButtons>
+  {/snippet}
 </FileTreeRoot>

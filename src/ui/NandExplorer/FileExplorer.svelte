@@ -57,21 +57,25 @@
 </script>
 
 <FileTreeRoot class={cls} nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
-  <ActionButtons slot="dir-extra" let:dir>
-    <ActionButton onclick={() => handlers.onDirActions(dir)}>
-      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
-    </ActionButton>
-  </ActionButtons>
-  <ActionButtons slot="file-extra" let:file>
-    <span class="font-mono">{file.sizeHuman}</span>
-    <Tooltip placement="left">
-      <ActionButton slot="content" onclick={() => handlers.downloadFile(file)}>
-        <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
+  {#snippet dirExtra(dir)}
+    <ActionButtons>
+      <ActionButton onclick={() => handlers.onDirActions(dir)}>
+        <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
       </ActionButton>
-      <span slot="tooltip">Download {file.name}</span>
-    </Tooltip>
-    <ActionButton onclick={() => handlers.onFileActions(file)}>
-      <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
-    </ActionButton>
-  </ActionButtons>
+    </ActionButtons>
+  {/snippet}
+  {#snippet fileExtra(file)}
+    <ActionButtons>
+      <span class="font-mono">{file.sizeHuman}</span>
+      <Tooltip placement="left">
+        <ActionButton slot="content" onclick={() => handlers.downloadFile(file)}>
+          <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
+        </ActionButton>
+        <span slot="tooltip">Download {file.name}</span>
+      </Tooltip>
+      <ActionButton onclick={() => handlers.onFileActions(file)}>
+        <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
+      </ActionButton>
+    </ActionButtons>
+  {/snippet}
 </FileTreeRoot>

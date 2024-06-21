@@ -56,17 +56,19 @@
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
       <FileTreeRoot class="overflow-auto" nodes={payloads.map(entryToNode)}>
-        <ActionButtons slot="file-extra" let:file>
-          <span>{file.sizeHuman}</span>
-          <Tooltip placement="left">
-            <div slot="tooltip">Inject {file.name}</div>
-            <div slot="content">
-              <Button size="small" appearance="primary" onclick={() => handlers.injectPayload(file.path)}>
-                inject
-              </Button>
-            </div>
-          </Tooltip>
-        </ActionButtons>
+        {#snippet fileExtra(file)}
+          <ActionButtons>
+            <span>{file.sizeHuman}</span>
+            <Tooltip placement="left">
+              <div slot="tooltip">Inject {file.name}</div>
+              <div slot="content">
+                <Button size="small" appearance="primary" onclick={() => handlers.injectPayload(file.path)}>
+                  inject
+                </Button>
+              </div>
+            </Tooltip>
+          </ActionButtons>
+        {/snippet}
       </FileTreeRoot>
       <div class:grow={!showHelp} class="flex flex-col gap-1">
         <DownloadPayloads />

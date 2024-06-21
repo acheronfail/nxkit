@@ -44,12 +44,13 @@
     small: 'px-1 text-xs',
   };
 
-  const onPress: EventHandler<Event, HTMLElement> = (event) => {
+  type EventParam = Parameters<EventHandler<Event, HTMLElement>>[0];
+  const onPress = (event: EventParam, isKeyEvent = false) => {
     if (disabled) {
       event.preventDefault();
     } else if (rest.onclick) {
       rest.onclick?.(event);
-    } else {
+    } else if (isKeyEvent) {
       event.currentTarget.click();
     }
   };
@@ -61,7 +62,7 @@
   <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
   <label
     onclick={onPress}
-    onkeydown={(e) => e.code === 'Space' && onPress(e)}
+    onkeydown={(e) => e.code === 'Space' && onPress(e, true)}
     tabindex="0"
     role="button"
     class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"

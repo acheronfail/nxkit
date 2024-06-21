@@ -1,4 +1,6 @@
 <script context="module" lang="ts">
+  import type { Snippet } from 'svelte';
+
   export interface Node<FileData = any, DirData = any, IsDirectory extends boolean = boolean> {
     id: string;
     name: string;
@@ -14,12 +16,24 @@
     isDisabled: true,
   };
 
-  interface CommonProps<FileData = any, DirData = any> {
+  export interface Snippets<FileData = any, DirData = any> {
+    icon?: Snippet<
+      [
+        {
+          node: Node<FileData, DirData>;
+          iconClass: string;
+        },
+      ]
+    >;
+    dirExtra?: Snippet<[DirData]>;
+    fileExtra?: Snippet<[FileData]>;
+  }
+
+  interface CommonProps<FileData = any, DirData = any> extends Snippets<FileData, DirData> {
     node: Node<FileData, DirData>;
     depth: number;
     isExpanded?: boolean;
     onFileClick?: (data: FileData) => void;
-    iconSlotPresent?: boolean;
   }
 
   export type Props<FileData = any, DirData = any> = DirData extends never
@@ -41,8 +55,10 @@
     depth,
     onFileClick,
     openDirectory,
+    icon,
+    dirExtra,
+    fileExtra,
     isExpanded = expandedState[node.id] ?? false,
-    iconSlotPresent = false,
   }: Props = $props();
   let isLoading = $state(false);
   let children = $state<Node[] | null>(null);
@@ -81,9 +97,8 @@
   >
     {#if node.isDirectory}
       <span>
-        <!-- svelte-ignore slot_element_deprecated -->
-        {#if iconSlotPresent}
-          <slot name="icon" {node} {iconClass} />
+        {#if icon}
+          {@render icon({ node, iconClass })}
         {:else if isExpanded}
           <FolderOpenIcon class="text-blue-300 {iconClass}" />
         {:else}
@@ -91,15 +106,15 @@
         {/if}
         {node.name}
       </span>
-      <!-- svelte-ignore slot_element_deprecated -->
       <span>
-        <slot name="dir-extra" dir={node.data} />
+        {#if dirExtra}
+          {@render dirExtra(node.data)}
+        {/if}
       </span>
     {:else}
       <span>
-        <!-- svelte-ignore slot_element_deprecated -->
-        {#if iconSlotPresent}
-          <slot name="icon" {node} {iconClass} />
+        {#if icon}
+          {@render icon({ node, iconClass })}
         {:else if node === loadingFile}
           <ClockIcon class={iconClass} />
         {:else}
@@ -107,9 +122,10 @@
         {/if}
         {node.name}
       </span>
-      <!-- svelte-ignore slot_element_deprecated -->
       <span>
-        <slot name="file-extra" file={node.data} />
+        {#if fileExtra}
+          {@render fileExtra(node.data)}
+        {/if}
       </span>
     {/if}
   </div>
@@ -119,11 +135,7 @@
     <svelte:self {openDirectory} node={loadingFile} depth={depth + 1} />
   {:else if children}
     {#each children as e}
-      <!-- svelte-ignore slot_element_deprecated -->
-      <svelte:self {openDirectory} node={e} depth={depth + 1}>
-        <slot slot="dir-extra" name="dir-extra" let:dir {dir} />
-        <slot slot="file-extra" name="file-extra" let:file {file} />
-      </svelte:self>
+      <svelte:self {openDirectory} {fileExtra} {dirExtra} {icon} node={e} depth={depth + 1} />
     {/each}
   {/if}
 {/if}

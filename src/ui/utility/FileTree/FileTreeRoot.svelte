@@ -1,7 +1,7 @@
 <script context="module" lang="ts">
-  import FileTreeNode, { type Node } from './FileTreeNode.svelte';
+  import FileTreeNode, { type Snippets, type Node } from './FileTreeNode.svelte';
 
-  interface CommonProps<FileData = any, DirData = any> {
+  interface CommonProps<FileData = any, DirData = any> extends Snippets<FileData, DirData> {
     nodes: Node<FileData, DirData>[];
     onFileClick?: (data: FileData) => void;
     class?: string;
@@ -15,18 +15,11 @@
 </script>
 
 <script lang="ts">
-  let { nodes, onFileClick, openDirectory, class: cls = '' }: Props = $props();
+  let { nodes, onFileClick, openDirectory, icon, dirExtra, fileExtra, class: cls = '' }: Props = $props();
 </script>
 
 <ul class="select-none font-mono m-2 border border-slate-900 bg-slate-900 {cls}">
   {#each nodes as node}
-    <FileTreeNode {onFileClick} {openDirectory} {node} iconSlotPresent={$$slots.icon} depth={1}>
-      <!-- svelte-ignore slot_element_deprecated -->
-      <span slot="icon" let:iconClass let:node><slot name="icon" {iconClass} {node} /></span>
-      <!-- svelte-ignore slot_element_deprecated -->
-      <span slot="dir-extra" let:dir><slot name="dir-extra" {dir} /></span>
-      <!-- svelte-ignore slot_element_deprecated -->
-      <span slot="file-extra" let:file><slot name="file-extra" {file} /></span>
-    </FileTreeNode>
+    <FileTreeNode {onFileClick} {openDirectory} {node} {icon} {dirExtra} {fileExtra} depth={1} />
   {/each}
 </ul>
