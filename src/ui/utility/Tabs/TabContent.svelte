@@ -1,5 +1,8 @@
 <script lang="ts" context="module">
+  import { type Snippet } from 'svelte';
+
   export interface Props {
+    children: Snippet;
     class?: string;
   }
 </script>
@@ -8,14 +11,13 @@
   import { getContext } from 'svelte';
   import { TabContextKey, type TabContext } from './Tabs.svelte';
 
-  let { class: propClass = '' }: Props = $props();
+  let { children, class: propClass = '' }: Props = $props();
 
   const panel = {};
   const { registerPanel, selectedPanel } = getContext<TabContext>(TabContextKey);
   registerPanel(panel);
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
 <div class:hidden={$selectedPanel !== panel} class="grow flex flex-col px-4 {propClass}">
-  <slot />
+  {@render children()}
 </div>

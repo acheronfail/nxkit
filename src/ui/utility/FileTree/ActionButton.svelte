@@ -1,14 +1,16 @@
 <script lang="ts" context="module">
+  import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
 
   export interface Props extends HTMLAttributes<HTMLElement> {
     disabled?: boolean;
     onclick: () => void;
+    children: Snippet;
   }
 </script>
 
 <script lang="ts">
-  let { onclick, disabled = false, ...rest }: Props = $props();
+  let { children, onclick, disabled = false, ...rest }: Props = $props();
 
   function handler(e: Event) {
     e.stopPropagation();
@@ -16,10 +18,9 @@
   }
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
 {#if disabled}
   <span>
-    <slot />
+    {@render children()}
   </span>
 {:else}
   <span
@@ -29,6 +30,6 @@
     onclick={(e) => handler(e)}
     {...rest}
   >
-    <slot />
+    {@render children()}
   </span>
 {/if}

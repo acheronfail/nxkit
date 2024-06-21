@@ -91,34 +91,52 @@
     <TabContent class="justify-around">
       <InputImage onCropComplete={(img) => (image = img)} />
       <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.id}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.id}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="App Title" placeholder="NX Shell" bind:value={title}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.title}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.title}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="App Publisher" placeholder="joel16" bind:value={author}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.author}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.author}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.nroPath.app}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.nroPath.app}</div>
+        {/snippet}
       </InputFile>
     </TabContent>
     <TabContent class="justify-around">
       <InputImage onCropComplete={(img) => (image = img)} />
       <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.id}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.id}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.title}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.title}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="Game Publisher" placeholder="Nintendo" bind:value={author}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.author}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.author}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.nroPath.rom}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.nroPath.rom}</div>
+        {/snippet}
       </InputFile>
       <InputFile label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
-        <div slot="infoTooltip" class={tooltipClass}>{descriptions.romPath}</div>
+        {#snippet infoTooltip()}
+          <div class={tooltipClass}>{descriptions.romPath}</div>
+        {/snippet}
       </InputFile>
     </TabContent>
   </Tabs>

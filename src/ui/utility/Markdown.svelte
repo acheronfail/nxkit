@@ -21,7 +21,7 @@
         {@render renderText({ token: t })}
       {/each}
     {:else}
-      {token.raw}
+      {@html token.text}
     {/if}
   {:else if token.type === 'strong'}
     <strong>{token.text}</strong>
@@ -32,7 +32,7 @@
   {:else if token.type === 'link'}
     <a class="text-blue-400 underline" target="_blank" href={token.href}>{token.text}</a>
   {:else if token.type === 'codespan'}
-    <Code>{token.raw}</Code>
+    <Code>{@html token.text}</Code>
   {:else if token.type === 'list'}
     {@render renderList({ token })}
   {/if}

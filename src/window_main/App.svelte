@@ -47,13 +47,16 @@
   });
 </script>
 
+{#snippet header()}
+  <h1 class="font-bold text-2xl text-center pt-2" style="-webkit-app-region: drag">
+    <span class="bg-gradient-to-br from-red-500 to-yellow-500 bg-clip-text text-transparent box-decoration-clone">
+      NXKit
+    </span>
+  </h1>
+{/snippet}
+
 <Tabs bind:selected>
-  <TabList>
-    <h1 slot="header" class="font-bold text-2xl text-center pt-2" style="-webkit-app-region: drag">
-      <span class="bg-gradient-to-br from-red-500 to-yellow-500 bg-clip-text text-transparent box-decoration-clone">
-        NXKit
-      </span>
-    </h1>
+  <TabList {header}>
     <Tab>NRO Forwarder</Tab>
     <Tab>Payload Injector</Tab>
     <Tab>NAND Explorer</Tab>

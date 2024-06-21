@@ -1,7 +1,5 @@
 <script lang="ts" context="module">
-  export { default as TabList } from './TabList.svelte';
-  export { default as TabContent } from './TabContent.svelte';
-  export { default as Tab } from './Tab.svelte';
+  import type { Snippet } from 'svelte';
 
   export const TabContextKey = {};
   export interface TabContext {
@@ -14,6 +12,7 @@
   }
 
   export interface Props {
+    children: Snippet;
     selected?: number;
   }
 </script>
@@ -22,7 +21,7 @@
   import { setContext, onDestroy } from 'svelte';
   import { type Writable, writable } from 'svelte/store';
 
-  let { selected = $bindable(0) }: Props = $props();
+  let { children, selected = $bindable(0) }: Props = $props();
 
   const tabs: {}[] = [];
   const panels: {}[] = [];
@@ -75,5 +74,4 @@
   });
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
-<slot />
+{@render children()}

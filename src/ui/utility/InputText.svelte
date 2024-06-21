@@ -1,10 +1,12 @@
 <script lang="ts" context="module">
   import type { HTMLInputAttributes } from 'svelte/elements';
+  import type { Snippet } from 'svelte';
 
   export interface Props extends HTMLInputAttributes {
     id?: string;
     label: string;
     value?: string;
+    infoTooltip?: Snippet;
   }
 </script>
 
@@ -12,10 +14,9 @@
   import { QuestionMarkCircleIcon } from 'heroicons-svelte/24/outline';
   import Tooltip from './Tooltip.svelte';
 
-  let { label, id = label.toLowerCase(), value = $bindable(), ...rest }: Props = $props();
+  let { label, id = label.toLowerCase(), value = $bindable(), infoTooltip, ...rest }: Props = $props();
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
 <div class="flex justify-between items-center">
   <label class="min-w-32" for={id}>{label}:</label>
   <input
@@ -24,11 +25,11 @@
     bind:value
     {...rest}
   />
-  {#if $$slots.infoTooltip}
+  {#if infoTooltip}
     <span class="has-tooltip p-2 cursor-default hover:text-slate-400">
       <Tooltip placement="left">
         <span slot="tooltip" class="text-white">
-          <slot name="infoTooltip" />
+          {@render infoTooltip()}
         </span>
         <QuestionMarkCircleIcon slot="content" class="h-6" />
       </Tooltip>

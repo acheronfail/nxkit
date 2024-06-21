@@ -1,6 +1,6 @@
 <script context="module" lang="ts">
   import type { Snippet } from 'svelte';
-  import type { HTMLAttributes } from 'svelte/elements';
+  import type { EventHandler, HTMLAttributes } from 'svelte/elements';
   import Tooltip from './Tooltip.svelte';
 
   export type Appearance = 'primary' | 'default' | 'warning' | 'danger';
@@ -13,6 +13,7 @@
     children: Snippet;
     disabled?: boolean;
     for?: string;
+    onclick?: EventHandler<Event, HTMLElement>;
   }
 </script>
 
@@ -42,24 +43,42 @@
     inline: 'px-2 text-sm',
     small: 'px-1 text-xs',
   };
+
+  const onPress: EventHandler<Event, HTMLElement> = (event) => {
+    if (disabled) {
+      event.preventDefault();
+    } else if (rest.onclick) {
+      rest.onclick?.(event);
+    } else {
+      event.currentTarget.click();
+    }
+  };
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
 {#if typeof rest.for === 'string'}
+  <!-- svelte-ignore a11y_label_has_associated_control -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_to_interactive_role -->
   <label
-    onclick={(e) => (disabled ? e.preventDefault() : rest.onclick?.(e))}
+    onclick={onPress}
+    onkeydown={(e) => e.code === 'Space' && onPress(e)}
+    tabindex="0"
+    role="button"
     class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
     {...rest}
   >
     {#if tooltip}
       <Tooltip>
         <span slot="tooltip" class="text-white">{tooltip}</span>
-        <div slot="content" class={innerClass}><slot /></div>
+        <div slot="content" class={innerClass}>
+          {@render children()}
+        </div>
       </Tooltip>
     {:else}
       <Tooltip>
-        <div slot="content" class={innerClass}><slot /></div>
+        <div slot="content" class={innerClass}>
+          {@render children()}
+        </div>
       </Tooltip>
     {/if}
   </label>
@@ -72,11 +91,15 @@
     {#if tooltip}
       <Tooltip>
         <span slot="tooltip" class="text-white">{tooltip}</span>
-        <div slot="content" class={innerClass}><slot /></div>
+        <div slot="content" class={innerClass}>
+          {@render children()}
+        </div>
       </Tooltip>
     {:else}
       <Tooltip>
-        <div slot="content" class={innerClass}><slot /></div>
+        <div slot="content" class={innerClass}>
+          {@render children()}
+        </div>
       </Tooltip>
     {/if}
   </button>

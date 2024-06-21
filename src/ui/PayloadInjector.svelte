@@ -51,7 +51,6 @@
   };
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
 <Container fillContainer data-testid="injector">
   <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
