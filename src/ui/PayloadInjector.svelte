@@ -60,8 +60,10 @@
           <ActionButtons>
             <span>{file.sizeHuman}</span>
             <Tooltip placement="left">
-              <div slot="tooltip">Inject {file.name}</div>
-              <div slot="content">
+              {#snippet tooltip()}
+                <div>Inject {file.name}</div>
+              {/snippet}
+              <div>
                 <Button size="small" appearance="primary" onclick={() => handlers.injectPayload(file.path)}>
                   inject
                 </Button>

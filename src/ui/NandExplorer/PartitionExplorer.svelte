@@ -60,8 +60,10 @@
         <span>
           {getPartitionSize(file)}
           <Tooltip placement="left">
-            <span slot="tooltip">Format {(file as PartitionEntry).name}</span>
-            <ActionButton class="hidden" slot="content" onclick={() => handlers.format(file)}>
+            {#snippet tooltip()}
+              <span>Format {(file as PartitionEntry).name}</span>
+            {/snippet}
+            <ActionButton class="hidden" onclick={() => handlers.format(file)}>
               <XCircleIcon class="h-4 cursor-pointer hover:fill-slate-900 hover:stroke-2" />
             </ActionButton>
           </Tooltip>

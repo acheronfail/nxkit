@@ -1,7 +1,6 @@
 <script context="module" lang="ts">
   import type { Snippet } from 'svelte';
   import type { EventHandler, HTMLAttributes } from 'svelte/elements';
-  import Tooltip from './Tooltip.svelte';
 
   export type Appearance = 'primary' | 'default' | 'warning' | 'danger';
   export type Size = 'large' | 'default' | 'inline' | 'small';
@@ -9,7 +8,6 @@
   export interface Props extends HTMLAttributes<HTMLElement> {
     appearance?: Appearance;
     size?: Size;
-    tooltip?: string;
     children: Snippet;
     disabled?: boolean;
     for?: string;
@@ -23,8 +21,7 @@
     size = 'default',
     disabled = false,
     children,
-    tooltip,
-    class: cls,
+    class: propClass,
     ...rest
   }: Props = $props();
 
@@ -65,43 +62,21 @@
     onkeydown={(e) => e.code === 'Space' && onPress(e, true)}
     tabindex="0"
     role="button"
-    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {propClass}"
     {...rest}
   >
-    {#if tooltip}
-      <Tooltip>
-        <span slot="tooltip" class="text-white">{tooltip}</span>
-        <div slot="content" class={innerClass}>
-          {@render children()}
-        </div>
-      </Tooltip>
-    {:else}
-      <Tooltip>
-        <div slot="content" class={innerClass}>
-          {@render children()}
-        </div>
-      </Tooltip>
-    {/if}
+    <div class={innerClass}>
+      {@render children()}
+    </div>
   </label>
 {:else}
   <button
-    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {cls}"
+    class="{disabled ? disabledClass : appearanceClass[appearance]} {sizeClass[size]} {buttonClass} {propClass}"
     {disabled}
     {...rest}
   >
-    {#if tooltip}
-      <Tooltip>
-        <span slot="tooltip" class="text-white">{tooltip}</span>
-        <div slot="content" class={innerClass}>
-          {@render children()}
-        </div>
-      </Tooltip>
-    {:else}
-      <Tooltip>
-        <div slot="content" class={innerClass}>
-          {@render children()}
-        </div>
-      </Tooltip>
-    {/if}
+    <div class={innerClass}>
+      {@render children()}
+    </div>
   </button>
 {/if}

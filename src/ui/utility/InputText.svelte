@@ -28,10 +28,12 @@
   {#if infoTooltip}
     <span class="has-tooltip p-2 cursor-default hover:text-slate-400">
       <Tooltip placement="left">
-        <span slot="tooltip" class="text-white">
-          {@render infoTooltip()}
-        </span>
-        <QuestionMarkCircleIcon slot="content" class="h-6" />
+        {#snippet tooltip()}
+          <span class="text-white">
+            {@render infoTooltip()}
+          </span>
+        {/snippet}
+        <QuestionMarkCircleIcon class="h-6" />
       </Tooltip>
     </span>
   {/if}

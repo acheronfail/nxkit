@@ -1,9 +1,12 @@
 <script lang="ts" context="module">
   import { type Placement } from '@floating-ui/dom';
+  import { type Snippet } from 'svelte';
 
   export interface Props {
     placement?: Placement;
     disabled?: boolean;
+    children: Snippet;
+    tooltip?: Snippet;
   }
 </script>
 
@@ -11,7 +14,7 @@
   import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
   import { onMount } from 'svelte';
 
-  let { placement, disabled = false }: Props = $props();
+  let { children, tooltip, placement, disabled = false }: Props = $props();
 
   let referenceEl = $state<HTMLElement | null>(null);
   let tooltipEl = $state<HTMLElement | null>(null);
@@ -65,14 +68,14 @@
   }
 
   function show() {
-    if ($$slots.tooltip && tooltipEl) {
+    if (tooltip && tooltipEl) {
       update();
       tooltipEl.style.display = 'block';
     }
   }
 
   function hide() {
-    if ($$slots.tooltip && tooltipEl) {
+    if (tooltip && tooltipEl) {
       tooltipEl.style.display = '';
     }
   }
@@ -91,27 +94,24 @@
   };
 </script>
 
-<!-- svelte-ignore slot_element_deprecated -->
-{#if $$slots.content}
-  <span bind:this={referenceEl} role="tooltip" onmouseenter={show} onmouseleave={hide} onfocus={show} onblur={hide}>
-    <slot name="content" />
-  </span>
+<span bind:this={referenceEl} role="tooltip" onmouseenter={show} onmouseleave={hide} onfocus={show} onblur={hide}>
+  {@render children()}
+</span>
 
-  {#if !disabled}
-    <div bind:this={tooltipEl} class="hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
-      {#if $$slots.tooltip}
-        <slot name="tooltip" />
-      {/if}
-      <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
-        <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
-          <polygon
-            points="1 1, 1 {arrowSizePx - 1}, {arrowSizePx - 1}, {arrowSizePx - 1}, 1"
-            class="{c.strokeBg} {c.fill}"
-          />
-          <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
-          <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
-        </svg>
-      </div>
+{#if !disabled}
+  <div bind:this={tooltipEl} class="hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
+    {#if tooltip}
+      {@render tooltip()}
+    {/if}
+    <div bind:this={arrowEl} class="absolute" style="width: {arrowSizePx * 2}px;">
+      <svg viewBox="0 0 {arrowSizePx} {arrowSizePx}" class="fill-white w-full h-full">
+        <polygon
+          points="1 1, 1 {arrowSizePx - 1}, {arrowSizePx - 1}, {arrowSizePx - 1}, 1"
+          class="{c.strokeBg} {c.fill}"
+        />
+        <line class="stroke-1 {c.stroke}" x1="0" y1="0" x2="0" y2={arrowSizePx} />
+        <line class="stroke-1 {c.stroke}" x1="0" y1={arrowSizePx} x2={arrowSizePx} y2={arrowSizePx} />
+      </svg>
     </div>
-  {/if}
+  </div>
 {/if}

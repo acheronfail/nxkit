@@ -68,10 +68,12 @@
     <ActionButtons>
       <span class="font-mono">{file.sizeHuman}</span>
       <Tooltip placement="left">
-        <ActionButton slot="content" onclick={() => handlers.downloadFile(file)}>
+        {#snippet tooltip()}
+          <span>Download {file.name}</span>
+        {/snippet}
+        <ActionButton onclick={() => handlers.downloadFile(file)}>
           <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
         </ActionButton>
-        <span slot="tooltip">Download {file.name}</span>
       </Tooltip>
       <ActionButton onclick={() => handlers.onFileActions(file)}>
         <EllipsisHorizontalCircleIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />

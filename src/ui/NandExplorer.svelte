@@ -108,19 +108,21 @@
 <Container fillContainer data-testid="nandexplorer">
   <div class="flex flex-col">
     <Tooltip>
-      <p slot="tooltip" class="text-center w-96">
-        {#if !keys.value}
-          Please select your prod.keys in Settings!
-        {:else if loading}
-          Loading...
-        {:else if nandFilePath}
-          Currently exploring <Code>{nandFilePath}</Code>
-        {:else}
-          Choose either a complete dump <Code>rawnand.bin</Code>
-          <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
-        {/if}
-      </p>
-      <span slot="content" class="block">
+      {#snippet tooltip()}
+        <p class="text-center w-96">
+          {#if !keys.value}
+            Please select your prod.keys in Settings!
+          {:else if loading}
+            Loading...
+          {:else if nandFilePath}
+            Currently exploring <Code>{nandFilePath}</Code>
+          {:else}
+            Choose either a complete dump <Code>rawnand.bin</Code>
+            <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
+          {/if}
+        </p>
+      {/snippet}
+      <span class="block">
         {#if nandFilePath}
           <Button class="w-full block" appearance="warning" size="large" {disabled} onclick={handlers.reset}>
             Close NAND

@@ -9,6 +9,7 @@
   import InputImage, { type Image } from './utility/InputImage.svelte';
   import LogOutput from './utility/LogOutput.svelte';
   import { Tabs, TabList, TabContent, Tab } from './utility/Tabs';
+  import Tooltip from './utility/Tooltip.svelte';
 
   // TODO: choose mounted Switch SD card for path autocomplete and validation?
 
@@ -32,7 +33,7 @@
   let image = $state<Image | null>(null);
 
   let disabled = $derived(!keys.value || !image);
-  let tooltip = $derived(
+  let tooltipText = $derived(
     !keys.value ? 'Please select your prod.keys in Settings!' : !image ? 'Please select an image!' : undefined,
   );
 
@@ -141,7 +142,16 @@
     </TabContent>
   </Tabs>
 
-  <Button class="mt-4" appearance="primary" size="large" onclick={generate} {disabled} {tooltip}>Generate NSP</Button>
+  <div>
+    <Tooltip disabled={!tooltipText}>
+      {#snippet tooltip()}
+        <p>
+          {tooltipText}
+        </p>
+      {/snippet}
+      <Button class="w-full mt-4" appearance="primary" size="large" onclick={generate} {disabled}>Generate NSP</Button>
+    </Tooltip>
+  </div>
 </Container>
 
 {#if stdout}<LogOutput title="Standard Out" bind:output={stdout} />{/if}

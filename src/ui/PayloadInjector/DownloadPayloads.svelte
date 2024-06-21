@@ -54,20 +54,20 @@
   Go download a payload:
   <InputSelect small {options} bind:value={selectedPayloadKey} />
   <Tooltip>
-    <div slot="tooltip">
-      {#if selectedPayload}
-        <p class="text-center">
-          Opens <Code>{selectedPayload.link}</Code>
-        </p>
-        {#if selectedPayload.description}
-          <svelte:component this={selectedPayload.description} />
+    {#snippet tooltip()}
+      <div>
+        {#if selectedPayload}
+          <p class="text-center">
+            Opens <Code>{selectedPayload.link}</Code>
+          </p>
+          {#if selectedPayload.description}
+            <svelte:component this={selectedPayload.description} />
+          {/if}
+        {:else}
+          Select an option!
         {/if}
-      {:else}
-        Select an option!
-      {/if}
-    </div>
-    <Button slot="content" size="inline" appearance="primary" disabled={!selectedPayloadKey} onclick={downloadPayload}>
-      open
-    </Button>
+      </div>
+    {/snippet}
+    <Button size="inline" appearance="primary" disabled={!selectedPayloadKey} onclick={downloadPayload}>open</Button>
   </Tooltip>
 </div>
