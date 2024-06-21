@@ -61,6 +61,12 @@ const createMainWindow = (): BrowserWindow => {
     win.webContents.openDevTools();
   }
 
+  // open links externally (requires target="_blank" on all links in renderer)
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
   // Automatically select a pre-mariko Switch in RCM
   win.webContents.session.on('select-usb-device', (_event, details, callback) => {
     callback(details.deviceList.find((dev) => dev.vendorId === 0x0955)?.deviceId);

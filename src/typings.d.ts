@@ -19,6 +19,11 @@ declare module '*.npdm' {
   export default src;
 }
 
+declare module '*?raw' {
+  const text: string;
+  export default text;
+}
+
 /*
  * Types for untyped packages
  */

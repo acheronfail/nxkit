@@ -69,6 +69,7 @@
     "gpt": "^3.0.0",
     "heroicons-svelte": "^2.0.0",
     "js-fatfs": "^0.1.0",
+    "marked": "^13.0.0",
     "mbr": "^1.1.3",
     "pretty-bytes": "^6.1.1",
     "svelte-easy-crop": "^2.0.3",

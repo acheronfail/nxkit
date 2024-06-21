@@ -71,8 +71,12 @@ async function write(dev: USBDevice, data: Uint8Array) {
  * This works together with the main process to grant access to USB devices.
  */
 export async function findRCMDevices(): Promise<USBDevice[]> {
-  await navigator.usb.requestDevice({ filters: [] });
-  return await navigator.usb.getDevices();
+  try {
+    await navigator.usb.requestDevice({ filters: [] });
+    return await navigator.usb.getDevices();
+  } catch (err) {
+    return [];
+  }
 }
 
 /**

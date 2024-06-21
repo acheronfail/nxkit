@@ -10,16 +10,10 @@
   import Tooltip from './utility/Tooltip.svelte';
   import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
   import LogOutput from './utility/LogOutput.svelte';
+  import Markdown from './utility/Markdown.svelte';
+  import rcmHelpMd from './markdown/rcm-help.md?raw';
 
-  // TODO: description of how to enter RCM mode
-  // TODO: doc linux udev: `SUBSYSTEM=="usb", ATTR{idVendor}=="0955", MODE="0664", GROUP="plugdev"` @ `/etc/udev/rules.d/50-switch.rules`
-  // TODO: doc windows usb driver install:
-  //  - download https://zadig.akeo.ie/
-  //  - connect Switch in RCM
-  //  - choose `APX`
-  //  - select `libusbK`
-  //  - select `Install Driver`
-
+  let showHelp = $state(true);
   let output = $state('');
   let payloads = $state<FSFile[] | null>(null);
 
@@ -46,8 +40,12 @@
         const [dev] = await findRCMDevices();
         if (!dev) return alert('No Switch found in RCM mode!');
 
-        const payloadBytes = await window.nxkit.payloadsReadFile(payloadPath);
-        await injectPayload(dev, payloadBytes, (log) => (output += `${log}\n`));
+        try {
+          const payloadBytes = await window.nxkit.payloadsReadFile(payloadPath);
+          await injectPayload(dev, payloadBytes, (log) => (output += `${log}\n`));
+        } catch (err) {
+          output += err instanceof Error ? err.stack : String(err);
+        }
       }
     },
   };
@@ -71,14 +69,14 @@
           </Tooltip>
         </ActionButtons>
       </FileTreeRoot>
-      <div class="grow flex flex-col gap-1">
+      <div class:grow={!showHelp} class="flex flex-col gap-1">
         <DownloadPayloads />
         <div class="text-center">
           <Button onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
         </div>
       </div>
     {:else}
-      <div class="grow flex flex-col gap-2 justify-center items-center">
+      <div class:grow={!showHelp} class="flex flex-col gap-2 justify-center items-center">
         <h3 class="font-bold">No payloads found!</h3>
         <DownloadPayloads />
         <Button appearance="primary" onclick={handlers.openPayloadDir}>Open Payload Folder</Button>
@@ -88,5 +86,21 @@
     {#if output}
       <LogOutput title="Payload Injection Log" bind:output />
     {/if}
+
+    {#if showHelp}
+      <div class="grow">
+        <Markdown content={rcmHelpMd} />
+      </div>
+    {/if}
+
+    <div>
+      <Button onclick={() => (showHelp = !showHelp)}>
+        {#if showHelp}
+          Hide help
+        {:else}
+          Show help
+        {/if}
+      </Button>
+    </div>
   </div>
 </Container>
