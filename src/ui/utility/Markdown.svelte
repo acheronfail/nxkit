@@ -1,6 +1,7 @@
 <script lang="ts" context="module">
   export interface Props {
     content: string;
+    class?: string;
   }
 </script>
 
@@ -8,7 +9,7 @@
   import { lexer } from 'marked';
   import Code from './Code.svelte';
 
-  let { content }: Props = $props();
+  let { content, class: propClass = '' }: Props = $props();
 
   // TODO: support images (ensure vite bundles them in, etc)
   const tokens = lexer(content);
@@ -40,11 +41,11 @@
 
 {#snippet renderList({ token })}
   {#if token.ordered}
-    <ol class="list-decimal pl-4">
+    <ol class="text-left list-decimal pl-4">
       {@render renderListItems({ listItems: token.items })}
     </ol>
   {:else}
-    <ul class="list-disc pl-4">
+    <ul class="text-left list-disc pl-4">
       {@render renderListItems({ listItems: token.items })}
     </ul>
   {/if}
@@ -60,30 +61,32 @@
   {/each}
 {/snippet}
 
-{#each tokens as token}
-  {#if token.type === 'heading'}
-    {#if token.depth === 1}
-      <h1 class="font-bold text-2xl">{token.text}</h1>
-    {:else if token.depth === 2}
-      <h2 class="font-bold text-xl">{token.text}</h2>
-    {:else if token.depth === 3}
-      <h3 class="font-bold text-lg">{token.text}</h3>
-    {:else if token.depth === 4}
-      <h4 class="font-bold text-md">{token.text}</h4>
-    {:else if token.depth === 5}
-      <h5 class="font-bold text-sm">{token.text}</h5>
-    {:else if token.depth === 6}
-      <h6 class="font-bold text-xs">{token.text}</h6>
+<div class={propClass}>
+  {#each tokens as token}
+    {#if token.type === 'heading'}
+      {#if token.depth === 1}
+        <h1 class="font-bold text-2xl">{token.text}</h1>
+      {:else if token.depth === 2}
+        <h2 class="font-bold text-xl">{token.text}</h2>
+      {:else if token.depth === 3}
+        <h3 class="font-bold text-lg">{token.text}</h3>
+      {:else if token.depth === 4}
+        <h4 class="font-bold text-md">{token.text}</h4>
+      {:else if token.depth === 5}
+        <h5 class="font-bold text-sm">{token.text}</h5>
+      {:else if token.depth === 6}
+        <h6 class="font-bold text-xs">{token.text}</h6>
+      {/if}
+    {:else if token.type === 'space'}
+      <br />
+    {:else if token.type === 'list'}
+      {@render renderList({ token })}
+    {:else if token.type === 'paragraph'}
+      <p>
+        {#each token.tokens ?? [] as t}
+          {@render renderText({ token: t })}
+        {/each}
+      </p>
     {/if}
-  {:else if token.type === 'space'}
-    <br />
-  {:else if token.type === 'list'}
-    {@render renderList({ token })}
-  {:else if token.type === 'paragraph'}
-    <p>
-      {#each token.tokens ?? [] as t}
-        {@render renderText({ token: t })}
-      {/each}
-    </p>
-  {/if}
-{/each}
+  {/each}
+</div>

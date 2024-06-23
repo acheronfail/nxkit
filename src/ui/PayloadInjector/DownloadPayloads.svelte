@@ -1,23 +1,22 @@
 <script lang="ts" context="module">
-  import DescriptionHekate from './DescriptionHekate.svelte';
-  import DescriptionFusee from './DescriptionFusee.svelte';
-  import type { Component } from 'svelte';
+  import downloadHekateMd from '../markdown/download-hekate.md?raw';
+  import downloadFuseeMd from '../markdown/download-fusee.md?raw';
 
   interface PayloadOption {
     link: string;
     displayName: string;
-    description?: Component;
+    markdown?: string;
   }
 
   const payloadOptions: Record<string, PayloadOption> = {
     hekate: {
       displayName: 'hekate_ctcaer.bin',
-      description: DescriptionHekate,
+      markdown: downloadHekateMd,
       link: 'https://github.com/CTCaer/hekate/releases/latest',
     },
     fusee: {
       displayName: 'fusee.bin',
-      description: DescriptionFusee,
+      markdown: downloadFuseeMd,
       link: 'https://github.com/Atmosphere-NX/Atmosphere/releases/latest',
     },
     tegraExplorer: {
@@ -32,6 +31,7 @@
   import Tooltip from '../utility/Tooltip.svelte';
   import Code from '../utility/Code.svelte';
   import Button from '../utility/Button.svelte';
+  import Markdown from '../utility/Markdown.svelte';
 
   const options: Option[] = [
     { displayName: 'select payload', value: '', disabled: true, selected: true },
@@ -60,8 +60,8 @@
           <p class="text-center">
             Opens <Code>{selectedPayload.link}</Code>
           </p>
-          {#if selectedPayload.description}
-            <svelte:component this={selectedPayload.description} />
+          {#if selectedPayload.markdown}
+            <Markdown class="mt-2" content={selectedPayload.markdown} />
           {/if}
         {:else}
           Select an option!
