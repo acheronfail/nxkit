@@ -1,10 +1,17 @@
 import { IpcMainInvokeEvent } from 'electron';
 import { FSEntry, FSFile } from './nand/fatfs/fs';
-import { PartitionEntry } from './nand/gpt';
 
 export interface ProdKeys {
   location: string;
   data: string;
+}
+
+export interface Partition {
+  id: string;
+  name: string;
+  mountable: boolean;
+  size: number;
+  sizeHuman: string;
 }
 
 export enum NandError {
@@ -15,6 +22,7 @@ export enum NandError {
   InvalidPartitionTable,
   NoNandOpened,
   NoPartitionMounted,
+  Readonly,
 }
 
 export type NandResult<T = void> =
@@ -109,7 +117,7 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.ProdKeysFind]: ChannelImpl<() => ProdKeys | null>;
   [Channels.ProdKeysSearchPaths]: ChannelImpl<() => string[]>;
 
-  [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<PartitionEntry[]>>;
+  [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<Partition[]>>;
   [Channels.NandClose]: ChannelImpl<() => void>;
   [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;

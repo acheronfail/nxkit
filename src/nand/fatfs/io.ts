@@ -29,7 +29,7 @@ export async function createIo(nandPath: string): Promise<Io> {
     );
   }
 
-  const fd = fs.openSync(nandPath, 'r');
+  const fd = fs.openSync(nandPath, 'r+');
   return new CombinedDumpIo(fd);
 }
 
@@ -136,7 +136,7 @@ export class SplitDumpIo implements Io {
         break;
       }
 
-      const fd = fs.openSync(splitFile.path, 'w');
+      const fd = fs.openSync(splitFile.path, 'wx');
       const bytesRemaining = length - bytesLeftToWrite;
       const bytesWritten = fs.writeSync(fd, data, bytesRemaining, length, offset + bytesRemaining - splitFile.offset);
       bytesLeftToWrite -= bytesWritten;

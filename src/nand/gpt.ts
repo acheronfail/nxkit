@@ -61,7 +61,7 @@ function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTa
   return gpt;
 }
 
-// @ts-expect-error TODO: support repairing the backup gpt
+// @ts-expect-error TODO: support repairing the backup gpt + all gpt tables (are they unique or static?)
 function _readBackupGpt(io: Io, primaryGpt: GptTable): GptTable {
   const backupGpt = new GPT({ blockSize: primaryGpt.blockSize });
   const offset = (Number(primaryGpt.backupLBA) - 32) * primaryGpt.blockSize;

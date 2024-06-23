@@ -1,5 +1,4 @@
 import fs from 'node:fs/promises';
-import { Xtsn } from '../nand/xtsn';
 import { RawKeys, RawKeysSchema } from './keys.types';
 import { getResources } from '../resources';
 import { app } from 'electron';
@@ -57,11 +56,6 @@ export class Keys {
       crypto: Buffer.from(text.substring(0, 32), 'hex'),
       tweak: Buffer.from(text.substring(32), 'hex'),
     };
-  }
-
-  getXtsn(id: BisKeyId): Xtsn {
-    const { crypto, tweak } = this.getBisKey(id);
-    return new Xtsn(crypto, tweak);
   }
 
   toString(): string {

@@ -1,25 +1,27 @@
 import * as FatFs from 'js-fatfs';
-import { NandIo } from './layer';
+import { NandIoLayer } from './layer';
 
 export interface PartitionDriverOptions {
-  nandIo: NandIo;
+  nandIo: NandIoLayer;
   /**
    * Whether or not to treat the disk as readonly
    */
   readonly: boolean;
+  sectorSize: number;
 }
+
+export class ReadonlyError extends Error {}
 
 // eslint-disable-next-line import/namespace
 export class PartitionDriver implements FatFs.DiskIO {
   private readonly sectorSize: number;
-  private readonly nandIo: NandIo;
+  private readonly nandIo: NandIoLayer;
   private readonly readonly: boolean;
 
-  constructor({ readonly, nandIo }: PartitionDriverOptions) {
+  constructor({ readonly, nandIo, sectorSize }: PartitionDriverOptions) {
     this.readonly = readonly;
     this.nandIo = nandIo;
-    const buf = this.nandIo.read(0, 16);
-    this.sectorSize = buf.readUInt16LE(11); // BPB_BytsPerSec
+    this.sectorSize = sectorSize;
   }
 
   initialize(_ff: FatFs.FatFs, _pdrv: number) {
@@ -43,7 +45,7 @@ export class PartitionDriver implements FatFs.DiskIO {
 
   write(ff: FatFs.FatFs, _pdrv: number, buff: number, sector: number, count: number): number {
     if (this.readonly) {
-      return FatFs.RES_ERROR;
+      throw new ReadonlyError('Tried to write to a disk in readonly mode!');
     }
 
     const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);

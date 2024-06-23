@@ -10,11 +10,10 @@
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
   import Code from './utility/Code.svelte';
-  import { NandError } from '../channels';
+  import { NandError, type Partition } from '../channels';
   import FileExplorer from './NandExplorer/FileExplorer.svelte';
   import PartitionExplorer from './NandExplorer/PartitionExplorer.svelte';
   import type { FSEntry } from '../nand/fatfs/fs';
-  import type { PartitionEntry } from '../nand/gpt';
   import Tooltip from './utility/Tooltip.svelte';
   import { onMount } from 'svelte';
 
@@ -24,8 +23,8 @@
   let loading = $state(false);
   let disabled = $derived(!keys.value || loading);
 
-  let partitions = $state<PartitionEntry[] | null>(null);
-  let selectedPartition = $state<PartitionEntry | null>(null);
+  let partitions = $state<Partition[] | null>(null);
+  let selectedPartition = $state<Partition | null>(null);
   let rootEntries = $state<FSEntry[] | null>(null);
 
   // handle initial props
@@ -67,7 +66,7 @@
         }
       }
     },
-    onPartitionChoose: async (partition: PartitionEntry) => {
+    onPartitionChoose: async (partition: Partition) => {
       selectedPartition = partition;
       {
         const result = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));

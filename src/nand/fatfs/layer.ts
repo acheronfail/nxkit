@@ -1,20 +1,30 @@
-import { Xtsn } from '../xtsn';
+import { Crypto } from './crypto';
 import { Io } from './io';
+
+export interface NandIoOptions {
+  io: Io;
+  partitionStartOffset: number;
+  partitionEndOffset: number;
+  crypto?: Crypto;
+}
 
 /**
  * This is a class which allows reading partitions from Switch NAND dumps.
  * It handles split dumps as well as combined dumps, and also when configured
  * also handles decryption/encryption of reads/writes.
  */
-export class NandIo {
-  private readonly sectorSize = 0x4000;
+export class NandIoLayer {
+  private readonly io: Io;
+  private readonly partitionStartOffset: number;
+  private readonly partitionEndOffset: number;
+  private readonly crypto?: Crypto;
 
-  constructor(
-    private readonly io: Io,
-    private readonly partitionStartOffset: number,
-    private readonly partitionEndOffset: number,
-    private readonly xtsn?: Xtsn,
-  ) {}
+  constructor(options: NandIoOptions) {
+    this.io = options.io;
+    this.partitionStartOffset = options.partitionStartOffset;
+    this.partitionEndOffset = options.partitionEndOffset;
+    this.crypto = options.crypto;
+  }
 
   public size(): number {
     return this.io.size();
@@ -33,7 +43,7 @@ export class NandIo {
       size = this.partitionEndOffset - offset;
     }
 
-    if (!this.xtsn) {
+    if (!this.crypto) {
       return this.io.read(diskOffset, size);
     }
 
@@ -46,15 +56,18 @@ export class NandIo {
     // the second chunk. We then read both chunks and decrypt them, and return the
     // desired bytes (discarding `before` and `after`)
 
-    const before = offset % 16;
-    let after = (offset + size) % 16;
-    if (after) after = 16 - after;
+    const blockSize = this.crypto.blockSize();
 
-    const alignedDiskOffset = diskOffset - before;
+    const before = offset % blockSize;
+    let after = (offset + size) % blockSize;
+    if (after) after = blockSize - after;
+
     const readSize = before + size + after;
+    const alignedDiskOffset = diskOffset - before;
+    const partByteOffset = offset - before;
 
     const buf = this.io.read(alignedDiskOffset, readSize);
-    return this.xtsn.decrypt(buf, offset - before, this.sectorSize).subarray(before, before + size);
+    return this.crypto.decrypt(buf, partByteOffset).subarray(before, before + size);
   }
 
   public write(offset: number, data: Uint8Array): number {
@@ -72,7 +85,7 @@ export class NandIo {
       data = Buffer.from(data.buffer.slice(0, -excess));
     }
 
-    if (!this.xtsn) {
+    if (!this.crypto) {
       return this.io.write(diskOffset, Buffer.from(data));
     }
 
@@ -84,23 +97,27 @@ export class NandIo {
     //  BBBBBBBBBBBBBB^    AAAAAAAAAAAAAA   B = before, A = after, ^ = offset
     //  xxxxxxxxxxxxxxWW WWyyyyyyyyyyyyyy   x = before chunk, y = after chunk, W = data to write
 
+    const blockSize = this.crypto.blockSize();
     const chunks: Uint8Array[] = [];
 
-    const before = offset % this.sectorSize;
-    const alignedPartOffset = offset - before;
+    const before = offset % blockSize;
+    const partByteOffset = offset - before;
     if (before) {
-      chunks.push(this.read(alignedPartOffset, before));
+      chunks.push(this.read(partByteOffset, before));
     }
 
     chunks.push(data);
 
-    let after = (offset + data.byteLength) % this.sectorSize;
+    let after = (offset + data.byteLength) % blockSize;
     if (after) {
-      after = this.sectorSize - after;
+      after = blockSize - after;
       chunks.push(this.read(offset + data.byteLength, after));
     }
 
-    const enc = this.xtsn.encrypt(Buffer.concat(chunks), diskOffset - before, this.sectorSize);
-    return this.io.write(diskOffset + alignedPartOffset, enc);
+    const toWrite = Buffer.concat(chunks);
+    const enc = this.crypto.encrypt(toWrite, partByteOffset);
+
+    const alignedDiskOffset = diskOffset - before;
+    return this.io.write(alignedDiskOffset, enc);
   }
 }
