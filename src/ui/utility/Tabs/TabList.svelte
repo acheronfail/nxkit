@@ -3,13 +3,14 @@
   export interface Props {
     children: Snippet;
     header?: Snippet;
+    class?: string;
   }
 </script>
 
 <script lang="ts">
   import { onMount } from 'svelte';
 
-  let { children, header }: Props = $props();
+  let { children, header, class: propClass = '' }: Props = $props();
   let stickyHeader = $state<HTMLElement | null>(null);
 
   function onScroll() {
@@ -38,12 +39,12 @@
     class="sticky {shadowClass} top-0 z-50 border-b pb-1 dark:border-slate-900 dark:bg-slate-800"
   >
     {@render header()}
-    <ul class="px-4 text-sm font-medium text-center text-gray-500 flex dark:text-gray-400">
+    <ul class="px-4 text-sm font-medium text-center text-gray-500 flex dark:text-gray-400 {propClass}">
       {@render children()}
     </ul>
   </div>
 {:else}
-  <ul data-testid="tablist" class="text-sm font-medium text-center text-gray-500 flex dark:text-gray-400">
+  <ul data-testid="tablist" class="text-sm font-medium text-center text-gray-500 flex dark:text-gray-400 {propClass}">
     {@render children()}
   </ul>
 {/if}

@@ -45,6 +45,8 @@
     window.addEventListener('keydown', keyboardTabHandler);
     return () => window.removeEventListener('keydown', keyboardTabHandler);
   });
+
+  const widthClass = 'max-w-screen-lg';
 </script>
 
 {#snippet header()}
@@ -56,7 +58,7 @@
 {/snippet}
 
 <Tabs bind:selected>
-  <TabList {header}>
+  <TabList class={widthClass} {header}>
     <Tab>NRO Forwarder</Tab>
     <Tab>Payload Injector</Tab>
     <Tab>NAND Explorer</Tab>
@@ -68,17 +70,17 @@
     </Tab>
   </TabList>
 
-  <TabContent>
+  <TabContent class={widthClass}>
     <NroForwarder />
   </TabContent>
-  <TabContent>
+  <TabContent class={widthClass}>
     <PayloadInjector />
   </TabContent>
-  <TabContent>
+  <TabContent class={widthClass}>
     <NandExplorer {nandFilePath} {partitionName} />
   </TabContent>
   <!-- TODO: tool to split/merge files to/from fat32 chunks-->
-  <TabContent>
+  <TabContent class={widthClass}>
     <Settings />
   </TabContent>
 </Tabs>
