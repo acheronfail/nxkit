@@ -48,6 +48,13 @@ fetch-titles:
   npm exec tsx vendor/tinfoil/update.ts
 
 #
+# Release
+#
+
+publish-xtsn:
+  cd src/nand/xtsn && npm publish
+
+#
 # Hooks
 #
 
