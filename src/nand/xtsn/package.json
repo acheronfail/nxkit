@@ -1,6 +1,6 @@
 {
   "name": "haccrypto",
-  "version": "2.0.1",
+  "version": "2.0.2",
   "type": "module",
   "license": "AGPL-3.0-only",
   "main": "dist/index.esm.js",
@@ -14,8 +14,8 @@
   "scripts": {
     "test": "vitest",
     "build": "npm run clean && npm run build:cjs && npm run build:esm",
-    "build:cjs": "esbuild --outfile=dist/xtsn.cjs --format=cjs index.ts",
-    "build:esm": "esbuild --outfile=dist/xtsn.esm.js --format=esm index.ts",
+    "build:cjs": "esbuild --outfile=dist/index.cjs --format=cjs index.ts",
+    "build:esm": "esbuild --outfile=dist/index.esm.js --format=esm index.ts",
     "prepublish": "vitest run && npm run build",
     "clean": "rm -rf dist"
   },
