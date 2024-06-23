@@ -52,7 +52,7 @@ fetch-titles:
 #
 
 publish-xtsn:
-  cd src/nand/xtsn && npm publish
+  cd src/nand/xtsn && npm run prepublish && npm publish
 
 #
 # Hooks
