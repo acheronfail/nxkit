@@ -17,14 +17,19 @@
   import Tooltip from './utility/Tooltip.svelte';
   import { onMount } from 'svelte';
   import { handleNandResult } from './errors';
+  import InputCheckbox from './utility/InputCheckbox.svelte';
+  import Markdown from './utility/Markdown.svelte';
+  import readonlyMd from './markdown/nand-readonly.md?raw';
 
   let { nandFilePath, partitionName }: Props = $props();
 
   let input = $state<HTMLInputElement | null>(null);
   let loading = $state(false);
+  let readonly = $state(true);
   let partDisabled = $state(false);
 
   let disabled = $derived(!keys.value || loading || partDisabled);
+  let readonlyDisabled = $derived(!!nandFilePath);
 
   let partitions = $state<Partition[] | null>(null);
   let selectedPartition = $state<Partition | null>(null);
@@ -66,7 +71,7 @@
       selectedPartition = partition;
 
       handleNandResult(
-        await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value)),
+        await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(readonly), $state.snapshot(keys.value)),
         `mount partition '${selectedPartition.name}'`,
       );
 
@@ -145,6 +150,7 @@
       <p class="text-center">Choose a partition to explore</p>
       <PartitionExplorer
         class="overflow-auto grow h-0"
+        {readonly}
         bind:partitions
         bind:disabled={partDisabled}
         onPartitionChoose={handlers.onPartitionChoose}
@@ -154,5 +160,24 @@
         Choose your <Code>rawnand.bin</Code> file to begin!
       </p>
     {/if}
+  </div>
+
+  <div class="flex justify-center">
+    <InputCheckbox id="readonly" disabled={readonlyDisabled} bind:checked={readonly} tooltipPlacement="top">
+      {#snippet tooltip()}
+        <div class="w-96 text-center">
+          <Markdown content={readonlyMd} />
+          {#if readonlyDisabled}
+            <br />
+            <p class="text-yellow-600">
+              Close NAND to {#if readonly}disable{:else}enable{/if}!
+            </p>
+          {/if}
+        </div>
+      {/snippet}
+      {#snippet label()}
+        Read-Only:
+      {/snippet}
+    </InputCheckbox>
   </div>
 </Container>

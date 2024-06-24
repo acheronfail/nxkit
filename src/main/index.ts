@@ -118,7 +118,8 @@ app.on('ready', () => {
 
     [Channels.NandOpen]: async (_event, path) => nand.open(path),
     [Channels.NandClose]: async (_event) => nand.close(),
-    [Channels.NandMountPartition]: async (_event, paritionName, keysFromUser) => nand.mount(paritionName, keysFromUser),
+    [Channels.NandMountPartition]: async (_event, partName, readonly, keysFromUser) =>
+      nand.mount(partName, readonly, keysFromUser),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
     [Channels.NandCopyFile]: async (_event, pathInNand) => {
       if (!mainWindow) {
@@ -127,7 +128,8 @@ app.on('ready', () => {
 
       return nand.copyFile(pathInNand, mainWindow);
     },
-    [Channels.NandFormatPartition]: async (_event, partName, keysFromUser) => nand.format(partName, keysFromUser),
+    [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>
+      nand.format(partName, readonly, keysFromUser),
   };
 
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {

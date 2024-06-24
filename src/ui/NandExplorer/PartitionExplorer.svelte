@@ -7,6 +7,7 @@
     onPartitionChoose: (partition: Partition) => void;
     class?: string;
     disabled?: boolean;
+    readonly: boolean;
   }
 </script>
 
@@ -17,8 +18,15 @@
   import Tooltip from '../utility/Tooltip.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
   import { handleNandResult } from '../errors';
+  import { keys } from '../stores/keys.svelte';
 
-  let { partitions = $bindable(), disabled = $bindable(false), onPartitionChoose, class: cls = '' }: Props = $props();
+  let {
+    readonly,
+    partitions = $bindable(),
+    disabled = $bindable(false),
+    onPartitionChoose,
+    class: cls = '',
+  }: Props = $props();
 
   let formattingPartitionId = $state<string | null>(null);
 
@@ -31,7 +39,7 @@
         formattingPartitionId = partition.id;
         disabled = true;
         window.nxkit
-          .nandFormatPartition(partition.name)
+          .nandFormatPartition(partition.name, readonly, $state.snapshot(keys.value))
           .then((result) => handleNandResult(result, `format partition '${partition.name}'`))
           .finally(() => {
             disabled = false;

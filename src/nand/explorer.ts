@@ -76,7 +76,7 @@ function findPartition(partitionName: string): NandResult<PartitionEntry> {
   return { error: NandError.None, data: partition };
 }
 
-export async function mount(partitionName: string, keysFromUser?: ProdKeys): Promise<NandResult> {
+export async function mount(partitionName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
   const keys = await resolveKeys(keysFromUser);
   if (!keys) {
     return { error: NandError.NoProdKeys };
@@ -121,9 +121,6 @@ export async function mount(partitionName: string, keysFromUser?: ProdKeys): Pro
     }
   }
 
-  // TODO: pass readonly in from renderer (with warnings!)
-  const readonly = false;
-
   const bpb = new BiosParameterblock(nandIo.read(0, 512));
   nand.fs = new Fat32FileSystem(
     await FatFs.create({ diskio: new PartitionDriver({ nandIo, readonly, sectorSize: bpb.bytsPerSec }) }),
@@ -163,8 +160,8 @@ export async function copyFile(pathInNand: string, window: BrowserWindow): Promi
   return { error: NandError.None };
 }
 
-export async function format(partitionName: string, keysFromUser?: ProdKeys): Promise<NandResult> {
-  await mount(partitionName, keysFromUser);
+export async function format(partitionName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
+  await mount(partitionName, readonly, keysFromUser);
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
   }

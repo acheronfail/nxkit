@@ -119,10 +119,10 @@ export type ChannelImplDefinition<C extends Channels> = {
 
   [Channels.NandOpen]: ChannelImpl<(nandPath: string) => NandResult<Partition[]>>;
   [Channels.NandClose]: ChannelImpl<() => void>;
-  [Channels.NandMountPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
+  [Channels.NandMountPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;
   [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => NandResult>;
-  [Channels.NandFormatPartition]: ChannelImpl<(partitionName: string, keys?: ProdKeys) => NandResult>;
+  [Channels.NandFormatPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
 }[C];
 
 /**
