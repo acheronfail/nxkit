@@ -10,18 +10,21 @@
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
   import Code from './utility/Code.svelte';
-  import { NandError, type Partition } from '../channels';
+  import { type Partition } from '../channels';
   import FileExplorer from './NandExplorer/FileExplorer.svelte';
   import PartitionExplorer from './NandExplorer/PartitionExplorer.svelte';
   import type { FSEntry } from '../nand/fatfs/fs';
   import Tooltip from './utility/Tooltip.svelte';
   import { onMount } from 'svelte';
+  import { handleNandResult } from './errors';
 
   let { nandFilePath, partitionName }: Props = $props();
 
   let input = $state<HTMLInputElement | null>(null);
   let loading = $state(false);
-  let disabled = $derived(!keys.value || loading);
+  let partDisabled = $state(false);
+
+  let disabled = $derived(!keys.value || loading || partDisabled);
 
   let partitions = $state<Partition[] | null>(null);
   let selectedPartition = $state<Partition | null>(null);
@@ -53,37 +56,23 @@
     },
     openNand: async () => {
       if (nandFilePath) {
-        const result = await window.nxkit.nandOpen(nandFilePath);
-        switch (result.error) {
-          case NandError.None:
-            partitions = result.data;
-            break;
-          case NandError.InvalidPartitionTable:
-            return alert('Failed to read partition table, did you select a Nand dump?');
-          default:
-            console.log(result);
-            return alert('An unknown error occurred when trying to open the Nand!');
+        const result = handleNandResult(await window.nxkit.nandOpen(nandFilePath), 'open NAND');
+        if (result) {
+          partitions = result;
         }
       }
     },
     onPartitionChoose: async (partition: Partition) => {
       selectedPartition = partition;
-      {
-        const result = await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value));
-        switch (result.error) {
-          case NandError.None:
-            break;
-          case NandError.InvalidProdKeys:
-            return alert("Failed to read partition, please ensure you're using the right prod.keys!");
-          default:
-            console.log(result);
-            return alert(`An unknown error occurred when trying to mount ${selectedPartition.name}!`);
-        }
-      }
 
-      const result = await window.nxkit.nandReaddir('/');
-      if (result.error === NandError.None) {
-        rootEntries = result.data;
+      handleNandResult(
+        await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(keys.value)),
+        `mount partition '${selectedPartition.name}'`,
+      );
+
+      const result = handleNandResult(await window.nxkit.nandReaddir('/'), 'readdir /');
+      if (result) {
+        rootEntries = result;
       }
     },
     closePartition: () => {
@@ -157,6 +146,7 @@
       <PartitionExplorer
         class="overflow-auto grow h-0"
         bind:partitions
+        bind:disabled={partDisabled}
         onPartitionChoose={handlers.onPartitionChoose}
       />
     {:else}

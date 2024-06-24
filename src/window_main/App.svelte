@@ -46,7 +46,7 @@
     return () => window.removeEventListener('keydown', keyboardTabHandler);
   });
 
-  const widthClass = 'max-w-screen-lg';
+  const widthClass = 'w-[90vw] m-auto';
 </script>
 
 {#snippet header()}

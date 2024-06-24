@@ -6,16 +6,7 @@
     partitions: Partition[];
     onPartitionChoose: (partition: Partition) => void;
     class?: string;
-  }
-
-  function partitionToNode(partition: Partition): Node<Partition, never> {
-    return {
-      id: partition.id,
-      name: partition.name,
-      isDirectory: false,
-      isDisabled: !partition.mountable,
-      data: partition,
-    };
+    disabled?: boolean;
   }
 </script>
 
@@ -25,16 +16,40 @@
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import Tooltip from '../utility/Tooltip.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
+  import { handleNandResult } from '../errors';
 
-  let { partitions = $bindable(), onPartitionChoose, class: cls = '' }: Props = $props();
+  let { partitions = $bindable(), disabled = $bindable(false), onPartitionChoose, class: cls = '' }: Props = $props();
+
+  let formattingPartitionId = $state<string | null>(null);
 
   let handlers = {
     format: async (partition: Partition) => {
-      // TODO: show loading/disabled state while formatting
-      const result = await window.nxkit.nandFormatPartition(partition.name);
-      console.log(result);
+      const yes = confirm(
+        `Are you sure you want to format ${partition.name}?\n\nThis will delete all files and folders on this partition!`,
+      );
+      if (yes) {
+        formattingPartitionId = partition.id;
+        disabled = true;
+        window.nxkit
+          .nandFormatPartition(partition.name)
+          .then((result) => handleNandResult(result, `format partition '${partition.name}'`))
+          .finally(() => {
+            disabled = false;
+            formattingPartitionId = null;
+          });
+      }
     },
   };
+
+  function partitionToNode(partition: Partition): Node<Partition, never> {
+    return {
+      id: partition.id,
+      name: partition.name,
+      isDirectory: false,
+      isDisabled: disabled || !partition.mountable,
+      data: partition,
+    };
+  }
 </script>
 
 <FileTreeRoot class={cls} nodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
@@ -45,13 +60,15 @@
     <ActionButtons>
       {#if !file.mountable}
         <span>unsupported</span>
+      {:else if file.id === formattingPartitionId}
+        <span class="text-red-500">formatting...</span>
       {:else}
         {file.sizeHuman}
         <Tooltip placement="left">
           {#snippet tooltip()}
             <span>Format partition {(file as Partition).name} (<span class="text-red-500">data loss!</span>)</span>
           {/snippet}
-          <ActionButton onclick={() => handlers.format(file)}>
+          <ActionButton {disabled} onclick={() => handlers.format(file)}>
             <TrashIcon class="h-4 cursor-pointer hover:fill-red-500 hover:stroke-2" />
           </ActionButton>
         </Tooltip>
