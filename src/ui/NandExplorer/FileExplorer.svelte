@@ -1,8 +1,8 @@
 <script lang="ts" context="module">
   import type { FSDirectory, FSEntry, FSFile } from '../../nand/fatfs/fs';
-  import type { Node } from '../utility/FileTree/FileTreeNode.svelte';
+  import type { Node } from '../utility/FileTree/FileTree.svelte';
 
-  export function entryToNode(entry: FSEntry): Node<FSDirectory, FSFile> {
+  export function entryToNode(entry: FSEntry): Node<FSFile, FSDirectory> {
     return {
       id: entry.path,
       name: entry.name,
@@ -21,12 +21,12 @@
   import Tooltip from '../utility/Tooltip.svelte';
 
   import { ArrowDownTrayIcon, PencilSquareIcon, TrashIcon } from 'heroicons-svelte/24/solid';
-  import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import { NandError } from '../../channels';
   import Code from '../utility/Code.svelte';
   import { handleNandResult } from '../errors';
+  import FileTree from '../utility/FileTree/FileTree.svelte';
 
   let { rootEntries, class: cls = '' }: Props = $props();
 
@@ -63,7 +63,7 @@
     downloadFile: async (file: FSFile) => {
       await window.nxkit.nandCopyFile(file.path);
     },
-    openNandDirectory: async (dir: FSDirectory): Promise<Node<FSDirectory, FSFile>[]> => {
+    openNandDirectory: async (dir: FSDirectory): Promise<Node<FSFile, FSDirectory>[]> => {
       return window.nxkit.nandReaddir(dir.path).then((result) => {
         if (result.error === NandError.None) {
           return result.data.map(entryToNode);
@@ -79,7 +79,10 @@
 {#snippet renderDeleteAction(entry)}
   <Tooltip placement="left">
     {#snippet tooltip()}
-      <span><span class="text-red-500">Delete</span> <Code>{entry.name}</Code></span>
+      <span>
+        <span class="text-red-500">Delete</span>
+        <Code>{entry.name}</Code>
+      </span>
     {/snippet}
     <ActionButton onclick={() => handlers.delete(entry)}>
       <TrashIcon class="h-4 cursor-pointer hover:fill-red-500" />
@@ -100,7 +103,7 @@
   {/if}
 {/snippet}
 
-<FileTreeRoot class={cls} nodes={rootEntries.map(entryToNode)} openDirectory={handlers.openNandDirectory}>
+<FileTree class={cls} rootNodes={rootEntries.map(entryToNode)} loadDirectory={handlers.openNandDirectory}>
   {#snippet name(node)}
     {#if isRenamingId === node.id}
       TODO: editable name here
@@ -108,13 +111,13 @@
       {node.name}
     {/if}
   {/snippet}
-  {#snippet dirExtra(dir)}
+  {#snippet dirExtra(dir: FSDirectory)}
     <ActionButtons>
       {@render renderRenameAction(dir)}
       {@render renderDeleteAction(dir)}
     </ActionButtons>
   {/snippet}
-  {#snippet fileExtra(file)}
+  {#snippet fileExtra(file: FSFile)}
     <ActionButtons>
       <span class="font-mono">{file.sizeHuman}</span>
       <Tooltip placement="left">
@@ -129,4 +132,4 @@
       {@render renderDeleteAction(file)}
     </ActionButtons>
   {/snippet}
-</FileTreeRoot>
+</FileTree>

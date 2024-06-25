@@ -103,16 +103,20 @@
   <div class="flex flex-col">
     <Tooltip>
       {#snippet tooltip()}
-        <p class="text-center w-96">
+        <p class="text-center w-96 leading-6">
           {#if !keys.value}
             Please select your prod.keys in Settings!
           {:else if loading}
             Loading...
           {:else if nandFilePath}
-            Currently exploring <Code>{nandFilePath}</Code>
+            Currently exploring:
+            {#each nandFilePath.split('/').filter(Boolean) as part}
+              {' / '}<Code>{part}</Code>
+            {/each}
           {:else}
             Choose either a complete dump <Code>rawnand.bin</Code>
-            <br />Or the first part of a split dump <Code>rawnand.bin.00</Code>
+            <br />
+            Or the first part of a split dump <Code>rawnand.bin.00</Code>
           {/if}
         </p>
       {/snippet}

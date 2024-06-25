@@ -4,7 +4,7 @@
   import Container from './utility/Container.svelte';
   import { onMount } from 'svelte';
   import type { FSFile } from '../nand/fatfs/fs';
-  import FileTreeRoot from './utility/FileTree/FileTreeRoot.svelte';
+  import FileTree from './utility/FileTree/FileTree.svelte';
   import { entryToNode } from './NandExplorer/FileExplorer.svelte';
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
   import Tooltip from './utility/Tooltip.svelte';
@@ -55,7 +55,7 @@
   <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
-      <FileTreeRoot class="overflow-auto" nodes={payloads.map(entryToNode)}>
+      <FileTree class="overflow-auto" rootNodes={payloads.map(entryToNode)}>
         {#snippet fileExtra(file)}
           <ActionButtons>
             <span>{file.sizeHuman}</span>
@@ -71,7 +71,7 @@
             </Tooltip>
           </ActionButtons>
         {/snippet}
-      </FileTreeRoot>
+      </FileTree>
       <div class:grow={!showHelp} class="flex flex-col gap-1">
         <DownloadPayloads />
         <div class="text-center">

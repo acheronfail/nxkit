@@ -1,6 +1,6 @@
 <script lang="ts" context="module">
   import type { Partition } from 'src/channels';
-  import type { Node } from '../utility/FileTree/FileTreeNode.svelte';
+  import type { Node } from '../utility/FileTree/FileTree.svelte';
 
   export interface Props {
     partitions: Partition[];
@@ -13,7 +13,7 @@
 
 <script lang="ts">
   import { CircleStackIcon, TrashIcon } from 'heroicons-svelte/24/solid';
-  import FileTreeRoot from '../utility/FileTree/FileTreeRoot.svelte';
+  import FileTree from '../utility/FileTree/FileTree.svelte';
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import Tooltip from '../utility/Tooltip.svelte';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
@@ -60,9 +60,9 @@
   }
 </script>
 
-<FileTreeRoot class={cls} nodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
-  {#snippet icon({ iconClass })}
-    <CircleStackIcon class="text-red-300 {iconClass}" />
+<FileTree class={cls} rootNodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
+  {#snippet icon()}
+    <CircleStackIcon class="inline-block h-4 text-red-300" />
   {/snippet}
   {#snippet fileExtra(file)}
     <ActionButtons>
@@ -83,4 +83,4 @@
       {/if}
     </ActionButtons>
   {/snippet}
-</FileTreeRoot>
+</FileTree>
