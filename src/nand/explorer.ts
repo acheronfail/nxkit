@@ -3,7 +3,7 @@ import { basename } from 'node:path';
 import { BrowserWindow, dialog } from 'electron';
 import * as FatFs from 'js-fatfs';
 import { PartitionDriver, ReadonlyError } from './fatfs/diskio';
-import { FSEntry, Fat32FileSystem, FatType } from './fatfs/fs';
+import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
 import { resolveKeys } from '../main/keys';
 import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS, PartitionFormat, isFat } from './constants';
@@ -178,6 +178,48 @@ export async function format(partitionName: string, readonly: boolean, keysFromU
 
   try {
     nand.fs.format(format === PartitionFormat.Fat32 ? FatType.Fat32 : FatType.Fat);
+    return { error: NandError.None };
+  } catch (err) {
+    if (err instanceof ReadonlyError) {
+      return { error: NandError.Readonly };
+    }
+
+    console.error(err);
+    return { error: NandError.Unknown };
+  }
+}
+
+export async function move(oldPathInNand: string, newPathInNand: string): Promise<NandResult> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
+  try {
+    nand.fs.rename(oldPathInNand, newPathInNand);
+    return { error: NandError.None };
+  } catch (err) {
+    if (err instanceof ReadonlyError) {
+      return { error: NandError.Readonly };
+    }
+
+    if (err instanceof FatError) {
+      if (err.code === FatFs.FR_EXIST) {
+        return { error: NandError.AlreadyExists };
+      }
+    }
+
+    console.error(err);
+    return { error: NandError.Unknown };
+  }
+}
+
+export async function del(pathInNand: string): Promise<NandResult> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
+  try {
+    nand.fs.remove(pathInNand);
     return { error: NandError.None };
   } catch (err) {
     if (err instanceof ReadonlyError) {

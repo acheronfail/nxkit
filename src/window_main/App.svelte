@@ -9,7 +9,8 @@
   import { Tabs, TabList, TabContent, Tab } from '../ui/utility/Tabs';
 
   const params = new URLSearchParams(window.location.search);
-  const [nandFilePath, partitionName] = params.get('rawnand')?.split(':') ?? [];
+  const [nandFilePath, partitionName, nandReadonlyString = '1'] = params.get('rawnand')?.split(':') ?? [];
+  const nandReadonly = Boolean(parseInt(nandReadonlyString));
   const defaultOpen = ['forwarder', 'injector', 'explorer', 'settings'].findIndex((n) => n === params.get('tab'));
 
   let selected = $state(defaultOpen);
@@ -77,7 +78,7 @@
     <PayloadInjector />
   </TabContent>
   <TabContent class={widthClass}>
-    <NandExplorer {nandFilePath} {partitionName} />
+    <NandExplorer {nandFilePath} {partitionName} readonlyDefault={nandReadonly} />
   </TabContent>
   <!-- TODO: tool to split/merge files to/from fat32 chunks-->
   <TabContent class={widthClass}>

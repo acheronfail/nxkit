@@ -10,22 +10,25 @@ export function handleNandResult<T>(result: NandResult<T>, actionDescription: st
       return null;
     }
     case NandError.InvalidPartitionTable:
-      alert('Failed to read partition table, did you select a Nand dump?');
+      alert('Failed to read partition table.\n\nDid you select a NAND dump?');
       return null;
     case NandError.InvalidProdKeys:
-      alert('Invalid prod.keys provided, please ensure the prod.keys match the data you are using!');
+      alert('Invalid prod.keys provided.\n\n Please ensure the prod.keys match the data you are using!');
       return null;
     case NandError.NoNandOpened:
-      alert(`Failed to ${actionDescription} because no NAND file has been opened yet!`);
+      alert(`Failed to ${actionDescription}.\n\nNo NAND file has been opened yet!`);
       return null;
     case NandError.NoPartitionMounted:
-      alert(`Failed to ${actionDescription} because no partition has been mounted yet!`);
+      alert(`Failed to ${actionDescription}.\n\nNo partition has been mounted yet!`);
       return null;
     case NandError.NoProdKeys:
-      alert(`Failed to ${actionDescription} because prod.keys are required but none found!`);
+      alert(`Failed to ${actionDescription}.\n\nprod.keys are required but none found!`);
       return null;
     case NandError.Readonly:
-      alert(`Failed to ${actionDescription} the NAND was opened in readonly mode!`);
+      alert(`Failed to ${actionDescription}.\n\nThe NAND was opened in readonly mode!`);
+      return null;
+    case NandError.AlreadyExists:
+      alert(`Failed to ${actionDescription}.\n\nAn item already exists with that name!`);
       return null;
     case NandError.Unknown:
       console.error(result);

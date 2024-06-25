@@ -84,6 +84,46 @@ describe(Fat32FileSystem.name, () => {
     expect(fs.readdir('/')).toEqual([]);
   });
 
+  describe('rename', () => {
+    test('file', () => {
+      fs.writeFile('/file');
+      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/file']);
+      fs.rename('/file', '/new');
+      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/new']);
+    });
+
+    test('dir', () => {
+      fs.mkdir('/dir');
+      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/dir']);
+      fs.rename('/dir', '/new');
+      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/new']);
+    });
+
+    test('across directories', () => {
+      fs.mkdir('/dir');
+      fs.writeFile('/file');
+      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/dir', '/file']);
+      fs.rename('/file', '/dir/new');
+      expect(fs.readdir('/').map(({ name }) => name)).toEqual(['dir']);
+      expect(fs.readdir('/dir').map(({ name }) => name)).toEqual(['new']);
+    });
+  });
+
+  test('remove', () => {
+    fs.mkdir('/first');
+    fs.mkdir('/first/second');
+    fs.writeFile('/first/empty');
+    fs.writeFile('/first/stuff', Buffer.from('asdf'));
+    fs.writeFile('/first/second/stuff', Buffer.from('asdf'));
+
+    expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/first']);
+    expect(fs.readdir('/first').map(({ name }) => name)).toEqual(['second', 'empty', 'stuff']);
+    expect(fs.readdir('/first/second').map(({ name }) => name)).toEqual(['stuff']);
+
+    fs.remove('/first');
+    expect(fs.readdir('/')).toEqual([]);
+  });
+
   test('writeFile empty', () => {
     fs.writeFile('/empty');
     const data = fs.readFile('/empty');

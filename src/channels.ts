@@ -23,6 +23,7 @@ export enum NandError {
   NoNandOpened,
   NoPartitionMounted,
   Readonly,
+  AlreadyExists,
 }
 
 export type NandResult<T = void> =
@@ -46,6 +47,8 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandMount: RendererChannelImpl[Channels.NandMountPartition];
   nandReaddir: RendererChannelImpl[Channels.NandReaddir];
   nandCopyFile: RendererChannelImpl[Channels.NandCopyFile];
+  nandMoveEntry: RendererChannelImpl[Channels.NandMoveEntry];
+  nandDeleteEntry: RendererChannelImpl[Channels.NandDeleteEntry];
   nandFormatPartition: RendererChannelImpl[Channels.NandFormatPartition];
 }
 
@@ -84,6 +87,10 @@ export enum Channels {
   NandReaddir,
   /** Copy a file out of the currently mounted nand partition */
   NandCopyFile,
+  /** Move an entry inside of the currently mounted nand partition */
+  NandMoveEntry,
+  /** Delete an entry inside of the currently mounted nand partition */
+  NandDeleteEntry,
   /** Reformat nand partition */
   NandFormatPartition,
 }
@@ -122,6 +129,8 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandMountPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;
   [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => NandResult>;
+  [Channels.NandMoveEntry]: ChannelImpl<(oldPathInNand: string, newPathInNand: string) => NandResult>;
+  [Channels.NandDeleteEntry]: ChannelImpl<(pathInNand: string) => NandResult>;
   [Channels.NandFormatPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
 }[C];
 

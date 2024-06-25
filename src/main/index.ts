@@ -128,6 +128,8 @@ app.on('ready', () => {
 
       return nand.copyFile(pathInNand, mainWindow);
     },
+    [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) => nand.move(oldPathInNand, newPathInNand),
+    [Channels.NandDeleteEntry]: async (_event, pathInNand) => nand.del(pathInNand),
     [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>
       nand.format(partName, readonly, keysFromUser),
   };

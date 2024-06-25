@@ -2,6 +2,7 @@
   export interface Props {
     nandFilePath?: string;
     partitionName?: string;
+    readonlyDefault?: boolean;
   }
 </script>
 
@@ -21,11 +22,11 @@
   import Markdown from './utility/Markdown.svelte';
   import readonlyMd from './markdown/nand-readonly.md?raw';
 
-  let { nandFilePath, partitionName }: Props = $props();
+  let { nandFilePath, partitionName, readonlyDefault = true }: Props = $props();
 
   let input = $state<HTMLInputElement | null>(null);
   let loading = $state(false);
-  let readonly = $state(true);
+  let readonly = $state(readonlyDefault);
   let partDisabled = $state(false);
 
   let disabled = $derived(!keys.value || loading || partDisabled);

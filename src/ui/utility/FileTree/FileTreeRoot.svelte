@@ -15,11 +15,11 @@
 </script>
 
 <script lang="ts">
-  let { nodes, onFileClick, openDirectory, icon, dirExtra, fileExtra, class: cls = '' }: Props = $props();
+  let { nodes, onFileClick, openDirectory, icon, name, dirExtra, fileExtra, class: cls = '' }: Props = $props();
 </script>
 
 <ul class="select-none font-mono m-2 border border-slate-900 bg-slate-900 {cls}">
   {#each nodes as node}
-    <FileTreeNode {onFileClick} {openDirectory} {node} {icon} {dirExtra} {fileExtra} depth={1} />
+    <FileTreeNode {onFileClick} {openDirectory} {name} {node} {icon} {dirExtra} {fileExtra} depth={1} />
   {/each}
 </ul>

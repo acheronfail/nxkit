@@ -3,51 +3,40 @@ import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
 import { BiosParameterblock } from './bpb';
 
-export function check_result(r: number) {
-  switch (r) {
-    case FatFs.FR_OK:
-      return;
-    case FatFs.FR_DISK_ERR:
-      throw new Error('FatFs Error: FR_DISK_ERR');
-    case FatFs.FR_INT_ERR:
-      throw new Error('FatFs Error: FR_INT_ERR');
-    case FatFs.FR_NOT_READY:
-      throw new Error('FatFs Error: FR_NOT_READY');
-    case FatFs.FR_NO_FILE:
-      throw new Error('FatFs Error: FR_NO_FILE');
-    case FatFs.FR_NO_PATH:
-      throw new Error('FatFs Error: FR_NO_PATH');
-    case FatFs.FR_INVALID_NAME:
-      throw new Error('FatFs Error: FR_INVALID_NAME');
-    case FatFs.FR_DENIED:
-      throw new Error('FatFs Error: FR_DENIED');
-    case FatFs.FR_EXIST:
-      throw new Error('FatFs Error: FR_EXIST');
-    case FatFs.FR_INVALID_OBJECT:
-      throw new Error('FatFs Error: FR_INVALID_OBJECT');
-    case FatFs.FR_WRITE_PROTECTED:
-      throw new Error('FatFs Error: FR_WRITE_PROTECTED');
-    case FatFs.FR_INVALID_DRIVE:
-      throw new Error('FatFs Error: FR_INVALID_DRIVE');
-    case FatFs.FR_NOT_ENABLED:
-      throw new Error('FatFs Error: FR_NOT_ENABLED');
-    case FatFs.FR_NO_FILESYSTEM:
-      throw new Error('FatFs Error: FR_NO_FILESYSTEM');
-    case FatFs.FR_MKFS_ABORTED:
-      throw new Error('FatFs Error: FR_MKFS_ABORTED');
-    case FatFs.FR_TIMEOUT:
-      throw new Error('FatFs Error: FR_TIMEOUT');
-    case FatFs.FR_LOCKED:
-      throw new Error('FatFs Error: FR_LOCKED');
-    case FatFs.FR_NOT_ENOUGH_CORE:
-      throw new Error('FatFs Error: FR_NOT_ENOUGH_CORE');
-    case FatFs.FR_TOO_MANY_OPEN_FILES:
-      throw new Error('FatFs Error: FR_TOO_MANY_OPEN_FILES');
-    case FatFs.FR_INVALID_PARAMETER:
-      throw new Error('FatFs Error: FR_INVALID_PARAMETER');
-    default:
-      throw new Error(`FatFs Error: ${r}`);
+const errorToString: Record<number, string> = {
+  [FatFs.FR_DISK_ERR]: 'FR_DISK_ERR',
+  [FatFs.FR_INT_ERR]: 'FR_INT_ERR',
+  [FatFs.FR_NOT_READY]: 'FR_NOT_READY',
+  [FatFs.FR_NO_FILE]: 'FR_NO_FILE',
+  [FatFs.FR_NO_PATH]: 'FR_NO_PATH',
+  [FatFs.FR_INVALID_NAME]: 'FR_INVALID_NAME',
+  [FatFs.FR_DENIED]: 'FR_DENIED',
+  [FatFs.FR_EXIST]: 'FR_EXIST',
+  [FatFs.FR_INVALID_OBJECT]: 'FR_INVALID_OBJECT',
+  [FatFs.FR_WRITE_PROTECTED]: 'FR_WRITE_PROTECTED',
+  [FatFs.FR_INVALID_DRIVE]: 'FR_INVALID_DRIVE',
+  [FatFs.FR_NOT_ENABLED]: 'FR_NOT_ENABLED',
+  [FatFs.FR_NO_FILESYSTEM]: 'FR_NO_FILESYSTEM',
+  [FatFs.FR_MKFS_ABORTED]: 'FR_MKFS_ABORTED',
+  [FatFs.FR_TIMEOUT]: 'FR_TIMEOUT',
+  [FatFs.FR_LOCKED]: 'FR_LOCKED',
+  [FatFs.FR_NOT_ENOUGH_CORE]: 'FR_NOT_ENOUGH_CORE',
+  [FatFs.FR_TOO_MANY_OPEN_FILES]: 'FR_TOO_MANY_OPEN_FILES',
+  [FatFs.FR_INVALID_PARAMETER]: 'FR_INVALID_PARAMETER',
+};
+
+export class FatError extends Error {
+  constructor(public readonly code: number) {
+    super(`${errorToString[code] ?? 'Unknown'}`);
   }
+}
+
+export function check_result(result: number) {
+  if (result === FatFs.FR_OK) {
+    return;
+  }
+
+  throw new FatError(result);
 }
 
 export type FSFile = {
@@ -149,12 +138,57 @@ export class Fat32FileSystem {
     return ret;
   }
 
+  /**
+   * Create a new directory.
+   * @param dirPath path to the directory
+   */
   mkdir(dirPath: string) {
     check_result(this.ff.f_mkdir(dirPath));
   }
 
+  /**
+   * Delete a directory; the directory must be empty.
+   * @param dirPath path to the directory
+   */
   rmdir(dirPath: string) {
     check_result(this.ff.f_rmdir(dirPath));
+  }
+
+  /**
+   * Delete (unlink) a file.
+   * @param filePath path to the file
+   */
+  unlink(filePath: string) {
+    check_result(this.ff.f_unlink(filePath));
+  }
+
+  /**
+   * Renames (or moves) a file from src to dst.
+   * @param srcPath path to the existing file/directory
+   * @param dstPath path to the new location
+   */
+  rename(srcPath: string, dstPath: string) {
+    check_result(this.ff.f_rename(srcPath, dstPath));
+  }
+
+  /**
+   * Delete a file or directory. If it's a directory, then the directory is
+   * recursively deleted (all files and folders inside it are deleted).
+   * @param path path to file or directory to remove
+   */
+  remove(path: string) {
+    const fno = this.ff.malloc(FatFs.sizeof_FILINFO);
+    check_result(this.ff.f_stat(path, fno));
+
+    const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
+    if (isDir) {
+      this.readdir(path).forEach((entry) => this.remove(entry.path));
+      this.rmdir(path);
+    } else {
+      this.unlink(path);
+    }
+
+    this.ff.free(fno);
   }
 
   /**

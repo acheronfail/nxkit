@@ -25,6 +25,7 @@
         },
       ]
     >;
+    name?: Snippet<[Node<FileData, DirData>]>;
     dirExtra?: Snippet<[DirData]>;
     fileExtra?: Snippet<[FileData]>;
   }
@@ -55,6 +56,7 @@
     depth,
     onFileClick,
     openDirectory,
+    name,
     icon,
     dirExtra,
     fileExtra,
@@ -104,7 +106,11 @@
         {:else}
           <FolderIcon class="text-blue-300 {iconClass}" />
         {/if}
-        {node.name}
+        {#if name}
+          {@render name(node)}
+        {:else}
+          {node.name}
+        {/if}
       </span>
       <span>
         {#if dirExtra}
@@ -120,7 +126,11 @@
         {:else}
           <DocumentIcon class={iconClass} />
         {/if}
-        {node.name}
+        {#if name}
+          {@render name(node)}
+        {:else}
+          {node.name}
+        {/if}
       </span>
       <span>
         {#if fileExtra}
