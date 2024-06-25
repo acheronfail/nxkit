@@ -20,9 +20,10 @@ function exposeInMainWorld<K extends NXKitBridgeKeyType>(key: K, value: Window[K
 
 // -----------------------------------------------------------------------------
 
-invoke(Channels.PreloadBrige).then((bridge) =>
+invoke(Channels.PreloadBridge).then((bridge) =>
   exposeInMainWorld(NXKitBridgeKey, {
     ...bridge,
+    pathDirname: (path) => invoke(Channels.PathDirname, path),
     openLink: (link) => invoke(Channels.OpenLink, link),
 
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),

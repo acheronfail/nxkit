@@ -55,16 +55,16 @@
   <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
-      <FileTree class="overflow-auto" rootNodes={payloads.map(entryToNode)}>
-        {#snippet fileExtra(file)}
+      <FileTree class="overflow-auto" root={payloads.map(entryToNode)}>
+        {#snippet fileExtra(node)}
           <ActionButtons>
-            <span>{file.sizeHuman}</span>
+            <span>{node.data.sizeHuman}</span>
             <Tooltip placement="left">
               {#snippet tooltip()}
-                <div>Inject {file.name}</div>
+                <div>Inject {node.data.name}</div>
               {/snippet}
               <div>
-                <Button size="small" appearance="primary" onclick={() => handlers.injectPayload(file.path)}>
+                <Button size="small" appearance="primary" onclick={() => handlers.injectPayload(node.data.path)}>
                   inject
                 </Button>
               </div>

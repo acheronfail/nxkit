@@ -60,23 +60,23 @@
   }
 </script>
 
-<FileTree class={cls} rootNodes={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
+<FileTree class={cls} root={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
   {#snippet icon()}
     <CircleStackIcon class="inline-block h-4 text-red-300" />
   {/snippet}
-  {#snippet fileExtra(file)}
+  {#snippet fileExtra(node)}
     <ActionButtons>
-      {#if !file.mountable}
+      {#if !node.data.mountable}
         <span>unsupported</span>
-      {:else if file.id === formattingPartitionId}
+      {:else if node.id === formattingPartitionId}
         <span class="text-red-500">formatting...</span>
       {:else}
-        {file.sizeHuman}
+        {node.data.sizeHuman}
         <Tooltip placement="left">
           {#snippet tooltip()}
-            <span>Format partition {(file as Partition).name} (<span class="text-red-500">data loss!</span>)</span>
+            <span>Format partition {node.data.name} (<span class="text-red-500">data loss!</span>)</span>
           {/snippet}
-          <ActionButton {disabled} onclick={() => handlers.format(file)}>
+          <ActionButton {disabled} onclick={() => handlers.format(node.data)}>
             <TrashIcon class="h-4 cursor-pointer hover:fill-red-500 hover:stroke-2" />
           </ActionButton>
         </Tooltip>

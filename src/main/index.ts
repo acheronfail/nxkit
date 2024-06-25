@@ -83,7 +83,7 @@ app.on('ready', () => {
 
   let mainWindow: BrowserWindow | undefined = undefined;
   const mainChannelImpl: MainChannelImpl = {
-    [Channels.PreloadBrige]: async () => {
+    [Channels.PreloadBridge]: async () => {
       const plat = platform();
       return {
         isWindows: plat === 'win32',
@@ -92,6 +92,7 @@ app.on('ready', () => {
       };
     },
 
+    [Channels.PathDirname]: async (_event, p) => path.dirname(p),
     [Channels.OpenLink]: async (_event, link) => shell.openExternal(link),
 
     [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {

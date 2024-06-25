@@ -1,25 +1,27 @@
 <script context="module" lang="ts">
-  import type { Snippet } from 'svelte';
+  import { onMount, type Snippet } from 'svelte';
 
-  export type Props<File = any, Dir = any> = {
+  export type ReloadFn = (id: string) => Promise<void>;
+  export interface Props<File = any, Dir = any> {
     class?: string;
-    rootNodes: Node<File, Dir>[];
+
+    root: Node<File, Dir, true> | Node<File, Dir>[];
 
     onFileClick?: (file: File) => void;
-    loadDirectory?: (dir: Dir) => Promise<Node<File, Dir>[]>;
+    loadDirectory?: (id: string) => Promise<Node<File, Dir>[]>;
 
     icon?: Snippet<[Node<File, Dir>]>;
     name?: Snippet<[Node<File, Dir>]>;
-    dirExtra?: Snippet<[Dir, Node<File, Dir>]>;
-    fileExtra?: Snippet<[File, Node<File, Dir>]>;
-  };
+    dirExtra?: Snippet<[Node<File, Dir, true>, ReloadFn]>;
+    fileExtra?: Snippet<[Node<File, Dir, false>, ReloadFn]>;
+  }
 
   export interface Node<File = any, Dir = any, IsDirectory extends boolean = boolean> {
     id: string;
     name: string;
     isDirectory: IsDirectory;
     isDisabled?: boolean;
-    data?: IsDirectory extends true ? Dir : File;
+    data: IsDirectory extends true ? Dir : File;
   }
 
   const LOADING_NODE: Node = {
@@ -27,49 +29,73 @@
     name: 'Loading...',
     isDirectory: false,
     isDisabled: true,
+    data: undefined,
   };
 </script>
 
-<script lang="ts" generics="File, Dir">
+<script lang="ts" generics="F, D">
   import { ClockIcon, DocumentIcon, FolderIcon } from 'heroicons-svelte/24/outline';
   import { FolderOpenIcon } from 'heroicons-svelte/24/solid';
 
   let {
-    rootNodes,
-    onFileClick: openFile,
-    loadDirectory: openDirectory,
+    root,
+    onFileClick,
+    loadDirectory,
     icon,
     name,
     dirExtra,
     fileExtra,
     class: propClass = '',
-  }: Props<File, Dir> = $props();
+  }: Props<F, D> = $props();
 
   type NodeId = string;
   const expandedState = $state<Record<NodeId, boolean>>({});
   const loadingState = $state<Record<NodeId, boolean>>({});
   const childrenState = $state<Record<NodeId, string[]>>({});
-  const nodes: Record<NodeId, Node<File, Dir>> = $state({});
+  const nodes: Record<NodeId, Node<F, D>> = $state({});
+
+  onMount(async () => {
+    if (Array.isArray(root)) {
+      root.forEach((node) => (nodes[node.id] = node));
+    } else {
+      nodes[root.id] = root;
+      await handlers.toggleDir(root.id, true);
+    }
+  });
 
   const handlers = {
-    onclick: (node: Node<File, Dir>) => {
+    reloadDir: async (id: string) => {
+      const node = nodes[id];
+      if (node && node.isDirectory) {
+        await handlers.toggleDir(id, true);
+      }
+    },
+    reloadParent: async () => {
+      console.log('TODO reload');
+    },
+    toggleDir: async (id: string, expand?: boolean) => {
+      console.log({ id, nodes: nodes[id] });
+
+      expand ??= !expandedState[id];
+      expandedState[id] = expand;
+      if (expand) {
+        const loadingTimer = setTimeout(() => (loadingState[id] = true), 100);
+        await loadDirectory?.(id)
+          .then((childNodes) => {
+            childrenState[id] = childNodes.map((node) => node.id);
+            childNodes.forEach((node) => (nodes[node.id] = node));
+          })
+          .finally(() => {
+            clearTimeout(loadingTimer);
+            loadingState[id] = false;
+          });
+      }
+    },
+    onclick: (node: Node<F, D>) => {
       if (node.isDirectory) {
-        if (expandedState[node.id]) {
-          expandedState[node.id] = false;
-        } else {
-          expandedState[node.id] = true;
-          loadingState[node.id] = true;
-          openDirectory?.(node.data as Dir)
-            .then((childNodes) => {
-              childrenState[node.id] = childNodes.map((node) => node.id);
-              childNodes.forEach((node) => (nodes[node.id] = node));
-            })
-            .finally(() => {
-              loadingState[node.id] = false;
-            });
-        }
+        handlers.toggleDir(node.id);
       } else {
-        openFile?.(node.data as File);
+        onFileClick?.(node.data as F);
       }
     },
   };
@@ -78,7 +104,7 @@
   const itemClass = 'pr-2 flex justify-between items-center focus:outline-none';
 </script>
 
-{#snippet renderNode(node: Node, depth = 0)}
+{#snippet renderNode(node: Node, depth = 1)}
   {@const expanded = expandedState[node.id]}
   {@const loading = loadingState[node.id]}
   <li class="dark:bg-slate-800 odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
@@ -111,7 +137,7 @@
         </span>
         <span>
           {#if dirExtra}
-            {@render dirExtra(node.data, node)}
+            {@render dirExtra(node as Node<F, D, true>, handlers.reloadDir)}
           {/if}
         </span>
       {:else}
@@ -131,7 +157,7 @@
         </span>
         <span>
           {#if fileExtra && node !== LOADING_NODE}
-            {@render fileExtra(node.data, node)}
+            {@render fileExtra(node as Node<F, D, false>, handlers.reloadDir)}
           {/if}
         </span>
       {/if}
@@ -149,9 +175,17 @@
 {/snippet}
 
 <ul class="select-none font-mono m-2 border border-slate-900 bg-slate-900 {propClass}">
-  {#each rootNodes as node}
-    {@render renderNode(node, 1)}
-  {/each}
+  {#if Array.isArray(root)}
+    {#each root as node}
+      {@render renderNode(node, 1)}
+    {/each}
+  {:else if loadingState[root.id]}
+    {@render renderNode(LOADING_NODE, 1)}
+  {:else}
+    {#each childrenState[root.id] ?? [] as id}
+      {@render renderNode(nodes[id], 1)}
+    {/each}
+  {/if}
 </ul>
 
 <style>

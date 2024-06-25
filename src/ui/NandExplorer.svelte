@@ -14,7 +14,6 @@
   import { type Partition } from '../channels';
   import FileExplorer from './NandExplorer/FileExplorer.svelte';
   import PartitionExplorer from './NandExplorer/PartitionExplorer.svelte';
-  import type { FSEntry } from '../nand/fatfs/fs';
   import Tooltip from './utility/Tooltip.svelte';
   import { onMount } from 'svelte';
   import { handleNandResult } from './errors';
@@ -34,7 +33,6 @@
 
   let partitions = $state<Partition[] | null>(null);
   let selectedPartition = $state<Partition | null>(null);
-  let rootEntries = $state<FSEntry[] | null>(null);
 
   // handle initial props
   onMount(async () => {
@@ -47,7 +45,7 @@
     if (partitionName) {
       const part = partitions?.find((part) => part.name === partitionName);
       if (part) {
-        handlers.onPartitionChoose(part);
+        await handlers.onPartitionChoose(part);
       }
     }
 
@@ -69,27 +67,20 @@
       }
     },
     onPartitionChoose: async (partition: Partition) => {
-      selectedPartition = partition;
-
       handleNandResult(
-        await window.nxkit.nandMount(selectedPartition.name, $state.snapshot(readonly), $state.snapshot(keys.value)),
-        `mount partition '${selectedPartition.name}'`,
+        await window.nxkit.nandMount(partition.name, $state.snapshot(readonly), $state.snapshot(keys.value)),
+        `mount partition '${partition.name}'`,
       );
 
-      const result = handleNandResult(await window.nxkit.nandReaddir('/'), 'readdir /');
-      if (result) {
-        rootEntries = result;
-      }
+      selectedPartition = partition;
     },
     closePartition: () => {
-      rootEntries = null;
       selectedPartition = null;
     },
     reset: () => {
       loading = true;
       window.nxkit.nandClose().finally(() => {
         loading = false;
-        rootEntries = null;
         partitions = null;
         selectedPartition = null;
         nandFilePath = undefined;
@@ -143,14 +134,14 @@
   </div>
 
   <div data-testid="explorer-wrapper" class="flex flex-col grow">
-    {#if rootEntries && selectedPartition}
+    {#if selectedPartition}
       <p class="text-center">
         Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
       </p>
       <div class="text-center">
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </div>
-      <FileExplorer class="overflow-auto grow h-0" {rootEntries} />
+      <FileExplorer class="overflow-auto grow h-0" />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
       <PartitionExplorer

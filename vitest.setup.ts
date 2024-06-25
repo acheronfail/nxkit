@@ -23,6 +23,7 @@ window[NXKitBridgeKey] = {
   nandDeleteEntry: vi.fn(),
   nandMoveEntry: vi.fn(),
   openLink: vi.fn(),
+  pathDirname: vi.fn(),
   payloadsFind: vi.fn(),
   payloadsOpenDirectory: vi.fn(),
   payloadsReadFile: vi.fn(),
