@@ -38,7 +38,7 @@
     <label class="min-w-32 flex justify-between items-center gap-2 {disabled ? disabledClass : enabledClass}" for={id}>
       {@render label()}
       <div
-        class="relative rounded-full bg-slate-900 shadow-[inset_0_0_0_1px] {toggleClass} {disabled
+        class="relative rounded-full bg-slate-900 shadow-inset-border {toggleClass} {disabled
           ? 'shadow-slate-500'
           : checked
             ? 'shadow-green-500'

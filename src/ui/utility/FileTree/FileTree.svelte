@@ -10,8 +10,8 @@
     onFileClick?: (file: File) => void;
     loadDirectory?: (id: string) => Promise<Node<File, Dir>[]>;
 
-    icon?: Snippet<[Node<File, Dir>]>;
-    name?: Snippet<[Node<File, Dir>]>;
+    icon?: Snippet<[Node<File, Dir>, ReloadFn]>;
+    name?: Snippet<[Node<File, Dir>, ReloadFn]>;
     dirExtra?: Snippet<[Node<File, Dir, true>, ReloadFn]>;
     fileExtra?: Snippet<[Node<File, Dir, false>, ReloadFn]>;
   }
@@ -70,12 +70,7 @@
         await handlers.toggleDir(id, true);
       }
     },
-    reloadParent: async () => {
-      console.log('TODO reload');
-    },
     toggleDir: async (id: string, expand?: boolean) => {
-      console.log({ id, nodes: nodes[id] });
-
       expand ??= !expandedState[id];
       expandedState[id] = expand;
       if (expand) {
@@ -101,7 +96,7 @@
   };
 
   const iconClass = 'inline-block h-4';
-  const itemClass = 'pr-2 flex justify-between items-center focus:outline-none';
+  const spanClass = 'grow flex items-center justify-start gap-2';
 </script>
 
 {#snippet renderNode(node: Node, depth = 1)}
@@ -109,7 +104,7 @@
   {@const loading = loadingState[node.id]}
   <li class="dark:bg-slate-800 odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
     <div
-      class={itemClass}
+      class="pr-2 flex justify-between items-center focus:outline-none"
       class:text-slate-500={node.isDisabled}
       class:focus:bg-blue-600={!node.isDisabled}
       class:focus:hover:bg-blue-500={!node.isDisabled}
@@ -121,16 +116,16 @@
       onclick={!node.isDisabled ? () => handlers.onclick(node) : undefined}
     >
       {#if node.isDirectory}
-        <span>
+        <span class={spanClass}>
           {#if icon}
-            {@render icon(node)}
+            {@render icon(node, handlers.reloadDir)}
           {:else if expanded}
             <FolderOpenIcon class="text-blue-300 {iconClass}" />
           {:else}
             <FolderIcon class="text-blue-300 {iconClass}" />
           {/if}
           {#if name}
-            {@render name(node)}
+            {@render name(node, handlers.reloadDir)}
           {:else}
             {node.name}
           {/if}
@@ -141,16 +136,16 @@
           {/if}
         </span>
       {:else}
-        <span>
+        <span class={spanClass}>
           {#if icon}
-            {@render icon(node)}
+            {@render icon(node, handlers.reloadDir)}
           {:else if node === LOADING_NODE}
             <ClockIcon class={iconClass} />
           {:else}
             <DocumentIcon class={iconClass} />
           {/if}
           {#if name}
-            {@render name(node)}
+            {@render name(node, handlers.reloadDir)}
           {:else}
             {node.name}
           {/if}

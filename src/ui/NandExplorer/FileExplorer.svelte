@@ -20,13 +20,13 @@
 
 <script lang="ts">
   import Tooltip from '../utility/Tooltip.svelte';
-
   import { ArrowDownTrayIcon, PencilSquareIcon, TrashIcon } from 'heroicons-svelte/24/solid';
   import ActionButton from '../utility/FileTree/ActionButton.svelte';
   import ActionButtons from '../utility/FileTree/ActionButtons.svelte';
   import Code from '../utility/Code.svelte';
   import { handleNandResult } from '../errors';
   import FileTree from '../utility/FileTree/FileTree.svelte';
+  import InputTextInline from '../utility/InputTextInline.svelte';
 
   let { class: propClass = '' }: Props = $props();
 
@@ -38,18 +38,14 @@
     name: '<root>',
   }) as Node<FSFile, FSDirectory, true>;
 
-  // TODO build it out and enable
-  const renamingEnabled = false;
-
   const handlers = {
     toggleRename: (node: FileNode) => {
       isRenamingId = isRenamingId === node.id ? null : node.id;
     },
-    doRename: async (node: FileNode, reloadDir: ReloadFn) => {
-      // TODO: prompt for name somehow
+    doRename: (node: FileNode, reloadDir: ReloadFn) => async (newName: string) => {
       const parentDir = await window.nxkit.pathDirname(node.data.path);
       await window.nxkit
-        .nandMoveEntry(node.data.path, node.data.path == '/PRF2SAFE.RCV' ? '/newname' : '/PRF2SAFE.RCV')
+        .nandMoveEntry(node.data.path, [parentDir, newName].join('/'))
         .then((result) => handleNandResult(result, `rename ${node.data.name}`))
         .finally(() => reloadDir(parentDir));
     },
@@ -88,22 +84,26 @@
 {/snippet}
 
 {#snippet renderRenameAction(node: FileNode, reloadDir: ReloadFn)}
-  {#if renamingEnabled}
-    <Tooltip placement="left">
-      {#snippet tooltip()}
-        <span>Rename <Code>{node.name}</Code></span>
-      {/snippet}
-      <ActionButton onclick={() => handlers.toggleRename(node)}>
-        <PencilSquareIcon class="h-4 cursor-pointer hover:fill-slate-900" />
-      </ActionButton>
-    </Tooltip>
-  {/if}
+  <Tooltip placement="left">
+    {#snippet tooltip()}
+      <span>Rename <Code>{node.name}</Code></span>
+    {/snippet}
+    <ActionButton onclick={() => handlers.toggleRename(node)}>
+      <PencilSquareIcon class="h-4 cursor-pointer hover:fill-slate-900" />
+    </ActionButton>
+  </Tooltip>
 {/snippet}
 
 <FileTree class={propClass} {root} loadDirectory={handlers.openNandDirectory}>
-  {#snippet name(node)}
+  {#snippet name(node, reloadDir)}
     {#if isRenamingId === node.id}
-      TODO: editable name here
+      <InputTextInline
+        autoFocus
+        class="grow mr-2"
+        initialValue={node.name}
+        onEnter={handlers.doRename(node, reloadDir)}
+        onEscape={() => (isRenamingId = null)}
+      />
     {:else}
       {node.name}
     {/if}
