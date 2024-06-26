@@ -3,9 +3,9 @@
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
   import { onMount } from 'svelte';
-  import type { FSFile } from '../nand/fatfs/fs';
+  import type { FSDirectory, FSFile } from '../nand/fatfs/fs';
   import FileTree from './utility/FileTree/FileTree.svelte';
-  import { entryToNode, ROOT_NODE } from './NandExplorer/FileExplorer.svelte';
+  import { entryToNode, type FileNode, ROOT_NODE } from './NandExplorer/FileExplorer.svelte';
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
   import Tooltip from './utility/Tooltip.svelte';
   import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
@@ -15,10 +15,12 @@
 
   let showHelp = $state(true);
   let output = $state('');
-  let payloads = $state<FSFile[] | null>(null);
+  let payloads = $state<FSFile[]>([]);
+  let fileTree = $state<FileTree<FSFile, FSDirectory> | undefined>();
 
-  async function updatePayloads(): Promise<FSFile[]> {
-    return (payloads = await window.nxkit.payloadsFind());
+  async function updatePayloads() {
+    payloads = await window.nxkit.payloadsFind();
+    await fileTree?.reloadDir(ROOT_NODE.id);
   }
 
   onMount(() => {
@@ -48,6 +50,30 @@
         }
       }
     },
+    onDragDrop: (_: FileNode<true>, fileList: FileNode | FileList) => {
+      // only support incoming files
+      if (!(fileList instanceof FileList)) return;
+
+      // only copy in paths ending in `.bin`
+      const filePaths: string[] = [];
+      for (const file of fileList) {
+        if (file.path.endsWith('.bin')) {
+          filePaths.push(file.path);
+        }
+      }
+
+      if (filePaths.length !== fileList.length) {
+        return alert('You can only copy files ending with ".bin" to the payloads folder!');
+      }
+
+      window.nxkit
+        .payloadsCopyIn(filePaths)
+        .catch((err) => {
+          console.error(err);
+          alert(`An error occurred copying files: ${String(err)}`);
+        })
+        .finally(() => updatePayloads());
+    },
   };
 </script>
 
@@ -56,9 +82,11 @@
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
       <FileTree
+        bind:this={fileTree}
         class="overflow-auto"
         root={ROOT_NODE}
-        loadDirectory={() => updatePayloads().then((payloads) => payloads.map(entryToNode))}
+        loadDirectory={async () => payloads.map(entryToNode)}
+        onDragDrop={handlers.onDragDrop}
       >
         {#snippet fileExtra(node)}
           <ActionButtons>

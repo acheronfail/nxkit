@@ -139,16 +139,32 @@ export async function readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
   return { error: NandError.None, data: nand.fs.readdir(fsPath) };
 }
 
+async function copyEntry(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
+  const pathInNand = join(dirPathInNand, basename(pathOnHost));
+
+  const stats = await fsp.stat(pathOnHost);
+  if (stats.isFile()) {
+    fs.writeFile(pathInNand, await fsp.readFile(pathOnHost));
+  } else if (stats.isDirectory()) {
+    fs.mkdir(pathInNand);
+    for (const entry of await fsp.readdir(pathOnHost)) {
+      const entryPath = join(pathOnHost, entry);
+      await copyEntry(fs, entryPath, pathInNand);
+    }
+  } else {
+    console.error(`Unsupported type: ${pathOnHost}`);
+    return;
+  }
+}
+
+// FIXME: handle already existing files/directories
 export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
   }
 
   for (const filePath of filePathsOnHost) {
-    const path = join(dirPathInNand, basename(filePath));
-    console.log(`copy: ${filePath} -> NAND:${path}`);
-    const data = await fsp.readFile(filePath);
-    nand.fs.writeFile(path, data);
+    await copyEntry(nand.fs, filePath, dirPathInNand);
   }
 
   return { error: NandError.None };

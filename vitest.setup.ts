@@ -29,5 +29,6 @@ window[NXKitBridgeKey] = {
   payloadsFind: vi.fn(),
   payloadsOpenDirectory: vi.fn(),
   payloadsReadFile: vi.fn(),
+  payloadsCopyIn: vi.fn(),
   runTegraRcmSmash: vi.fn(),
 };

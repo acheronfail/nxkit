@@ -61,9 +61,11 @@
   const nodes: Record<NodeId, Node<F, D>> = $state({});
   let dragTargetId = $state<string | undefined>();
 
+  export const reloadDir: ReloadFn = (id: string) => handlers.toggleDir(id, true);
+
   onMount(async () => {
     nodes[root.id] = root;
-    await handlers.toggleDir(root.id, true);
+    await reloadDir(root.id);
   });
 
   const handlers = {
@@ -109,7 +111,7 @@
 
   const DRAG_MIME_TYPE = 'application/text+nxkit';
   const ALLOWED_DRAG_TYPES = [DRAG_MIME_TYPE, 'Files'];
-  let draggingId: string | undefined = undefined;
+  let draggingId: string | undefined;
   let draggingEnabled = false;
 
   const ondragstart = (ev: DragEvent) => {
@@ -123,9 +125,13 @@
     }
   };
 
-  const ondragend = (ev: DragEvent) => {
+  const ondragend = (_: DragEvent) => {
     draggingId = undefined;
     draggingEnabled = false;
+  };
+
+  const ondragleave = (_: DragEvent) => {
+    dragTargetId = undefined;
   };
 
   const ondragenter = (ev: DragEvent) => {
@@ -181,7 +187,6 @@
     }
   };
 
-  const ondragleave = (_: DragEvent) => {};
   const ondrop = (ev: DragEvent) => {
     ev.preventDefault();
 
@@ -211,7 +216,7 @@
   {@const isDisabled = node.isDisabled || disabled}
   <li
     data-id={node.id}
-    draggable="true"
+    draggable={!!onDragDrop}
     class="dark:bg-slate-800 odd:dark:bg-slate-700"
     style="padding-left: {depth}ex;"
   >

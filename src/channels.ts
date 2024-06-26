@@ -39,6 +39,7 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
 
   payloadsOpenDirectory: RendererChannelImpl[Channels.PayloadsOpenDirectory];
   payloadsReadFile: RendererChannelImpl[Channels.PayloadsReadFile];
+  payloadsCopyIn: RendererChannelImpl[Channels.PayloadsCopyIn];
   payloadsFind: RendererChannelImpl[Channels.PayloadsFind];
 
   keysFind: RendererChannelImpl[Channels.ProdKeysFind];
@@ -77,6 +78,7 @@ export enum Channels {
 
   PayloadsOpenDirectory,
   PayloadsReadFile,
+  PayloadsCopyIn,
   PayloadsFind,
 
   ProdKeysFind,
@@ -128,6 +130,7 @@ export type ChannelImplDefinition<C extends Channels> = {
 
   [Channels.PayloadsOpenDirectory]: ChannelImpl<() => void>;
   [Channels.PayloadsReadFile]: ChannelImpl<(payloadPath: string) => Uint8Array>;
+  [Channels.PayloadsCopyIn]: ChannelImpl<(filePaths: string[]) => void>;
   [Channels.PayloadsFind]: ChannelImpl<() => FSFile[]>;
 
   [Channels.ProdKeysFind]: ChannelImpl<() => ProdKeys | null>;

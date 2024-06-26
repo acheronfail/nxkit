@@ -2,7 +2,7 @@
   import type { FSDirectory, FSEntry, FSFile } from '../../nand/fatfs/fs';
   import type { Node, ReloadFn } from '../utility/FileTree/FileTree.svelte';
 
-  type FileNode<B extends boolean = boolean> = Node<FSFile, FSDirectory, B>;
+  export type FileNode<B extends boolean = boolean> = Node<FSFile, FSDirectory, B>;
 
   export function entryToNode(entry: FSEntry): FileNode {
     return {
@@ -13,11 +13,13 @@
     };
   }
 
-  export const ROOT_NODE = entryToNode({
-    type: 'd',
-    path: '/',
-    name: '<root>',
-  }) as Node<FSFile, FSDirectory, true>;
+  export const ROOT_NODE = Object.freeze(
+    entryToNode({
+      type: 'd',
+      path: '/',
+      name: '<root>',
+    }),
+  ) as Node<FSFile, FSDirectory, true>;
 
   export interface Props {
     class?: string;
@@ -38,6 +40,8 @@
 
   let isRenamingId = $state<string | null>(null);
   let disabled = $state(false);
+
+  // TODO: support dragging out to download files/directories
 
   const handlers = {
     toggleRename: (node: FileNode) => {

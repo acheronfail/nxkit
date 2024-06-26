@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { app } from 'electron';
 import prettyBytes from 'pretty-bytes';
 import { getResources } from '../resources';
@@ -13,6 +13,40 @@ export async function readPayload(payloadPath: string): Promise<Uint8Array> {
   }
 
   return fs.readFile(resolvedPath);
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await fs.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function copyInFiles(filePaths: string[]): Promise<void> {
+  const { payloadDirectory } = getResources(app.isPackaged);
+  await Promise.all(
+    filePaths.map(async (filePath) => {
+      const stats = await fs.stat(filePath);
+      if (!stats.isFile()) return;
+
+      // find a path that doesn't exist
+      let targetPath = join(payloadDirectory, basename(filePath));
+      if (await pathExists(targetPath)) {
+        let count = 1;
+        let nextPath: string;
+        do {
+          nextPath = `${targetPath.replace(/\.bin$/, '')}.copy_${count}.bin`;
+          count++;
+        } while (await pathExists(nextPath));
+        targetPath = nextPath;
+      }
+
+      // copy file into path
+      await fs.copyFile(filePath, targetPath);
+    }),
+  );
 }
 
 export async function findPayloads(): Promise<FSFile[]> {

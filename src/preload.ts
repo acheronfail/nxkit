@@ -31,6 +31,7 @@ invoke(Channels.PreloadBridge).then((bridge) =>
 
     payloadsOpenDirectory: () => invoke(Channels.PayloadsOpenDirectory),
     payloadsReadFile: (payloadPath) => invoke(Channels.PayloadsReadFile, payloadPath),
+    payloadsCopyIn: (filePaths) => invoke(Channels.PayloadsCopyIn, filePaths),
     payloadsFind: () => invoke(Channels.PayloadsFind),
 
     keysFind: () => invoke(Channels.ProdKeysFind),

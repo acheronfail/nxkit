@@ -112,6 +112,7 @@ app.on('ready', () => {
 
     [Channels.PayloadsOpenDirectory]: async (_event) => shell.showItemInFolder(payloadDirectory),
     [Channels.PayloadsReadFile]: (_event, payloadPath) => payloads.readPayload(payloadPath),
+    [Channels.PayloadsCopyIn]: (_event, filePaths) => payloads.copyInFiles(filePaths),
     [Channels.PayloadsFind]: (_event) => payloads.findPayloads(),
 
     [Channels.ProdKeysFind]: (_event) =>
