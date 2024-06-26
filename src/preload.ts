@@ -23,8 +23,9 @@ function exposeInMainWorld<K extends NXKitBridgeKeyType>(key: K, value: Window[K
 invoke(Channels.PreloadBridge).then((bridge) =>
   exposeInMainWorld(NXKitBridgeKey, {
     ...bridge,
-    pathDirname: (path) => invoke(Channels.PathDirname, path),
     openLink: (link) => invoke(Channels.OpenLink, link),
+    pathDirname: (path) => invoke(Channels.PathDirname, path),
+    pathJoin: (...parts) => invoke(Channels.PathJoin, ...parts),
 
     runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
 
@@ -39,7 +40,8 @@ invoke(Channels.PreloadBridge).then((bridge) =>
     nandClose: () => invoke(Channels.NandClose),
     nandMount: (partName, readonly, keys) => invoke(Channels.NandMountPartition, partName, readonly, keys),
     nandReaddir: (path) => invoke(Channels.NandReaddir, path),
-    nandCopyFile: (pathInNand) => invoke(Channels.NandCopyFile, pathInNand),
+    nandCopyFileOut: (pathInNand) => invoke(Channels.NandCopyFileOut, pathInNand),
+    nandCopyFilesIn: (pathInNand, filePaths) => invoke(Channels.NandCopyFilesIn, pathInNand, filePaths),
     nandMoveEntry: (oldPathInNand, newPathInNand) => invoke(Channels.NandMoveEntry, oldPathInNand, newPathInNand),
     nandDeleteEntry: (pathInNand) => invoke(Channels.NandDeleteEntry, pathInNand),
     nandFormatPartition: (partName, readonly, keys) => invoke(Channels.NandFormatPartition, partName, readonly, keys),

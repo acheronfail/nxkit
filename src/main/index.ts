@@ -92,8 +92,9 @@ app.on('ready', () => {
       };
     },
 
-    [Channels.PathDirname]: async (_event, p) => path.dirname(p),
     [Channels.OpenLink]: async (_event, link) => shell.openExternal(link),
+    [Channels.PathDirname]: async (_event, p) => path.dirname(p),
+    [Channels.PathJoin]: async (_event, ...parts) => path.join(...parts),
 
     [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {
       return new Promise((resolve) => {
@@ -122,13 +123,14 @@ app.on('ready', () => {
     [Channels.NandMountPartition]: async (_event, partName, readonly, keysFromUser) =>
       nand.mount(partName, readonly, keysFromUser),
     [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
-    [Channels.NandCopyFile]: async (_event, pathInNand) => {
+    [Channels.NandCopyFileOut]: async (_event, pathInNand) => {
       if (!mainWindow) {
         return { error: NandError.Unknown };
       }
 
-      return nand.copyFile(pathInNand, mainWindow);
+      return nand.copyFileOut(pathInNand, mainWindow);
     },
+    [Channels.NandCopyFilesIn]: async (_event, pathInNand, filePaths) => nand.copyFilesIn(pathInNand, filePaths),
     [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) => nand.move(oldPathInNand, newPathInNand),
     [Channels.NandDeleteEntry]: async (_event, pathInNand) => nand.del(pathInNand),
     [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>

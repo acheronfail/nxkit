@@ -1,5 +1,6 @@
 import fs from 'node:fs';
-import { basename } from 'node:path';
+import fsp from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { BrowserWindow, dialog } from 'electron';
 import * as FatFs from 'js-fatfs';
 import { PartitionDriver, ReadonlyError } from './fatfs/diskio';
@@ -138,7 +139,22 @@ export async function readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
   return { error: NandError.None, data: nand.fs.readdir(fsPath) };
 }
 
-export async function copyFile(pathInNand: string, window: BrowserWindow): Promise<NandResult> {
+export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
+  for (const filePath of filePathsOnHost) {
+    const path = join(dirPathInNand, basename(filePath));
+    console.log(`copy: ${filePath} -> NAND:${path}`);
+    const data = await fsp.readFile(filePath);
+    nand.fs.writeFile(path, data);
+  }
+
+  return { error: NandError.None };
+}
+
+export async function copyFileOut(pathInNand: string, window: BrowserWindow): Promise<NandResult> {
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
   }
@@ -190,6 +206,7 @@ export async function format(partitionName: string, readonly: boolean, keysFromU
 }
 
 export async function move(oldPathInNand: string, newPathInNand: string): Promise<NandResult> {
+  console.log(`move: ${oldPathInNand} -> ${newPathInNand}`);
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
   }

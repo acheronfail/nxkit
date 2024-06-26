@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import type { FSFile } from '../nand/fatfs/fs';
   import FileTree from './utility/FileTree/FileTree.svelte';
-  import { entryToNode } from './NandExplorer/FileExplorer.svelte';
+  import { entryToNode, ROOT_NODE } from './NandExplorer/FileExplorer.svelte';
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
   import Tooltip from './utility/Tooltip.svelte';
   import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
@@ -17,8 +17,8 @@
   let output = $state('');
   let payloads = $state<FSFile[] | null>(null);
 
-  async function updatePayloads() {
-    payloads = await window.nxkit.payloadsFind();
+  async function updatePayloads(): Promise<FSFile[]> {
+    return (payloads = await window.nxkit.payloadsFind());
   }
 
   onMount(() => {
@@ -55,7 +55,11 @@
   <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>
-      <FileTree class="overflow-auto" root={payloads.map(entryToNode)}>
+      <FileTree
+        class="overflow-auto"
+        root={ROOT_NODE}
+        loadDirectory={() => updatePayloads().then((payloads) => payloads.map(entryToNode))}
+      >
         {#snippet fileExtra(node)}
           <ActionButtons>
             <span>{node.data.sizeHuman}</span>

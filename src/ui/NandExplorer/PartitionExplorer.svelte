@@ -49,7 +49,7 @@
     },
   };
 
-  function partitionToNode(partition: Partition): Node<Partition, never> {
+  function partitionToNode(partition: Partition): Node<Partition, undefined> {
     return {
       id: partition.id,
       name: partition.name,
@@ -58,9 +58,22 @@
       data: partition,
     };
   }
+
+  const root: Node<Partition, undefined, true> = {
+    id: 'root',
+    name: '<root>',
+    isDirectory: true,
+    isDisabled: false,
+    data: undefined,
+  };
 </script>
 
-<FileTree class={cls} root={partitions.map(partitionToNode)} onFileClick={onPartitionChoose}>
+<FileTree
+  class={cls}
+  {root}
+  loadDirectory={async () => partitions.map(partitionToNode)}
+  onFileClick={disabled ? undefined : onPartitionChoose}
+>
   {#snippet icon()}
     <CircleStackIcon class="inline-block h-4 text-red-300" />
   {/snippet}

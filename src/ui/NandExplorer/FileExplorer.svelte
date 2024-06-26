@@ -2,7 +2,7 @@
   import type { FSDirectory, FSEntry, FSFile } from '../../nand/fatfs/fs';
   import type { Node, ReloadFn } from '../utility/FileTree/FileTree.svelte';
 
-  type FileNode = Node<FSFile, FSDirectory>;
+  type FileNode<B extends boolean = boolean> = Node<FSFile, FSDirectory, B>;
 
   export function entryToNode(entry: FSEntry): FileNode {
     return {
@@ -12,6 +12,12 @@
       data: entry,
     };
   }
+
+  export const ROOT_NODE = entryToNode({
+    type: 'd',
+    path: '/',
+    name: '<root>',
+  }) as Node<FSFile, FSDirectory, true>;
 
   export interface Props {
     class?: string;
@@ -31,12 +37,7 @@
   let { class: propClass = '' }: Props = $props();
 
   let isRenamingId = $state<string | null>(null);
-
-  const root = entryToNode({
-    type: 'd',
-    path: '/',
-    name: '<root>',
-  }) as Node<FSFile, FSDirectory, true>;
+  let disabled = $state(false);
 
   const handlers = {
     toggleRename: (node: FileNode) => {
@@ -44,10 +45,44 @@
     },
     doRename: (node: FileNode, reloadDir: ReloadFn) => async (newName: string) => {
       const parentDir = await window.nxkit.pathDirname(node.data.path);
+      const targetPath = await window.nxkit.pathJoin(parentDir, newName);
       await window.nxkit
-        .nandMoveEntry(node.data.path, [parentDir, newName].join('/'))
+        .nandMoveEntry(node.data.path, targetPath)
         .then((result) => handleNandResult(result, `rename ${node.data.name}`))
         .finally(() => reloadDir(parentDir));
+    },
+    moveEntry: async (target: FileNode<true>, item: FileNode, reloadDir: ReloadFn) => {
+      disabled = true;
+      const parentDir = await window.nxkit.pathDirname(item.data.path);
+      const targetPath = await window.nxkit.pathJoin(target.data.path, item.data.name);
+      await window.nxkit
+        .nandMoveEntry(item.data.path, targetPath)
+        .then((result) => handleNandResult(result, `move ${item.data.name}`))
+        .finally(() => {
+          reloadDir(parentDir);
+          reloadDir(target.data.path);
+          disabled = false;
+        });
+    },
+    copyFiles: async (target: FileNode<true>, files: FileList, reloadDir: ReloadFn) => {
+      disabled = true;
+      const filePaths: string[] = [];
+      for (const file of files) {
+        filePaths.push(file.path);
+      }
+
+      if (!filePaths.length) {
+        disabled = false;
+        return;
+      }
+
+      await window.nxkit
+        .nandCopyFilesIn(target.data.path, filePaths)
+        .then((result) => handleNandResult(result, `copy in ${filePaths.join(', ')}`))
+        .finally(() => {
+          reloadDir(target.data.path);
+          disabled = false;
+        });
     },
     delete: async (node: FileNode, reloadDir: ReloadFn) => {
       const yes = confirm(`Are you sure you want to delete ${node.data.name}?\n\nThis action cannot be undone!`);
@@ -60,7 +95,7 @@
       }
     },
     downloadFile: async (file: FSFile) => {
-      await window.nxkit.nandCopyFile(file.path);
+      await window.nxkit.nandCopyFileOut(file.path);
     },
     openNandDirectory: async (path: string): Promise<FileNode[]> => {
       const result = handleNandResult(await window.nxkit.nandReaddir(path), `readdir /`);
@@ -70,31 +105,45 @@
 </script>
 
 {#snippet renderDeleteAction(node: FileNode, reloadDir: ReloadFn)}
-  <Tooltip placement="left">
+  <Tooltip {disabled} placement="left">
     {#snippet tooltip()}
       <span>
         <span class="text-red-500">Delete</span>
         <Code>{node.name}</Code>
       </span>
     {/snippet}
-    <ActionButton onclick={() => handlers.delete(node, reloadDir)}>
+    <ActionButton {disabled} onclick={() => handlers.delete(node, reloadDir)}>
       <TrashIcon class="h-4 cursor-pointer hover:fill-red-500" />
     </ActionButton>
   </Tooltip>
 {/snippet}
 
 {#snippet renderRenameAction(node: FileNode, reloadDir: ReloadFn)}
-  <Tooltip placement="left">
+  <Tooltip {disabled} placement="left">
     {#snippet tooltip()}
       <span>Rename <Code>{node.name}</Code></span>
     {/snippet}
-    <ActionButton onclick={() => handlers.toggleRename(node)}>
+    <ActionButton {disabled} onclick={() => handlers.toggleRename(node)}>
       <PencilSquareIcon class="h-4 cursor-pointer hover:fill-slate-900" />
     </ActionButton>
   </Tooltip>
 {/snippet}
 
-<FileTree class={propClass} {root} loadDirectory={handlers.openNandDirectory}>
+<FileTree
+  {disabled}
+  class={propClass}
+  loadDirectory={handlers.openNandDirectory}
+  root={ROOT_NODE}
+  onDragDrop={disabled
+    ? undefined
+    : (target, item, reloadDir) => {
+        if (item instanceof FileList) {
+          handlers.copyFiles(target, item, reloadDir);
+        } else {
+          handlers.moveEntry(target, item, reloadDir);
+        }
+      }}
+>
   {#snippet name(node, reloadDir)}
     {#if isRenamingId === node.id}
       <InputTextInline
@@ -117,11 +166,11 @@
   {#snippet fileExtra(node, reloadDir)}
     <ActionButtons>
       <span class="font-mono">{node.data.sizeHuman}</span>
-      <Tooltip placement="left">
+      <Tooltip {disabled} placement="left">
         {#snippet tooltip()}
           <span>Download <Code>{node.data.name}</Code></span>
         {/snippet}
-        <ActionButton onclick={() => handlers.downloadFile(node.data)}>
+        <ActionButton {disabled} onclick={() => handlers.downloadFile(node.data)}>
           <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
         </ActionButton>
       </Tooltip>

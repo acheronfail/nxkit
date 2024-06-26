@@ -19,7 +19,7 @@
 </script>
 
 {#if disabled}
-  <span>
+  <span class="pointer-events-none">
     {@render children()}
   </span>
 {:else}

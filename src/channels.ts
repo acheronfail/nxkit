@@ -31,8 +31,9 @@ export type NandResult<T = void> =
   | { error: Exclude<NandError, NandError.None> };
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
-  pathDirname: RendererChannelImpl[Channels.PathDirname];
   openLink: RendererChannelImpl[Channels.OpenLink];
+  pathDirname: RendererChannelImpl[Channels.PathDirname];
+  pathJoin: RendererChannelImpl[Channels.PathJoin];
 
   runTegraRcmSmash: RendererChannelImpl[Channels.TegraRcmSmash];
 
@@ -47,7 +48,8 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandClose: RendererChannelImpl[Channels.NandClose];
   nandMount: RendererChannelImpl[Channels.NandMountPartition];
   nandReaddir: RendererChannelImpl[Channels.NandReaddir];
-  nandCopyFile: RendererChannelImpl[Channels.NandCopyFile];
+  nandCopyFileOut: RendererChannelImpl[Channels.NandCopyFileOut];
+  nandCopyFilesIn: RendererChannelImpl[Channels.NandCopyFilesIn];
   nandMoveEntry: RendererChannelImpl[Channels.NandMoveEntry];
   nandDeleteEntry: RendererChannelImpl[Channels.NandDeleteEntry];
   nandFormatPartition: RendererChannelImpl[Channels.NandFormatPartition];
@@ -69,6 +71,7 @@ export enum Channels {
 
   OpenLink,
   PathDirname,
+  PathJoin,
 
   TegraRcmSmash,
 
@@ -88,7 +91,9 @@ export enum Channels {
   /** Read directory from currently mounted nand partition */
   NandReaddir,
   /** Copy a file out of the currently mounted nand partition */
-  NandCopyFile,
+  NandCopyFileOut,
+  /** Copy files into the currently mounted nand partition */
+  NandCopyFilesIn,
   /** Move an entry inside of the currently mounted nand partition */
   NandMoveEntry,
   /** Delete an entry inside of the currently mounted nand partition */
@@ -109,8 +114,9 @@ type ChannelImpl<F extends (...args: never[]) => unknown> = [Parameters<F>, Prom
 export type ChannelImplDefinition<C extends Channels> = {
   [Channels.PreloadBridge]: ChannelImpl<() => NXKitBridge>;
 
-  [Channels.PathDirname]: ChannelImpl<(path: string) => string>;
   [Channels.OpenLink]: ChannelImpl<(link: string) => void>;
+  [Channels.PathDirname]: ChannelImpl<(path: string) => string>;
+  [Channels.PathJoin]: ChannelImpl<(...parts: string[]) => string>;
 
   [Channels.TegraRcmSmash]: ChannelImpl<
     (payloadPath: string) => {
@@ -131,7 +137,8 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandClose]: ChannelImpl<() => void>;
   [Channels.NandMountPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;
-  [Channels.NandCopyFile]: ChannelImpl<(pathInNand: string) => NandResult>;
+  [Channels.NandCopyFileOut]: ChannelImpl<(pathInNand: string) => NandResult>;
+  [Channels.NandCopyFilesIn]: ChannelImpl<(pathInNand: string, filePaths: string[]) => NandResult>;
   [Channels.NandMoveEntry]: ChannelImpl<(oldPathInNand: string, newPathInNand: string) => NandResult>;
   [Channels.NandDeleteEntry]: ChannelImpl<(pathInNand: string) => NandResult>;
   [Channels.NandFormatPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;

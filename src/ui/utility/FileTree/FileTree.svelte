@@ -1,14 +1,17 @@
 <script context="module" lang="ts">
   import { onMount, type Snippet } from 'svelte';
+  import type { HTMLAttributes } from 'svelte/elements';
 
   export type ReloadFn = (id: string) => Promise<void>;
-  export interface Props<File = any, Dir = any> {
+  export interface Props<File = any, Dir = any> extends HTMLAttributes<HTMLUListElement> {
     class?: string;
+    disabled?: boolean;
 
-    root: Node<File, Dir, true> | Node<File, Dir>[];
+    root: Node<File, Dir, true>;
 
+    onDragDrop?: (target: Node<File, Dir, true>, item: Node<File, Dir> | FileList, reloadDir: ReloadFn) => void;
     onFileClick?: (file: File) => void;
-    loadDirectory?: (id: string) => Promise<Node<File, Dir>[]>;
+    loadDirectory: (id: string) => Promise<Node<File, Dir>[]>;
 
     icon?: Snippet<[Node<File, Dir>, ReloadFn]>;
     name?: Snippet<[Node<File, Dir>, ReloadFn]>;
@@ -38,7 +41,9 @@
   import { FolderOpenIcon } from 'heroicons-svelte/24/solid';
 
   let {
+    disabled,
     root,
+    onDragDrop,
     onFileClick,
     loadDirectory,
     icon,
@@ -46,21 +51,19 @@
     dirExtra,
     fileExtra,
     class: propClass = '',
+    ...ulProps
   }: Props<F, D> = $props();
 
   type NodeId = string;
-  const expandedState = $state<Record<NodeId, boolean>>({});
   const loadingState = $state<Record<NodeId, boolean>>({});
+  const expandedState = $state<Record<NodeId, boolean>>({});
   const childrenState = $state<Record<NodeId, string[]>>({});
   const nodes: Record<NodeId, Node<F, D>> = $state({});
+  let dragTargetId = $state<string | undefined>();
 
   onMount(async () => {
-    if (Array.isArray(root)) {
-      root.forEach((node) => (nodes[node.id] = node));
-    } else {
-      nodes[root.id] = root;
-      await handlers.toggleDir(root.id, true);
-    }
+    nodes[root.id] = root;
+    await handlers.toggleDir(root.id, true);
   });
 
   const handlers = {
@@ -75,7 +78,7 @@
       expandedState[id] = expand;
       if (expand) {
         const loadingTimer = setTimeout(() => (loadingState[id] = true), 100);
-        await loadDirectory?.(id)
+        await loadDirectory(id)
           .then((childNodes) => {
             childrenState[id] = childNodes.map((node) => node.id);
             childNodes.forEach((node) => (nodes[node.id] = node));
@@ -95,25 +98,135 @@
     },
   };
 
+  function getNodeParent(nodeId: string): string | null {
+    const entry = Object.entries(childrenState).find(([_, childrenList]) => childrenList.includes(nodeId));
+    if (entry) {
+      return entry[0];
+    }
+
+    return null;
+  }
+
+  const DRAG_MIME_TYPE = 'application/text+nxkit';
+  const ALLOWED_DRAG_TYPES = [DRAG_MIME_TYPE, 'Files'];
+  let draggingId: string | undefined = undefined;
+  let draggingEnabled = false;
+
+  const ondragstart = (ev: DragEvent) => {
+    if (ev.dataTransfer) {
+      const { id } = (ev.target as HTMLLIElement).dataset;
+      if (id) {
+        draggingEnabled = true;
+        draggingId = id;
+        ev.dataTransfer.setData(DRAG_MIME_TYPE, id);
+      }
+    }
+  };
+
+  const ondragend = (ev: DragEvent) => {
+    draggingId = undefined;
+    draggingEnabled = false;
+  };
+
+  const ondragenter = (ev: DragEvent) => {
+    if (ev.dataTransfer) {
+      draggingEnabled = ALLOWED_DRAG_TYPES.some((type) => ev.dataTransfer?.types.includes(type));
+    }
+  };
+
+  const ondragover = (ev: DragEvent) => {
+    if (!onDragDrop || !draggingEnabled) return;
+    ev.preventDefault();
+
+    if (ev.dataTransfer) {
+      if (ev.dataTransfer.types.includes('Files')) {
+        ev.dataTransfer.dropEffect = 'copy';
+      } else if (ev.dataTransfer.types.includes(DRAG_MIME_TYPE)) {
+        ev.dataTransfer.dropEffect = 'move';
+      }
+    }
+
+    // find node we're dragging over
+    let dom: HTMLElement | null = ev.target as HTMLElement;
+    while (dom) {
+      const tag = dom.tagName.toLowerCase();
+      if (tag === 'li') break;
+      if (tag === 'ul') break;
+      dom = dom.parentElement;
+    }
+
+    if (!dom) return;
+    const { id } = dom.dataset;
+    if (typeof id !== 'string') return;
+
+    // compute drop target directory
+    if (nodes[id].isDirectory) {
+      dragTargetId = dom.dataset.id;
+    } else {
+      const parent = getNodeParent(id);
+      if (parent) {
+        dragTargetId = parent;
+      }
+    }
+
+    // if we're dragging an item and it's targeting itself or its parent, don't do anything
+    if (draggingId) {
+      if (draggingId === dragTargetId) {
+        dragTargetId = undefined;
+        ev.dataTransfer!.dropEffect = 'none';
+      } else if (getNodeParent(draggingId) === dragTargetId) {
+        dragTargetId = undefined;
+        ev.dataTransfer!.dropEffect = 'none';
+      }
+    }
+  };
+
+  const ondragleave = (_: DragEvent) => {};
+  const ondrop = (ev: DragEvent) => {
+    ev.preventDefault();
+
+    if (!draggingEnabled) return;
+    if (!dragTargetId) return;
+    if (!ev.dataTransfer) return;
+
+    const target = nodes[dragTargetId] as Node<F, D, true>;
+    if (draggingId) {
+      onDragDrop?.(target, nodes[draggingId], handlers.reloadDir);
+    } else if (ev.dataTransfer.files.length) {
+      onDragDrop?.(target, ev.dataTransfer.files, handlers.reloadDir);
+    }
+
+    dragTargetId = undefined;
+  };
+
+  const ulClass = 'select-none font-mono m-2 border border-slate-900 bg-slate-900';
   const iconClass = 'inline-block h-4';
   const spanClass = 'grow flex items-center justify-start gap-2';
 </script>
 
 {#snippet renderNode(node: Node, depth = 1)}
-  {@const expanded = expandedState[node.id]}
   {@const loading = loadingState[node.id]}
-  <li class="dark:bg-slate-800 odd:dark:bg-slate-700" style="padding-left: {depth}ex;">
+  {@const expanded = expandedState[node.id]}
+  {@const dragging = dragTargetId === node.id}
+  {@const isDisabled = node.isDisabled || disabled}
+  <li
+    data-id={node.id}
+    draggable="true"
+    class="dark:bg-slate-800 odd:dark:bg-slate-700"
+    style="padding-left: {depth}ex;"
+  >
     <div
       class="pr-2 flex justify-between items-center focus:outline-none"
-      class:text-slate-500={node.isDisabled}
-      class:focus:bg-blue-600={!node.isDisabled}
-      class:focus:hover:bg-blue-500={!node.isDisabled}
-      class:hover:dark:bg-slate-600={!node.isDisabled}
-      role={node.isDisabled ? '' : 'button'}
-      tabIndex={node.isDisabled ? -1 : 0}
-      aria-disabled={node.isDisabled}
-      onkeypress={!node.isDisabled ? (e) => e.key === ' ' && handlers.onclick(node) : undefined}
-      onclick={!node.isDisabled ? () => handlers.onclick(node) : undefined}
+      class:text-slate-500={isDisabled}
+      class:focus:bg-blue-600={!isDisabled && !dragging}
+      class:focus:hover:bg-blue-500={!isDisabled && !dragging}
+      class:hover:dark:bg-slate-600={!isDisabled && !dragging}
+      class:bg-blue-600={dragging}
+      role={isDisabled ? '' : 'button'}
+      tabIndex={isDisabled ? -1 : 0}
+      aria-disabled={isDisabled}
+      onkeypress={!isDisabled ? (e) => e.key === ' ' && handlers.onclick(node) : undefined}
+      onclick={!isDisabled ? () => handlers.onclick(node) : undefined}
     >
       {#if node.isDirectory}
         <span class={spanClass}>
@@ -169,12 +282,18 @@
   {/if}
 {/snippet}
 
-<ul class="select-none font-mono m-2 border border-slate-900 bg-slate-900 {propClass}">
-  {#if Array.isArray(root)}
-    {#each root as node}
-      {@render renderNode(node, 1)}
-    {/each}
-  {:else if loadingState[root.id]}
+<ul
+  data-id={root.id}
+  class="relative {ulClass} {propClass} {dragTargetId === root.id ? 'bg-blue-600' : ''}"
+  {ondragstart}
+  {ondragend}
+  {ondragenter}
+  {ondragover}
+  {ondragleave}
+  {ondrop}
+  {...ulProps}
+>
+  {#if loadingState[root.id]}
     {@render renderNode(LOADING_NODE, 1)}
   {:else}
     {#each childrenState[root.id] ?? [] as id}
