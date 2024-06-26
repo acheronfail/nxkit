@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
 import { BiosParameterblock } from './bpb';
@@ -26,17 +26,21 @@ const errorToString: Record<number, string> = {
 };
 
 export class FatError extends Error {
-  constructor(public readonly code: number) {
-    super(`${errorToString[code] ?? 'Unknown'}`);
+  constructor(
+    public readonly code: number,
+    description: string,
+  ) {
+    super(`Failed to ${description}: ${errorToString[code] ?? 'Unknown Error'}`);
   }
 }
 
-export function check_result(result: number) {
+// FIXME: each time this throws, there's a memory leak if malloc'd resources aren't freed
+export function check_result(result: number, description: string) {
   if (result === FatFs.FR_OK) {
     return;
   }
 
-  throw new FatError(result);
+  throw new FatError(result, description);
 }
 
 export type FSFile = {
@@ -62,11 +66,11 @@ export class Fat32FileSystem {
     private readonly bpb: BiosParameterblock,
   ) {
     this.fsHandle = this.ff.malloc(FatFs.sizeof_FATFS);
-    check_result(this.ff.f_mount(this.fsHandle, '', 1));
+    check_result(this.ff.f_mount(this.fsHandle, '', 1), 'f_mount');
   }
 
   close() {
-    check_result(this.ff.f_unmount(''));
+    check_result(this.ff.f_unmount(''), 'f_close');
     this.ff.free(this.fsHandle);
   }
 
@@ -89,7 +93,7 @@ export class Fat32FileSystem {
     };
 
     const work = this.ff.malloc(FatFs.FF_MAX_SS);
-    check_result(this.ff.f_mkfs('', opts, work, FatFs.FF_MAX_SS));
+    check_result(this.ff.f_mkfs('', opts, work, FatFs.FF_MAX_SS), 'f_mkfs');
     this.ff.free(work);
   }
 
@@ -102,7 +106,7 @@ export class Fat32FileSystem {
   readFile(filePath: string, onRead: (chunk: Uint8Array) => void): void;
   readFile(filePath: string, onRead?: (chunk: Uint8Array) => void): Uint8Array | void {
     const filePtr = this.ff.malloc(FatFs.sizeof_FIL);
-    check_result(this.ff.f_open(filePtr, filePath, FatFs.FA_READ));
+    check_result(this.ff.f_open(filePtr, filePath, FatFs.FA_READ), 'f_open');
     const size = this.ff.f_size(filePtr);
     const buff = this.ff.malloc(size);
 
@@ -125,7 +129,7 @@ export class Fat32FileSystem {
     let offset = 0;
     let bytesRead = Infinity;
     do {
-      check_result(this.ff.f_read(filePtr, buff + offset, chunkSize, bytesReadPtr));
+      check_result(this.ff.f_read(filePtr, buff + offset, chunkSize, bytesReadPtr), 'f_read');
       bytesRead = this.ff.getValue(bytesReadPtr, 'i32');
       onRead(this.ff.HEAPU8.slice(buff + offset, buff + offset + bytesRead));
       offset += bytesRead;
@@ -133,7 +137,7 @@ export class Fat32FileSystem {
 
     this.ff.free(bytesReadPtr);
     this.ff.free(buff);
-    check_result(this.ff.f_close(filePtr));
+    check_result(this.ff.f_close(filePtr), 'f_close');
     this.ff.free(filePtr);
 
     return ret;
@@ -143,8 +147,35 @@ export class Fat32FileSystem {
    * Create a new directory.
    * @param dirPath path to the directory
    */
-  mkdir(dirPath: string) {
-    check_result(this.ff.f_mkdir(dirPath));
+  mkdir(dirPath: string, recursive = false) {
+    if (!recursive) {
+      check_result(this.ff.f_mkdir(dirPath), `f_mkdir ${dirPath}`);
+      return;
+    }
+
+    const fno = this.ff.malloc(FatFs.sizeof_FILINFO);
+    const parts = dirPath.split('/');
+    for (let i = 1; i <= parts.length; i++) {
+      const partialPath = parts.slice(0, i + 1).join('/');
+      const result = this.ff.f_stat(partialPath, fno);
+      switch (result) {
+        case FatFs.FR_OK:
+          // something existed and it wasn't a file
+          if (!(this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR)) {
+            throw new FatError(FatFs.FR_EXIST, `f_mkdir ${partialPath}`);
+          }
+          break;
+        // nothing existed, create the directory
+        case FatFs.FR_NO_FILE:
+          check_result(this.ff.f_mkdir(partialPath), `f_mkdir ${partialPath}`);
+          break;
+        // something else happened
+        default:
+          check_result(result, `f_stat ${partialPath}`);
+      }
+    }
+
+    this.ff.free(fno);
   }
 
   /**
@@ -152,7 +183,7 @@ export class Fat32FileSystem {
    * @param dirPath path to the directory
    */
   rmdir(dirPath: string) {
-    check_result(this.ff.f_rmdir(dirPath));
+    check_result(this.ff.f_rmdir(dirPath), `f_rmdir ${dirPath}`);
   }
 
   /**
@@ -160,7 +191,7 @@ export class Fat32FileSystem {
    * @param filePath path to the file
    */
   unlink(filePath: string) {
-    check_result(this.ff.f_unlink(filePath));
+    check_result(this.ff.f_unlink(filePath), `f_unlink ${filePath}`);
   }
 
   /**
@@ -169,7 +200,7 @@ export class Fat32FileSystem {
    * @param dstPath path to the new location
    */
   rename(srcPath: string, dstPath: string) {
-    check_result(this.ff.f_rename(srcPath, dstPath));
+    check_result(this.ff.f_rename(srcPath, dstPath), `f_rename ${srcPath} -> ${dstPath}`);
   }
 
   /**
@@ -179,7 +210,7 @@ export class Fat32FileSystem {
    */
   remove(path: string) {
     const fno = this.ff.malloc(FatFs.sizeof_FILINFO);
-    check_result(this.ff.f_stat(path, fno));
+    check_result(this.ff.f_stat(path, fno), `f_stat ${path}`);
 
     const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
     if (isDir) {
@@ -193,30 +224,59 @@ export class Fat32FileSystem {
   }
 
   /**
+   * Return information about an entry in the filesystem.
+   * @param path path of file or directory inside FAT filesystem
+   */
+  read(path: string): FSEntry | null {
+    const fno = this.ff.malloc(FatFs.sizeof_FILINFO);
+    const result = this.ff.f_stat(path, fno);
+
+    let entry: FSEntry | null = null;
+    switch (result) {
+      case FatFs.FR_OK:
+        entry = this.createEntry(path, fno);
+        break;
+      case FatFs.FR_NO_FILE:
+      case FatFs.FR_NO_PATH:
+        break;
+      default:
+        this.ff.free(fno);
+        check_result(result, `f_stat ${path}`);
+        return null;
+    }
+
+    this.ff.free(fno);
+    return entry;
+  }
+
+  private createEntry(path: string, fno: number): FSEntry {
+    const name = basename(path);
+    const size = this.ff.FILINFO_fsize(fno);
+    const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
+    return isDir ? { type: 'd', name, path } : { type: 'f', name, path, size, sizeHuman: prettyBytes(size) };
+  }
+
+  /**
    * Read directory inside FAT filesystem
    * @param dirPath path of directory inside FAT filesystem
    */
   readdir(dirPath: string): FSEntry[] {
     const dir = this.ff.malloc(FatFs.sizeof_DIR);
     const fno = this.ff.malloc(FatFs.sizeof_FILINFO);
-    check_result(this.ff.f_opendir(dir, dirPath));
+    check_result(this.ff.f_opendir(dir, dirPath), `f_opendir ${dirPath}`);
 
     const entries: FSEntry[] = [];
     for (;;) {
-      check_result(this.ff.f_readdir(dir, fno));
+      check_result(this.ff.f_readdir(dir, fno), `f_readdir ${dirPath}`);
       const name = this.ff.FILINFO_fname(fno);
       if (name === '') break;
 
-      const path = join(dirPath, name);
-      const size = this.ff.FILINFO_fsize(fno);
-      const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
-
-      entries.push(isDir ? { type: 'd', name, path } : { type: 'f', name, path, size, sizeHuman: prettyBytes(size) });
+      entries.push(this.createEntry(join(dirPath, name), fno));
     }
 
     // Clean up.
     this.ff.free(fno);
-    check_result(this.ff.f_closedir(dir));
+    check_result(this.ff.f_closedir(dir), `f_closedir ${dirPath}`);
     this.ff.free(dir);
 
     return entries;
@@ -227,14 +287,17 @@ export class Fat32FileSystem {
    * @param filePath path of file inside FAT filesystem
    * @param contents optional contents to write (file is created empty if not provided)
    */
-  writeFile(filePath: string, contents?: Uint8Array) {
+  writeFile(filePath: string, contents?: Uint8Array, overwrite = false) {
     const filePtr = this.ff.malloc(FatFs.sizeof_FIL);
-    check_result(this.ff.f_open(filePtr, filePath, FatFs.FA_WRITE | FatFs.FA_CREATE_NEW));
+    check_result(
+      this.ff.f_open(filePtr, filePath, FatFs.FA_WRITE | (overwrite ? FatFs.FA_CREATE_ALWAYS : FatFs.FA_CREATE_NEW)),
+      `f_open ${filePath}`,
+    );
     if (contents) {
       const bufOffset = this.ff.malloc(contents.byteLength);
       this.ff.HEAPU8.set(contents, bufOffset);
       const bytesWrittenPtr = this.ff.malloc(4);
-      check_result(this.ff.f_write(filePtr, bufOffset, contents.byteLength, bytesWrittenPtr));
+      check_result(this.ff.f_write(filePtr, bufOffset, contents.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
 
       const bytesWritten = this.ff.getValue(bytesWrittenPtr, 'i32');
       if (bytesWritten != contents.byteLength) {
@@ -245,7 +308,7 @@ export class Fat32FileSystem {
       this.ff.free(bufOffset);
     }
 
-    check_result(this.ff.f_close(filePtr));
+    check_result(this.ff.f_close(filePtr), `f_close ${filePath}`);
     this.ff.free(filePtr);
   }
 }

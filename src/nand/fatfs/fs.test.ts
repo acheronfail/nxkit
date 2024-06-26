@@ -1,6 +1,6 @@
 import { describe, beforeEach, test, expect } from 'vitest';
 import * as FatFs from 'js-fatfs';
-import { Fat32FileSystem, FatType, check_result } from './fs';
+import { Fat32FileSystem, FatType } from './fs';
 import { BiosParameterblock } from './bpb';
 
 class MockDisk implements FatFs.DiskIO {
@@ -49,7 +49,7 @@ describe(Fat32FileSystem.name, () => {
     const ff = await FatFs.create({ diskio: new MockDisk(new Uint8Array(128 * 1024)) });
 
     const work = ff.malloc(FatFs.FF_MAX_SS);
-    check_result(ff.f_mkfs('', 0, work, FatFs.FF_MAX_SS));
+    expect(ff.f_mkfs('', 0, work, FatFs.FF_MAX_SS)).toBe(FatFs.FR_OK);
     ff.free(work);
 
     fs = new Fat32FileSystem(ff, {
@@ -66,15 +66,72 @@ describe(Fat32FileSystem.name, () => {
     expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/empty', '/stuff']);
   });
 
-  test('mkdir', () => {
-    fs.mkdir('/dir');
-    expect(fs.readdir('/')).toEqual([
-      {
+  describe('mkdir', () => {
+    test('normal', () => {
+      fs.mkdir('/dir');
+      expect(fs.readdir('/')).toEqual([
+        {
+          type: 'd',
+          name: 'dir',
+          path: '/dir',
+        },
+      ]);
+    });
+
+    test('recursive', () => {
+      fs.mkdir('/path/to/sub/directory', true);
+      expect(fs.readdir('/').map(({ name }) => name)).toEqual(['path']);
+      expect(fs.readdir('/path').map(({ name }) => name)).toEqual(['to']);
+      expect(fs.readdir('/path/to').map(({ name }) => name)).toEqual(['sub']);
+      expect(fs.readdir('/path/to/sub').map(({ name }) => name)).toEqual(['directory']);
+      expect(fs.readdir('/path/to/sub/directory')).toEqual([]);
+    });
+
+    test('recursive with pre-existing dirs', () => {
+      fs.mkdir('/path');
+      fs.mkdir('/path/to');
+
+      fs.mkdir('/path/to/sub/directory', true);
+      expect(fs.readdir('/').map(({ name }) => name)).toEqual(['path']);
+      expect(fs.readdir('/path').map(({ name }) => name)).toEqual(['to']);
+      expect(fs.readdir('/path/to').map(({ name }) => name)).toEqual(['sub']);
+      expect(fs.readdir('/path/to/sub').map(({ name }) => name)).toEqual(['directory']);
+      expect(fs.readdir('/path/to/sub/directory')).toEqual([]);
+    });
+
+    test('recursive with file conflict', () => {
+      fs.mkdir('/path');
+      fs.mkdir('/path/to');
+      fs.writeFile('/path/to/sub');
+
+      expect(() => fs.mkdir('/path/to/sub/directory', true)).toThrowError('Failed to f_mkdir /path/to/sub: FR_EXIST');
+    });
+  });
+
+  describe('read', () => {
+    test('no file', () => {
+      expect(fs.read('/asdf')).toBe(null);
+    });
+
+    test('a file', () => {
+      fs.writeFile('/asdf');
+      expect(fs.read('/asdf')).toEqual({
+        type: 'f',
+        name: 'asdf',
+        path: '/asdf',
+        size: 0,
+        sizeHuman: '0 B',
+      });
+    });
+
+    test('a directory', () => {
+      fs.mkdir('/asdf');
+      expect(fs.read('/asdf')).toEqual({
         type: 'd',
-        name: 'dir',
-        path: '/dir',
-      },
-    ]);
+        name: 'asdf',
+        path: '/asdf',
+      });
+    });
   });
 
   test('rmdir', () => {
@@ -138,10 +195,22 @@ describe(Fat32FileSystem.name, () => {
   });
 
   test('readFile chunks', () => {
-    fs.writeFile('/stuff', Buffer.from('asdf'));
-    let data = Buffer.alloc(0);
-    fs.readFile('/stuff', (chunk) => (data = Buffer.concat([data, chunk])));
-    expect(fs.readFile('/stuff')).toEqual(data);
+    const size = 10_000;
+    const buf = Buffer.alloc(size);
+    for (let i = 0; i < size; i++) buf[i] = size - i;
+
+    fs.writeFile('/stuff', buf);
+
+    const readInOneGo = fs.readFile('/stuff');
+    const readInChunks = Buffer.alloc(size);
+    let offset = 0;
+    fs.readFile('/stuff', (chunk) => {
+      readInChunks.set(chunk, offset);
+      offset += chunk.byteLength;
+    });
+
+    expect(readInChunks).toEqual(buf);
+    expect(readInOneGo).toEqual(readInChunks);
   });
 
   test('format', () => {

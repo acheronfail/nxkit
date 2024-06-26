@@ -131,7 +131,8 @@ app.on('ready', () => {
 
       return nand.copyFileOut(pathInNand, mainWindow);
     },
-    [Channels.NandCopyFilesIn]: async (_event, pathInNand, filePaths) => nand.copyFilesIn(pathInNand, filePaths),
+    [Channels.NandCopyFilesIn]: async (_event, dirPathInNand, filePaths) => nand.copyFilesIn(dirPathInNand, filePaths),
+    [Channels.NandCheckExists]: async (_event, dirPathInNand, filePaths) => nand.checkExists(dirPathInNand, filePaths),
     [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) => nand.move(oldPathInNand, newPathInNand),
     [Channels.NandDeleteEntry]: async (_event, pathInNand) => nand.del(pathInNand),
     [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>

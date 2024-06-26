@@ -51,6 +51,7 @@ export interface ExposedPreloadAPIs extends NXKitBridge {
   nandReaddir: RendererChannelImpl[Channels.NandReaddir];
   nandCopyFileOut: RendererChannelImpl[Channels.NandCopyFileOut];
   nandCopyFilesIn: RendererChannelImpl[Channels.NandCopyFilesIn];
+  nandCheckExists: RendererChannelImpl[Channels.NandCheckExists];
   nandMoveEntry: RendererChannelImpl[Channels.NandMoveEntry];
   nandDeleteEntry: RendererChannelImpl[Channels.NandDeleteEntry];
   nandFormatPartition: RendererChannelImpl[Channels.NandFormatPartition];
@@ -96,6 +97,8 @@ export enum Channels {
   NandCopyFileOut,
   /** Copy files into the currently mounted nand partition */
   NandCopyFilesIn,
+  /** Recursively check for conflicts in the currently mounted nand partition */
+  NandCheckExists,
   /** Move an entry inside of the currently mounted nand partition */
   NandMoveEntry,
   /** Delete an entry inside of the currently mounted nand partition */
@@ -141,7 +144,8 @@ export type ChannelImplDefinition<C extends Channels> = {
   [Channels.NandMountPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;
   [Channels.NandReaddir]: ChannelImpl<(path: string) => NandResult<FSEntry[]>>;
   [Channels.NandCopyFileOut]: ChannelImpl<(pathInNand: string) => NandResult>;
-  [Channels.NandCopyFilesIn]: ChannelImpl<(pathInNand: string, filePaths: string[]) => NandResult>;
+  [Channels.NandCopyFilesIn]: ChannelImpl<(dirPathInNand: string, filePaths: string[]) => NandResult>;
+  [Channels.NandCheckExists]: ChannelImpl<(dirPathInNand: string, filePaths: string[]) => NandResult<boolean>>;
   [Channels.NandMoveEntry]: ChannelImpl<(oldPathInNand: string, newPathInNand: string) => NandResult>;
   [Channels.NandDeleteEntry]: ChannelImpl<(pathInNand: string) => NandResult>;
   [Channels.NandFormatPartition]: ChannelImpl<(partName: string, readonly: boolean, keys?: ProdKeys) => NandResult>;

@@ -143,7 +143,7 @@
       <div class="text-center">
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </div>
-      <FileExplorer class="overflow-auto grow h-0" />
+      <FileExplorer {readonly} class="overflow-auto grow h-0" />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
       <PartitionExplorer

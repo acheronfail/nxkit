@@ -139,17 +139,63 @@ export async function readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
   return { error: NandError.None, data: nand.fs.readdir(fsPath) };
 }
 
-async function copyEntry(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
+export async function checkExistsRecursively(
+  fs: Fat32FileSystem,
+  pathOnHost: string,
+  dirPathInNand: string,
+): Promise<boolean> {
+  const pathInNand = join(dirPathInNand, basename(pathOnHost));
+
+  const stats = await fsp.stat(pathOnHost);
+  const entry = fs.read(pathInNand);
+
+  // there's nothing in the nand here, so no conflict
+  if (!entry) return false;
+
+  // if there's a file and an entry of any kind, that's a conflict
+  if (stats.isFile() && entry) {
+    return true;
+  }
+
+  if (stats.isDirectory()) {
+    // conflict if exists in the nand and it's not a directory
+    if (entry.type !== 'd') return true;
+
+    for (const entry of await fsp.readdir(pathOnHost)) {
+      if (await checkExistsRecursively(fs, join(pathOnHost, entry), pathInNand)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+export async function checkExists(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult<boolean>> {
+  if (!nand.fs) {
+    return { error: NandError.NoPartitionMounted };
+  }
+
+  for (const filePath of filePathsOnHost) {
+    if (await checkExistsRecursively(nand.fs, filePath, dirPathInNand)) {
+      return { error: NandError.None, data: true };
+    }
+  }
+
+  return { error: NandError.None, data: false };
+}
+
+async function copyEntryOverwriting(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
   const pathInNand = join(dirPathInNand, basename(pathOnHost));
 
   const stats = await fsp.stat(pathOnHost);
   if (stats.isFile()) {
-    fs.writeFile(pathInNand, await fsp.readFile(pathOnHost));
+    fs.writeFile(pathInNand, await fsp.readFile(pathOnHost), true);
   } else if (stats.isDirectory()) {
-    fs.mkdir(pathInNand);
+    fs.mkdir(pathInNand, true);
     for (const entry of await fsp.readdir(pathOnHost)) {
       const entryPath = join(pathOnHost, entry);
-      await copyEntry(fs, entryPath, pathInNand);
+      await copyEntryOverwriting(fs, entryPath, pathInNand);
     }
   } else {
     console.error(`Unsupported type: ${pathOnHost}`);
@@ -157,14 +203,21 @@ async function copyEntry(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand:
   }
 }
 
-// FIXME: handle already existing files/directories (do check for conflicts, and alert if there will be one and then overwrite)
+// FIXME: warn if combined size of files won't fit in NAND
+// FIXME: large files copied in crash electron with an OOM
 export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
   }
 
-  for (const filePath of filePathsOnHost) {
-    await copyEntry(nand.fs, filePath, dirPathInNand);
+  try {
+    for (const filePath of filePathsOnHost) {
+      await copyEntryOverwriting(nand.fs, filePath, dirPathInNand);
+    }
+  } catch (err) {
+    if (err instanceof ReadonlyError) {
+      return { error: NandError.Readonly };
+    }
   }
 
   return { error: NandError.None };

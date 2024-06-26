@@ -23,6 +23,7 @@
 
   export interface Props {
     class?: string;
+    readonly: boolean;
   }
 </script>
 
@@ -36,12 +37,10 @@
   import FileTree from '../utility/FileTree/FileTree.svelte';
   import InputTextInline from '../utility/InputTextInline.svelte';
 
-  let { class: propClass = '' }: Props = $props();
+  let { readonly, class: propClass = '' }: Props = $props();
 
   let isRenamingId = $state<string | null>(null);
   let disabled = $state(false);
-
-  // TODO: support dragging out to download files/directories
 
   const handlers = {
     toggleRename: (node: FileNode) => {
@@ -68,7 +67,7 @@
           disabled = false;
         });
     },
-    copyFiles: async (target: FileNode<true>, files: FileList, reloadDir: ReloadFn) => {
+    copyFilesIn: async (target: FileNode<true>, files: FileList, reloadDir: ReloadFn) => {
       disabled = true;
       const filePaths: string[] = [];
       for (const file of files) {
@@ -78,6 +77,20 @@
       if (!filePaths.length) {
         disabled = false;
         return;
+      }
+
+      const exists = await window.nxkit
+        .nandCheckExists(target.data.path, filePaths)
+        .then((result) => handleNandResult(result, `copy in ${filePaths.join(', ')}`));
+
+      if (exists) {
+        const yes = confirm(
+          'This operation will overwrite existing files in the NAND, are you sure you want to continue?',
+        );
+        if (!yes) {
+          disabled = false;
+          return;
+        }
       }
 
       await window.nxkit
@@ -128,7 +141,7 @@
       <span>Rename <Code>{node.name}</Code></span>
     {/snippet}
     <ActionButton {disabled} onclick={() => handlers.toggleRename(node)}>
-      <PencilSquareIcon class="h-4 cursor-pointer hover:fill-slate-900" />
+      <PencilSquareIcon class="h-4 cursor-pointer hover:stroke-blue-400 hover:fill-blue-400" />
     </ActionButton>
   </Tooltip>
 {/snippet}
@@ -138,11 +151,11 @@
   class={propClass}
   loadDirectory={handlers.openNandDirectory}
   root={ROOT_NODE}
-  onDragDrop={disabled
+  onDragDrop={disabled || readonly
     ? undefined
     : (target, item, reloadDir) => {
         if (item instanceof FileList) {
-          handlers.copyFiles(target, item, reloadDir);
+          handlers.copyFilesIn(target, item, reloadDir);
         } else {
           handlers.moveEntry(target, item, reloadDir);
         }
@@ -163,8 +176,10 @@
   {/snippet}
   {#snippet dirExtra(node, reloadDir)}
     <ActionButtons>
-      {@render renderRenameAction(node, reloadDir)}
-      {@render renderDeleteAction(node, reloadDir)}
+      {#if !readonly}
+        {@render renderRenameAction(node, reloadDir)}
+        {@render renderDeleteAction(node, reloadDir)}
+      {/if}
     </ActionButtons>
   {/snippet}
   {#snippet fileExtra(node, reloadDir)}
@@ -175,11 +190,13 @@
           <span>Download <Code>{node.data.name}</Code></span>
         {/snippet}
         <ActionButton {disabled} onclick={() => handlers.downloadFile(node.data)}>
-          <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-slate-900 hover:stroke-2" />
+          <ArrowDownTrayIcon class="h-4 cursor-pointer hover:stroke-blue-400 hover:stroke-2" />
         </ActionButton>
       </Tooltip>
-      {@render renderRenameAction(node, reloadDir)}
-      {@render renderDeleteAction(node, reloadDir)}
+      {#if !readonly}
+        {@render renderRenameAction(node, reloadDir)}
+        {@render renderDeleteAction(node, reloadDir)}
+      {/if}
     </ActionButtons>
   {/snippet}
 </FileTree>
