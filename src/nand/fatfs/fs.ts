@@ -121,10 +121,11 @@ export class Fat32FileSystem {
         };
       })();
 
+    const chunkSize = 4096;
     let offset = 0;
     let bytesRead = Infinity;
     do {
-      check_result(this.ff.f_read(filePtr, buff, size, bytesReadPtr));
+      check_result(this.ff.f_read(filePtr, buff + offset, chunkSize, bytesReadPtr));
       bytesRead = this.ff.getValue(bytesReadPtr, 'i32');
       onRead(this.ff.HEAPU8.slice(buff + offset, buff + offset + bytesRead));
       offset += bytesRead;

@@ -180,14 +180,15 @@ export async function copyFileOut(pathInNand: string, window: BrowserWindow): Pr
   });
   if (result.canceled) return { error: NandError.None };
 
-  const fd = fs.openSync(result.filePath, 'w+');
+  const handle = await fsp.open(result.filePath, 'w+');
   nand.fs.readFile(pathInNand, (chunk) => {
     let bytesWritten = 0;
     while (bytesWritten < chunk.byteLength) {
-      bytesWritten += fs.writeSync(fd, chunk, bytesWritten, chunk.byteLength - bytesWritten, null);
+      bytesWritten += fs.writeSync(handle.fd, chunk, bytesWritten, chunk.byteLength - bytesWritten, null);
     }
   });
-  fs.closeSync(fd);
+
+  await handle.close();
 
   return { error: NandError.None };
 }
