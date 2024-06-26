@@ -56,8 +56,15 @@
     },
     moveEntry: async (target: FileNode<true>, item: FileNode, reloadDir: ReloadFn) => {
       disabled = true;
-      const parentDir = await window.nxkit.pathDirname(item.data.path);
+      const srcPath = item.data.path;
+      const parentDir = await window.nxkit.pathDirname(srcPath);
       const targetPath = await window.nxkit.pathJoin(target.data.path, item.data.name);
+
+      if (targetPath.startsWith(srcPath)) {
+        disabled = false;
+        return alert('Cannot move a directory into itself');
+      }
+
       await window.nxkit
         .nandMoveEntry(item.data.path, targetPath)
         .then((result) => handleNandResult(result, `move ${item.data.name}`))
