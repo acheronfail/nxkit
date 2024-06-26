@@ -63,6 +63,8 @@
         const result = handleNandResult(await window.nxkit.nandOpen(nandFilePath), 'open NAND');
         if (result) {
           partitions = result;
+        } else {
+          handlers.reset();
         }
       }
     },

@@ -157,7 +157,7 @@ async function copyEntry(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand:
   }
 }
 
-// FIXME: handle already existing files/directories
+// FIXME: handle already existing files/directories (do check for conflicts, and alert if there will be one and then overwrite)
 export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };
