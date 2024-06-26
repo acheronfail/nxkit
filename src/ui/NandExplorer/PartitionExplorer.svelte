@@ -5,6 +5,7 @@
   export interface Props {
     partitions: Partition[];
     onPartitionChoose: (partition: Partition) => void;
+    reloadPartitions: () => void;
     class?: string;
     disabled?: boolean;
     readonly: boolean;
@@ -22,7 +23,8 @@
 
   let {
     readonly,
-    partitions = $bindable(),
+    partitions,
+    reloadPartitions,
     disabled = $bindable(false),
     onPartitionChoose,
     class: cls = '',
@@ -66,6 +68,11 @@
     isDisabled: false,
     data: undefined,
   };
+
+  function reload(event: Event) {
+    event.stopPropagation();
+    reloadPartitions();
+  }
 </script>
 
 <FileTree
@@ -85,6 +92,20 @@
         <span class="text-red-500">formatting...</span>
       {:else}
         {node.data.sizeHuman}
+        {#if node.data.freeHuman}
+          <Tooltip placement="top">
+            {#snippet tooltip()}
+              <p class="text-center w-60">click to reload free space</p>
+            {/snippet}
+            <span
+              class="text-slate-400"
+              tabindex="0"
+              role="button"
+              onkeypress={(e) => e.code === 'Space' && reload(e)}
+              onclick={reload}>({node.data.freeHuman} free)</span
+            >
+          </Tooltip>
+        {/if}
         <Tooltip placement="left">
           {#snippet tooltip()}
             <span>Format partition {node.data.name} (<span class="text-red-500">data loss!</span>)</span>

@@ -58,12 +58,15 @@ export enum FatType {
   Fat32 = FatFs.FM_FAT32,
 }
 
+export type WriteGetChunk = (size: number) => Uint8Array;
+
 export class Fat32FileSystem {
   private readonly fsHandle: number;
 
   constructor(
     private readonly ff: FatFs.FatFs,
     private readonly bpb: BiosParameterblock,
+    public readonly chunkSize = 2 ** 20,
   ) {
     this.fsHandle = this.ff.malloc(FatFs.sizeof_FATFS);
     check_result(this.ff.f_mount(this.fsHandle, '', 1), 'f_mount');
@@ -72,6 +75,14 @@ export class Fat32FileSystem {
   close() {
     check_result(this.ff.f_unmount(''), 'f_close');
     this.ff.free(this.fsHandle);
+  }
+
+  free(): number {
+    const freeClustersPtr = this.ff.malloc(4);
+    check_result(this.ff.f_getfree('', freeClustersPtr, 0), 'f_getfree');
+    const free = this.bpb.bytsPerSec * this.bpb.secPerClus * this.ff.getValue(freeClustersPtr, 'i32');
+    this.ff.free(freeClustersPtr);
+    return free;
   }
 
   /**
@@ -125,11 +136,10 @@ export class Fat32FileSystem {
         };
       })();
 
-    const chunkSize = 4096;
     let offset = 0;
     let bytesRead = Infinity;
     do {
-      check_result(this.ff.f_read(filePtr, buff + offset, chunkSize, bytesReadPtr), 'f_read');
+      check_result(this.ff.f_read(filePtr, buff + offset, Math.min(this.chunkSize, size), bytesReadPtr), 'f_read');
       bytesRead = this.ff.getValue(bytesReadPtr, 'i32');
       onRead(this.ff.HEAPU8.slice(buff + offset, buff + offset + bytesRead));
       offset += bytesRead;
@@ -287,25 +297,54 @@ export class Fat32FileSystem {
    * @param filePath path of file inside FAT filesystem
    * @param contents optional contents to write (file is created empty if not provided)
    */
-  writeFile(filePath: string, contents?: Uint8Array, overwrite = false) {
+  writeFile(filePath: string, getChunk?: WriteGetChunk, overwrite?: boolean): void;
+  writeFile(filePath: string, contents?: Uint8Array, overwrite?: boolean): void;
+  writeFile(filePath: string, contentsOrFn?: Uint8Array | WriteGetChunk, overwrite = false): void {
     const filePtr = this.ff.malloc(FatFs.sizeof_FIL);
     check_result(
       this.ff.f_open(filePtr, filePath, FatFs.FA_WRITE | (overwrite ? FatFs.FA_CREATE_ALWAYS : FatFs.FA_CREATE_NEW)),
       `f_open ${filePath}`,
     );
-    if (contents) {
-      const bufOffset = this.ff.malloc(contents.byteLength);
-      this.ff.HEAPU8.set(contents, bufOffset);
-      const bytesWrittenPtr = this.ff.malloc(4);
-      check_result(this.ff.f_write(filePtr, bufOffset, contents.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
 
-      const bytesWritten = this.ff.getValue(bytesWrittenPtr, 'i32');
-      if (bytesWritten != contents.byteLength) {
-        throw new Error(`expected to write ${contents.byteLength} bytes, but wrote ${bytesWritten}`);
+    if (contentsOrFn) {
+      const bytesWrittenPtr = this.ff.malloc(4);
+      const checkBytesWritten = (expectedLength: number) => {
+        const bytesWritten = this.ff.getValue(bytesWrittenPtr, 'i32');
+        if (bytesWritten != expectedLength) {
+          throw new Error(`expected to write ${expectedLength} bytes, but wrote ${bytesWritten}`);
+        }
+      };
+
+      // we've been given the entire data, write it all in one go
+      if (typeof contentsOrFn === 'function') {
+        const fn: WriteGetChunk = contentsOrFn;
+        const bufOffset = this.ff.malloc(this.chunkSize);
+
+        let chunk: Uint8Array | null;
+        while ((chunk = fn(this.chunkSize)) && chunk.byteLength > 0) {
+          if (chunk.byteLength > this.chunkSize) {
+            throw new Error(
+              `Provided chunk was too large, expected ${this.chunkSize} or smaller, but got ${chunk.byteLength}`,
+            );
+          }
+
+          this.ff.HEAPU8.set(chunk, bufOffset);
+          check_result(this.ff.f_write(filePtr, bufOffset, chunk.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
+          checkBytesWritten(chunk.byteLength);
+        }
+
+        this.ff.free(bufOffset);
+      } else {
+        const data: Uint8Array = contentsOrFn;
+        const bufOffset = this.ff.malloc(data.byteLength);
+        this.ff.HEAPU8.set(data, bufOffset);
+        check_result(this.ff.f_write(filePtr, bufOffset, data.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
+
+        checkBytesWritten(data.byteLength);
+        this.ff.free(bufOffset);
       }
 
       this.ff.free(bytesWrittenPtr);
-      this.ff.free(bufOffset);
     }
 
     check_result(this.ff.f_close(filePtr), `f_close ${filePath}`);

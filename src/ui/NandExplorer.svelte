@@ -149,10 +149,16 @@
       <PartitionExplorer
         class="overflow-auto grow h-0"
         {readonly}
-        bind:partitions
+        {partitions}
+        reloadPartitions={() => {
+          partitions = null;
+          handlers.openNand();
+        }}
         bind:disabled={partDisabled}
         onPartitionChoose={handlers.onPartitionChoose}
       />
+    {:else if nandFilePath}
+      <p class="text-center">Loading...</p>
     {:else}
       <p class="text-center">
         Choose your <Code>rawnand.bin</Code> file to begin!

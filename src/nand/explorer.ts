@@ -38,7 +38,7 @@ export async function close() {
   }
 }
 
-export async function open(nandPath: string): Promise<NandResult<Partition[]>> {
+export async function open(nandPath: string, keysFromUser?: ProdKeys): Promise<NandResult<Partition[]>> {
   if (nand.io) {
     await close();
   }
@@ -53,15 +53,34 @@ export async function open(nandPath: string): Promise<NandResult<Partition[]>> {
     return { error: NandError.InvalidPartitionTable };
   }
 
+  const data: Partition[] = [];
+  for (const part of gpt.partitions) {
+    const { name, format } = NX_PARTITIONS[part.type];
+    const size = Number((part.lastLBA - part.firstLBA) * 512n);
+    const sizeHuman = prettyBytes(size);
+    const mountable = isFat(format);
+    const partition: Partition = { id: part.type, name, mountable, size, sizeHuman };
+
+    try {
+      if (mountable) {
+        await mount(name, true, keysFromUser);
+        if (nand.fs) {
+          const free = nand.fs.free();
+          partition.free = free;
+          partition.freeHuman = prettyBytes(free);
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to detect free space on partition: ${name}`);
+      console.error(err);
+    }
+
+    data.push(partition);
+  }
+
   return {
     error: NandError.None,
-    data: gpt.partitions.map((part) => {
-      const { name, format } = NX_PARTITIONS[part.type];
-      const mountable = isFat(format);
-      const size = Number((part.lastLBA - part.firstLBA) * 512n);
-      const sizeHuman = prettyBytes(size);
-      return { id: part.type, name, mountable, size, sizeHuman };
-    }),
+    data,
   };
 }
 
@@ -185,17 +204,28 @@ export async function checkExists(dirPathInNand: string, filePathsOnHost: string
   return { error: NandError.None, data: false };
 }
 
-async function copyEntryOverwriting(fs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
+async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
   const pathInNand = join(dirPathInNand, basename(pathOnHost));
 
   const stats = await fsp.stat(pathOnHost);
   if (stats.isFile()) {
-    fs.writeFile(pathInNand, await fsp.readFile(pathOnHost), true);
+    let offset = 0;
+    const handle = await fsp.open(pathOnHost);
+    nandFs.writeFile(
+      pathInNand,
+      (size) => {
+        const buf = Buffer.alloc(size);
+        offset += fs.readSync(handle.fd, buf, 0, size, offset);
+        return buf;
+      },
+      true,
+    );
+    await handle.close();
   } else if (stats.isDirectory()) {
-    fs.mkdir(pathInNand, true);
+    nandFs.mkdir(pathInNand, true);
     for (const entry of await fsp.readdir(pathOnHost)) {
       const entryPath = join(pathOnHost, entry);
-      await copyEntryOverwriting(fs, entryPath, pathInNand);
+      await copyEntryOverwriting(nandFs, entryPath, pathInNand);
     }
   } else {
     console.error(`Unsupported type: ${pathOnHost}`);
@@ -204,7 +234,6 @@ async function copyEntryOverwriting(fs: Fat32FileSystem, pathOnHost: string, dir
 }
 
 // FIXME: warn if combined size of files won't fit in NAND
-// FIXME: large files copied in crash electron with an OOM
 export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
   if (!nand.fs) {
     return { error: NandError.NoPartitionMounted };

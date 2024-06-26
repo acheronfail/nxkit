@@ -1,6 +1,6 @@
 import { describe, beforeEach, test, expect } from 'vitest';
 import * as FatFs from 'js-fatfs';
-import { Fat32FileSystem, FatType } from './fs';
+import { FSFile, Fat32FileSystem, FatType } from './fs';
 import { BiosParameterblock } from './bpb';
 
 class MockDisk implements FatFs.DiskIO {
@@ -42,6 +42,12 @@ class MockDisk implements FatFs.DiskIO {
   }
 }
 
+const getABuffer = (size: number) => {
+  const buf = Buffer.alloc(size);
+  for (let i = 0; i < size; i++) buf[i] = size - i;
+  return buf;
+};
+
 describe(Fat32FileSystem.name, () => {
   let fs: Fat32FileSystem;
 
@@ -52,11 +58,22 @@ describe(Fat32FileSystem.name, () => {
     expect(ff.f_mkfs('', 0, work, FatFs.FF_MAX_SS)).toBe(FatFs.FR_OK);
     ff.free(work);
 
-    fs = new Fat32FileSystem(ff, {
+    const chunkSize = 128;
+    const bpb = {
       numFats: 2,
       bytsPerSec: 512,
       secPerClus: 1,
-    } as unknown as BiosParameterblock);
+    } as unknown as BiosParameterblock;
+
+    fs = new Fat32FileSystem(ff, bpb, chunkSize);
+  });
+
+  test('free', () => {
+    expect(fs.free()).toEqual(81920 - 512);
+    fs.writeFile('/stuff', getABuffer(512));
+    expect(fs.free()).toEqual(81920 - 512 - 512);
+    fs.writeFile('/stuff', getABuffer(513), true);
+    expect(fs.free()).toEqual(81920 - 512 - 512 - 512);
   });
 
   test('readdir', () => {
@@ -109,7 +126,7 @@ describe(Fat32FileSystem.name, () => {
   });
 
   describe('read', () => {
-    test('no file', () => {
+    test('not exists', () => {
       expect(fs.read('/asdf')).toBe(null);
     });
 
@@ -181,28 +198,43 @@ describe(Fat32FileSystem.name, () => {
     expect(fs.readdir('/')).toEqual([]);
   });
 
-  test('writeFile empty', () => {
-    fs.writeFile('/empty');
-    const data = fs.readFile('/empty');
-    expect(data.byteLength).toBe(0);
-  });
+  describe('writeFile', () => {
+    test('empty', () => {
+      fs.writeFile('/empty');
+      const data = fs.readFile('/empty');
+      expect(data.byteLength).toBe(0);
+    });
 
-  test('writeFile contents', () => {
-    fs.writeFile('/stuff', Buffer.from('asdf'));
-    const data = fs.readFile('/stuff');
-    expect(data.byteLength).toBe(4);
-    expect(data).toEqual(Buffer.from('asdf'));
+    // TODO: test conflict and overwrite
+
+    test('contents', () => {
+      fs.writeFile('/stuff', Buffer.from('asdf'));
+      const data = fs.readFile('/stuff');
+      expect(data.byteLength).toBe(4);
+      expect(data).toEqual(Buffer.from('asdf'));
+    });
+
+    test('chunks', () => {
+      const buf = getABuffer(10_000);
+      let offset = 0;
+      fs.writeFile('/stuff', (size) => {
+        const slice = buf.subarray(offset, offset + size);
+        offset += size;
+        return slice;
+      });
+
+      const data = fs.read('/stuff') as FSFile;
+      expect(data?.type).toBe('f');
+      expect(data?.size).toBe(10_000);
+    });
   });
 
   test('readFile chunks', () => {
-    const size = 10_000;
-    const buf = Buffer.alloc(size);
-    for (let i = 0; i < size; i++) buf[i] = size - i;
-
+    const buf = getABuffer(10_000);
     fs.writeFile('/stuff', buf);
 
     const readInOneGo = fs.readFile('/stuff');
-    const readInChunks = Buffer.alloc(size);
+    const readInChunks = Buffer.alloc(buf.byteLength);
     let offset = 0;
     fs.readFile('/stuff', (chunk) => {
       readInChunks.set(chunk, offset);

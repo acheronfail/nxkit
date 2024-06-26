@@ -12,6 +12,8 @@ export interface Partition {
   mountable: boolean;
   size: number;
   sizeHuman: string;
+  free?: number;
+  freeHuman?: string;
 }
 
 export enum NandError {
