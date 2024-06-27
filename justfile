@@ -1,15 +1,20 @@
 _default:
   just -l
 
-# TODO: check for DKP
-# TODO: check for build toolchain
-# TODO: check for emscripten for wasm
+@_check CMD MSG="":
+    if ! command -v {{CMD}} >/dev/null 2>&1 /dev/null; then echo "{{CMD}} is required! {{MSG}}"; exit 1; fi
+
 # set up the local repository for development
 setup:
   npm install --force
   echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
   echo "just pre-commit" >> .git/hooks/pre-commit
   chmod +x .git/hooks/pre-commit
+
+  @just _check "gcc"
+  @just _check "make"
+  @just _check "emcc" "See https://emscripten.org/docs/getting_started/downloads.html for installation instructions"
+  @just _check "dkp-pacman" "See https://devkitpro.org/wiki/Getting_Started for installation instructions"
 
 #
 # Dev Scripts
