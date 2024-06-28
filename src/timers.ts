@@ -1,3 +1,5 @@
+import chalk from 'chalk';
+
 interface Timer {
   timings: number[];
 }
@@ -17,6 +19,21 @@ class Timers {
     return () => this.timers[name].timings.push(performance.now() - start);
   }
 
+  formatTimestamp(millis: number): string {
+    const fmt = (n: number, u: string) => `${n.toFixed(4).padStart(9, ' ')} ${u}`;
+
+    if (millis > 1) {
+      return fmt(millis, chalk.red('ms'));
+    }
+
+    const pos = Math.floor(Math.abs(Math.log10(millis)));
+    if (pos <= 3) {
+      return fmt(millis * 1_000, chalk.yellow('us'));
+    }
+
+    return fmt(millis * 1_000_000, chalk.magenta('ns'));
+  }
+
   complete(name: string) {
     if (!this.timers[name]) {
       throw new Error(`No timer started with name: ${name}`);
@@ -24,9 +41,9 @@ class Timers {
 
     const { timings } = this.timers[name];
     const median = timings.sort((a, b) => a - b)[Math.floor(timings.length / 2)];
-    console.log(
-      `${name.padStart(this.longestLength, ' ')}: ${median.toFixed(4).padStart(9, ' ')} ms (${timings.length} total)`,
-    );
+
+    const label = chalk.cyan(name.padStart(this.longestLength, ' '));
+    console.log(`${label}: ${this.formatTimestamp(median)} (${timings.length} total)`);
 
     delete this.timers[name];
   }

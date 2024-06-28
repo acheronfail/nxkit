@@ -13,6 +13,10 @@ import { FatType, check_result } from '../src/nand/fatfs/fs';
 import { PartitionDriver } from '../src/nand/fatfs/diskio';
 import { PartitionEntry, getPartitionTable } from '../src/nand/gpt';
 
+const argv = process.argv.slice(2);
+const split = argv.includes('--split'); // create a split dump
+const clear = argv.includes('--clear'); // do not encrypt partitions
+
 const emptyKeys = (Object.keys(RawKeysSchema.shape) as (keyof RawKeys)[]).reduce<RawKeys>((keys, prop) => {
   switch (prop) {
     case 'bis_key_00':
@@ -56,7 +60,6 @@ await fsp.rm('.data', { recursive: true, force: true });
 await fsp.mkdir('.data', { recursive: true });
 await fsp.writeFile('.data/prod.keys', keys.toString());
 
-const split = process.argv.slice(2).includes('--split');
 const imageSize = 31268536320;
 const chunkSize = 2147483648;
 
@@ -204,7 +207,7 @@ async function formatPartition(name: string) {
 
   const { bisKeyId } = NX_PARTITIONS[partition.type];
   let crypto: Crypto | undefined = undefined;
-  if (typeof bisKeyId === 'number') {
+  if (!clear && typeof bisKeyId === 'number') {
     const bisKey = keys.getBisKey(bisKeyId);
     crypto = new NxCrypto(new Xtsn(bisKey.crypto, bisKey.tweak));
   }

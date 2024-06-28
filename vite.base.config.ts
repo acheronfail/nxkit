@@ -8,6 +8,8 @@ import pkg from './package.json';
 export const builtins = ['electron', ...builtinModules.map((m) => [m, `node:${m}`]).flat()];
 
 export const external = [
+  // https://github.com/chalk/chalk/issues/557
+  'chalk',
   ...builtins,
   ...Object.keys('dependencies' in pkg ? (pkg.dependencies as Record<string, unknown>) : {}),
 ];

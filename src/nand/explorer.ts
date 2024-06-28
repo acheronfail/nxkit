@@ -117,8 +117,14 @@ export async function mount(partitionName: string, readonly: boolean, keysFromUs
   const partitionEndOffset = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
 
   const { bisKeyId, magicOffset, magicBytes, format } = NX_PARTITIONS[partition.type];
+
+  const isClearText =
+    magicOffset && magicBytes
+      ? nand.io.read(magicOffset + partitionStartOffset, magicBytes.byteLength).equals(magicBytes)
+      : false;
+
   let crypto: Crypto | undefined = undefined;
-  if (typeof bisKeyId === 'number') {
+  if (!isClearText && typeof bisKeyId === 'number') {
     const bisKey = keys.getBisKey(bisKeyId);
     crypto = new NxCrypto(new Xtsn(bisKey.crypto, bisKey.tweak));
   }
