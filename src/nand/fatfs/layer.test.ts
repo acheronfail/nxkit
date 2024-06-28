@@ -25,7 +25,7 @@ const BLOCK_SIZE = 12;
 const CLUSTER_SIZE = 12;
 const DISK_SIZE = CLUSTER_SIZE * 8;
 
-class XorOffsetCrypto implements Crypto {
+export class XorOffsetCrypto implements Crypto {
   public blockSize(): number {
     return BLOCK_SIZE;
   }
@@ -50,15 +50,15 @@ class XorOffsetCrypto implements Crypto {
   }
 }
 
-describe(NandIoLayer.name, () => {
-  const getLayer = (disk: Buffer, crypto?: Crypto) =>
-    new NandIoLayer({
-      io: new MockIo(disk),
-      partitionStartOffset: 0,
-      partitionEndOffset: disk.byteLength,
-      crypto,
-    });
+export const getLayer = (disk: Buffer, crypto?: Crypto) =>
+  new NandIoLayer({
+    io: new MockIo(disk),
+    partitionStartOffset: 0,
+    partitionEndOffset: disk.byteLength,
+    crypto,
+  });
 
+describe(NandIoLayer.name, () => {
   describe('no crypto', () => {
     test('read', () => {
       const disk = Buffer.alloc(DISK_SIZE, 0);

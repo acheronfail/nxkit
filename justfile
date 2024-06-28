@@ -32,6 +32,10 @@ test:
 testw:
   npm run test:vitest
 
+# runs vitest in bench mode
+bench:
+  npm exec vitest -- bench
+
 # formats all code
 format:
   npm run format
