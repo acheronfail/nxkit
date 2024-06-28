@@ -94,4 +94,7 @@ out/
 # NXKit
 precommit.diff
 .data/
+
 *.0x/
+scripts/*.wasm
+scripts/bench100m.js
