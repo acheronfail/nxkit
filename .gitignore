@@ -95,6 +95,6 @@ out/
 precommit.diff
 .data/
 
-*.0x/
+*.cpuprofile
 scripts/*.wasm
 scripts/bench100m.js

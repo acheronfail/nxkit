@@ -35,7 +35,7 @@ export class Xtsn {
     this.cryptoDecipher = crypto.createDecipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
   }
 
-  private createTweak(sectorOffset: number) {
+  private createTweak(sectorOffset: number): Buffer {
     const tweak = Buffer.alloc(16, 0);
     tweak.writeBigInt64BE(BigInt(sectorOffset), 8);
 
@@ -43,9 +43,13 @@ export class Xtsn {
   }
 
   private applyTweak(tweak: Buffer, data: Buffer) {
-    for (let j = 0; j < 16; j++) {
-      data[j] ^= tweak[j];
-    }
+    const dataView = new Uint32Array(data.buffer, data.byteOffset, data.length / Uint32Array.BYTES_PER_ELEMENT);
+    const tweakView = new Uint32Array(tweak.buffer, tweak.byteOffset, tweak.length / Uint32Array.BYTES_PER_ELEMENT);
+
+    dataView[0] ^= tweakView[0];
+    dataView[1] ^= tweakView[1];
+    dataView[2] ^= tweakView[2];
+    dataView[3] ^= tweakView[3];
   }
 
   private updateTweak(tweak: Buffer) {
