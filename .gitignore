@@ -94,3 +94,4 @@ out/
 # NXKit
 precommit.diff
 .data/
+*.0x/

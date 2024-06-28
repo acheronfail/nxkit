@@ -37,7 +37,7 @@ bench:
   npm exec vitest -- bench
 
 bench100m:
-  npm exec tsx -- ./scripts/bench100m.ts
+  npx 0x -- node --import tsx scripts/bench100m.ts
 
 # formats all code
 format:
