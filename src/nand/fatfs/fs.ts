@@ -262,8 +262,7 @@ export class Fat32FileSystem {
 
   private createEntry(path: string, fno: number): FSEntry {
     const name = basename(path);
-    // TODO: https://github.com/irori/js-fatfs/issues/4
-    const size = this.ff.FILINFO_fsize(fno) >>> 0;
+    const size = this.ff.FILINFO_fsize(fno);
     const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
     return isDir ? { type: 'd', name, path } : { type: 'f', name, path, size, sizeHuman: prettyBytes(size) };
   }
