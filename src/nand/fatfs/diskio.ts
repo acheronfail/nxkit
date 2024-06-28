@@ -1,5 +1,6 @@
 import * as FatFs from 'js-fatfs';
 import { NandIoLayer } from './layer';
+import timers from '../../timers';
 
 export interface PartitionDriverOptions {
   nandIo: NandIoLayer;
@@ -39,7 +40,9 @@ export class PartitionDriver implements FatFs.DiskIO {
     const end = (sector + count) * this.sectorSize;
     const size = end - start;
 
+    const stop = timers.start('nandIoRead');
     ff.HEAPU8.set(this.nandIo.read(start, size), buff);
+    stop();
     return FatFs.RES_OK;
   }
 
@@ -48,8 +51,10 @@ export class PartitionDriver implements FatFs.DiskIO {
       throw new ReadonlyError('Tried to write to a disk in readonly mode!');
     }
 
+    const stop = timers.start('nandIoWrite');
     const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);
     this.nandIo.write(sector * this.sectorSize, data);
+    stop();
     return FatFs.RES_OK;
   }
 

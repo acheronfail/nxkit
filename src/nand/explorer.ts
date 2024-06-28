@@ -15,6 +15,7 @@ import prettyBytes from 'pretty-bytes';
 import { BiosParameterblock } from './fatfs/bpb';
 import { Crypto, NxCrypto } from './fatfs/crypto';
 import { Xtsn } from './xtsn';
+import timers from '../timers';
 
 interface Nand {
   io: Io | null;
@@ -209,19 +210,27 @@ async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string,
 
   const stats = await fsp.stat(pathOnHost);
   if (stats.isFile()) {
+    const timerCopyKey = `copy(${prettyBytes(stats.size)})`;
+    const stop = timers.start(timerCopyKey);
+
     let offset = 0;
     const handle = await fsp.open(pathOnHost);
     nandFs.writeFile(
       pathInNand,
       (size) => {
         const buf = Buffer.alloc(size);
+        const stop = timers.start('hostReadChunk');
         const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
+        stop();
         offset += bytesRead;
         return buf.subarray(0, bytesRead);
       },
       true,
     );
     await handle.close();
+
+    stop();
+    timers.completeAll();
   } else if (stats.isDirectory()) {
     nandFs.mkdir(pathInNand, true);
     for (const entry of await fsp.readdir(pathOnHost)) {

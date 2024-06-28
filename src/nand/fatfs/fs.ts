@@ -2,6 +2,7 @@ import { basename, join } from 'node:path';
 import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
 import { BiosParameterblock } from './bpb';
+import timers from '../../timers';
 
 const errorToString: Record<number, string> = {
   [FatFs.FR_DISK_ERR]: 'FR_DISK_ERR',
@@ -66,7 +67,7 @@ export class Fat32FileSystem {
   constructor(
     private readonly ff: FatFs.FatFs,
     private readonly bpb: BiosParameterblock,
-    public readonly chunkSize = 2 ** 20,
+    public readonly chunkSize = 16384,
   ) {
     this.fsHandle = this.ff.malloc(FatFs.sizeof_FATFS);
     check_result(this.ff.f_mount(this.fsHandle, '', 1), 'f_mount');
@@ -261,7 +262,8 @@ export class Fat32FileSystem {
 
   private createEntry(path: string, fno: number): FSEntry {
     const name = basename(path);
-    const size = this.ff.FILINFO_fsize(fno);
+    // TODO: https://github.com/irori/js-fatfs/issues/4
+    const size = this.ff.FILINFO_fsize(fno) >>> 0;
     const isDir = this.ff.FILINFO_fattrib(fno) & FatFs.AM_DIR;
     return isDir ? { type: 'd', name, path } : { type: 'f', name, path, size, sizeHuman: prettyBytes(size) };
   }
@@ -328,9 +330,16 @@ export class Fat32FileSystem {
             );
           }
 
-          this.ff.HEAPU8.set(chunk, bufOffset);
+          {
+            const stop = timers.start('fatfsSetChunk');
+            this.ff.HEAPU8.set(chunk, bufOffset);
+            stop();
+          }
+
+          const stop = timers.start('fatfsWriteChunk');
           check_result(this.ff.f_write(filePtr, bufOffset, chunk.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
           checkBytesWritten(chunk.byteLength);
+          stop();
         }
 
         this.ff.free(bufOffset);
