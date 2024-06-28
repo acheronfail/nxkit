@@ -36,6 +36,10 @@ testw:
 format:
   npm run format
 
+# creates a fake NAND dump for testing
+create-nand *ARGS:
+  npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
+
 #
 # Vendor
 #

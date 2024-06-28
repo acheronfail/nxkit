@@ -28,6 +28,12 @@ declare module '*?raw' {
  * Types for untyped packages
  */
 
+declare module 'chs' {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const mod: any;
+  export default mod;
+}
+
 declare module 'mbr' {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any;

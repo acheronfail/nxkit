@@ -1,5 +1,42 @@
 import { z } from 'zod';
 
+export type BisKeyId = 0 | 1 | 2 | 3;
+
+export class Keys {
+  static parseKeys(path: string, text: string): Keys | null {
+    return new Keys(
+      path,
+      RawKeysSchema.parse(
+        Object.fromEntries(
+          text
+            .trim()
+            .split('\n')
+            .map((line) => line.split('=').map((s) => s.trim())),
+        ),
+      ),
+    );
+  }
+
+  constructor(
+    public readonly path: string,
+    public readonly raw: RawKeys,
+  ) {}
+
+  getBisKey(id: BisKeyId): { crypto: Buffer; tweak: Buffer } {
+    const text = this.raw[`bis_key_0${id}`];
+    return {
+      crypto: Buffer.from(text.substring(0, 32), 'hex'),
+      tweak: Buffer.from(text.substring(32), 'hex'),
+    };
+  }
+
+  toString(): string {
+    return Object.entries(this.raw)
+      .map((entry) => entry.join(' = '))
+      .join('\n');
+  }
+}
+
 export type RawKeys = z.infer<typeof RawKeysSchema>;
 export const RawKeysSchema = z.object({
   aes_kek_generation_source: z.string(),
