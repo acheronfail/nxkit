@@ -12,11 +12,14 @@
 
 import crypto from 'node:crypto';
 
+type Tweak = BigUint64Array;
+
 /**
  * Some notes:
  *  It's AES-XTS encryption, and AES works in 128 bit (16 byte) blocks
  *  Sector size is 0x4000
  *  XTS tweaks are updated (consecutively) once per sector
+ *  When encrypting/decrypting, the input buffer must be 16-byte aligned
  *
  * See https://switchbrew.org/wiki/Flash_Filesystem for more information.
  */
@@ -35,38 +38,39 @@ export class Xtsn {
     this.cryptoDecipher = crypto.createDecipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
   }
 
-  private createTweak(sectorOffset: number): Buffer {
+  private createTweak(sectorOffset: number): Tweak {
     const tweak = Buffer.alloc(16, 0);
     tweak.writeBigInt64BE(BigInt(sectorOffset), 8);
 
-    return this.tweakCipher.update(tweak);
+    const tmp = this.tweakCipher.update(tweak);
+    return new BigUint64Array(tmp.buffer, tmp.byteOffset, 2);
   }
 
-  private applyTweak(tweak: Buffer, data: Buffer) {
-    const dataView = new Uint32Array(data.buffer, data.byteOffset, data.length / Uint32Array.BYTES_PER_ELEMENT);
-    const tweakView = new Uint32Array(tweak.buffer, tweak.byteOffset, tweak.length / Uint32Array.BYTES_PER_ELEMENT);
-
+  private applyTweak(tweakView: Tweak, data: Buffer) {
+    const dataView = new BigUint64Array(data.buffer, data.byteOffset, 2);
     dataView[0] ^= tweakView[0];
     dataView[1] ^= tweakView[1];
-    dataView[2] ^= tweakView[2];
-    dataView[3] ^= tweakView[3];
   }
 
-  private updateTweak(tweak: Buffer) {
-    const lastHigh = tweak[15] & 0x80;
+  private updateTweak(tweak: Tweak) {
+    const tweakView = new Uint8Array(tweak.buffer, tweak.byteOffset, 16);
+
+    const lastHigh = tweakView[15] & 0x80;
     for (let j = 15; j > 0; j--) {
-      tweak[j] = ((tweak[j] << 1) & ~1) | (tweak[j - 1] & 0x80 ? 1 : 0);
+      tweakView[j] = ((tweakView[j] << 1) & ~1) | (tweakView[j - 1] & 0x80 ? 1 : 0);
     }
 
-    tweak[0] = ((tweak[0] << 1) & ~1) ^ (lastHigh ? 0x87 : 0);
+    tweakView[0] = ((tweakView[0] << 1) & ~1) ^ (lastHigh ? 0x87 : 0);
   }
 
   private doCrypt(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean) {
     const cipher = encrypt ? this.cryptoCipher : this.cryptoDecipher;
 
     let currentSectorOffset = 0;
-    const processBlock = (tweak: Buffer, runs: number) => {
+    const processBlock = (tweak: Tweak, runs: number) => {
       for (let i = 0; i < runs; i++) {
+        if (currentSectorOffset >= input.length) return;
+
         const block = input.subarray(currentSectorOffset, currentSectorOffset + 16);
         this.applyTweak(tweak, block);
         const processedBlock = cipher.update(block);
