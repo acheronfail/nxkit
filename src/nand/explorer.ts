@@ -215,8 +215,9 @@ async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string,
       pathInNand,
       (size) => {
         const buf = Buffer.alloc(size);
-        offset += fs.readSync(handle.fd, buf, 0, size, offset);
-        return buf;
+        const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
+        offset += bytesRead;
+        return buf.subarray(0, bytesRead);
       },
       true,
     );
@@ -247,6 +248,8 @@ export async function copyFilesIn(dirPathInNand: string, filePathsOnHost: string
     if (err instanceof ReadonlyError) {
       return { error: NandError.Readonly };
     }
+
+    throw err;
   }
 
   return { error: NandError.None };

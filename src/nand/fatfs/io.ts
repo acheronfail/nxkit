@@ -136,7 +136,7 @@ export class SplitDumpIo implements Io {
         break;
       }
 
-      const fd = fs.openSync(splitFile.path, 'wx');
+      const fd = fs.openSync(splitFile.path, 'w+');
       const bytesRemaining = length - bytesLeftToWrite;
       const bytesWritten = fs.writeSync(fd, data, bytesRemaining, length, offset + bytesRemaining - splitFile.offset);
       bytesLeftToWrite -= bytesWritten;
