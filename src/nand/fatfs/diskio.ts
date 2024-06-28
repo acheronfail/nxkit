@@ -51,8 +51,8 @@ export class PartitionDriver implements FatFs.DiskIO {
       throw new ReadonlyError('Tried to write to a disk in readonly mode!');
     }
 
-    const stop = timers.start('nandIoWrite');
     const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);
+    const stop = timers.start('nandIoWrite');
     this.nandIo.write(sector * this.sectorSize, data);
     stop();
     return FatFs.RES_OK;

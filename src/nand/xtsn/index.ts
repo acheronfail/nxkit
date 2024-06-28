@@ -21,17 +21,25 @@ import crypto from 'node:crypto';
  * See https://switchbrew.org/wiki/Flash_Filesystem for more information.
  */
 export class Xtsn {
+  private readonly tweakCipher: crypto.Cipher;
+  private readonly cryptoCipher: crypto.Cipher;
+  private readonly cryptoDecipher: crypto.Decipher;
+
   constructor(
     private readonly cryptoKey: Buffer,
     private readonly tweakKey: Buffer,
     public readonly sectorSize = 0x4000,
-  ) {}
+  ) {
+    this.tweakCipher = crypto.createCipheriv('aes-128-ecb', tweakKey, null).setAutoPadding(false);
+    this.cryptoCipher = crypto.createCipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
+    this.cryptoDecipher = crypto.createDecipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
+  }
 
   private createTweak(sectorOffset: number) {
     const tweak = Buffer.alloc(16, 0);
     tweak.writeBigInt64BE(BigInt(sectorOffset), 8);
 
-    return this.aesEcb(tweak, this.tweakKey, 'createCipheriv');
+    return this.tweakCipher.update(tweak);
   }
 
   private applyTweak(tweak: Buffer, data: Buffer) {
@@ -49,27 +57,18 @@ export class Xtsn {
     tweak[0] = ((tweak[0] << 1) & ~1) ^ (lastHigh ? 0x87 : 0);
   }
 
-  private aesEcb(data: Buffer, key: Buffer, method: 'createCipheriv' | 'createDecipheriv') {
-    const cipher = crypto[method]('aes-128-ecb', key, null).setAutoPadding(false);
-    return Buffer.concat([cipher.update(data), cipher.final()]);
-  }
+  private doCrypt(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean) {
+    const cipher = encrypt ? this.cryptoCipher : this.cryptoDecipher;
 
-  private doCrypt(
-    input: Buffer,
-    sectorOffset: number,
-    skippedBytes: number,
-    method: 'createCipheriv' | 'createDecipheriv',
-  ) {
-    const data = Buffer.from(input);
     let currentSectorOffset = 0;
     const processBlock = (tweak: Buffer, runs: number) => {
       for (let i = 0; i < runs; i++) {
-        const block = data.subarray(currentSectorOffset, currentSectorOffset + 16);
+        const block = input.subarray(currentSectorOffset, currentSectorOffset + 16);
         this.applyTweak(tweak, block);
-        const processedBlock = this.aesEcb(block, this.cryptoKey, method);
+        const processedBlock = cipher.update(block);
         this.applyTweak(tweak, processedBlock);
         this.updateTweak(tweak);
-        processedBlock.copy(data, currentSectorOffset);
+        processedBlock.copy(input, currentSectorOffset);
 
         currentSectorOffset += 16;
       }
@@ -91,34 +90,34 @@ export class Xtsn {
       sectorOffset++;
     }
 
-    while (currentSectorOffset < data.byteLength) {
+    while (currentSectorOffset < input.byteLength) {
       const tweak = this.createTweak(sectorOffset);
       processBlock(tweak, Math.floor(this.sectorSize / 16));
       sectorOffset++;
     }
 
-    return data;
+    return input;
   }
 
   public encrypt(input: Buffer, byteOffset = 0): Buffer {
     const sectorOffset = Math.floor(byteOffset / this.sectorSize);
-    return this.doCrypt(input, sectorOffset, byteOffset % this.sectorSize, 'createCipheriv');
+    return this.doCrypt(input, sectorOffset, byteOffset % this.sectorSize, true);
   }
 
   public decrypt(input: Buffer, byteOffset = 0): Buffer {
     const sectorOffset = Math.floor(byteOffset / this.sectorSize);
-    return this.doCrypt(input, sectorOffset, byteOffset % this.sectorSize, 'createDecipheriv');
+    return this.doCrypt(input, sectorOffset, byteOffset % this.sectorSize, false);
   }
 
   // Expose APIs that are compatible with the python haccrypto lib
 
   public encryptHC(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0): Buffer {
     const xtsn = new Xtsn(this.cryptoKey, this.tweakKey, sectorSize);
-    return xtsn.doCrypt(input, sectorOffset, skippedBytes, 'createCipheriv');
+    return xtsn.doCrypt(input, sectorOffset, skippedBytes, true);
   }
 
   public decryptHC(input: Buffer, sectorOffset: number, sectorSize = 0x200, skippedBytes = 0): Buffer {
     const xtsn = new Xtsn(this.cryptoKey, this.tweakKey, sectorSize);
-    return xtsn.doCrypt(input, sectorOffset, skippedBytes, 'createDecipheriv');
+    return xtsn.doCrypt(input, sectorOffset, skippedBytes, false);
   }
 }

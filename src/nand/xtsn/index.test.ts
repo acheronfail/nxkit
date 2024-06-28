@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { Xtsn } from '.';
+import { Xtsn } from './index';
 
 function isAllZeros(buf: Buffer): boolean {
   for (const byte of buf) {
