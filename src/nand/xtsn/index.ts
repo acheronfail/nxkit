@@ -62,25 +62,22 @@ export class Xtsn {
     const input8 = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
     const input64 = new BigInt64Array(input8.buffer, input.byteOffset, input.byteLength / 8);
 
-    let block8Offset = 0;
-    let block64Offset = 0;
+    let offset8 = 0;
+    let offset64 = 0;
     const processBlock = (tweak: Tweak, runs: number) => {
       for (let i = 0; i < runs; i++) {
-        if (block8Offset >= input.length) return;
+        if (offset8 >= input.length) return;
 
-        const block = new Uint8Array(input8.buffer, input8.byteOffset + block8Offset, 16);
-
-        input64[block64Offset + 0] ^= tweak[0];
-        input64[block64Offset + 1] ^= tweak[1];
-        cipher.update(block).copy(block);
-        input64[block64Offset + 0] ^= tweak[0];
-        input64[block64Offset + 1] ^= tweak[1];
+        input64[offset64 + 0] ^= tweak[0];
+        input64[offset64 + 1] ^= tweak[1];
+        cipher.update(new Uint8Array(input8.buffer, input8.byteOffset + offset8, 16)).copy(input8, offset8);
+        input64[offset64 + 0] ^= tweak[0];
+        input64[offset64 + 1] ^= tweak[1];
 
         this.updateTweak(tweak);
-        input.set(block, block8Offset);
 
-        block8Offset += 16;
-        block64Offset += 2;
+        offset8 += 16;
+        offset64 += 2;
       }
     };
 
@@ -100,7 +97,7 @@ export class Xtsn {
       sectorOffset++;
     }
 
-    while (block8Offset < input.byteLength) {
+    while (offset8 < input.byteLength) {
       const tweak = this.createTweak(sectorOffset);
       processBlock(tweak, Math.floor(this.sectorSize / 16));
       sectorOffset++;
