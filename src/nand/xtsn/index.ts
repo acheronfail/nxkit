@@ -46,12 +46,6 @@ export class Xtsn {
     return new BigUint64Array(tmp.buffer, tmp.byteOffset, 2);
   }
 
-  private applyTweak(tweakView: Tweak, data: Buffer) {
-    const dataView = new BigUint64Array(data.buffer, data.byteOffset, 2);
-    dataView[0] ^= tweakView[0];
-    dataView[1] ^= tweakView[1];
-  }
-
   private updateTweak(tweak: Tweak) {
     const tweakView = new Uint8Array(tweak.buffer, tweak.byteOffset, 16);
 
@@ -66,19 +60,24 @@ export class Xtsn {
   private doCrypt(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean) {
     const cipher = encrypt ? this.cryptoCipher : this.cryptoDecipher;
 
-    let currentSectorOffset = 0;
+    let blockOffset = 0;
     const processBlock = (tweak: Tweak, runs: number) => {
       for (let i = 0; i < runs; i++) {
-        if (currentSectorOffset >= input.length) return;
+        if (blockOffset >= input.length) return;
 
-        const block = input.subarray(currentSectorOffset, currentSectorOffset + 16);
-        this.applyTweak(tweak, block);
-        const processedBlock = cipher.update(block);
-        this.applyTweak(tweak, processedBlock);
+        const block = new Uint8Array(input.buffer, input.byteOffset + blockOffset, 16);
+        const blockView = new BigUint64Array(block.buffer, block.byteOffset, 2);
+
+        blockView[0] ^= tweak[0];
+        blockView[1] ^= tweak[1];
+        cipher.update(block).copy(block);
+        blockView[0] ^= tweak[0];
+        blockView[1] ^= tweak[1];
+
         this.updateTweak(tweak);
-        processedBlock.copy(input, currentSectorOffset);
+        input.set(block, blockOffset);
 
-        currentSectorOffset += 16;
+        blockOffset += 16;
       }
     };
 
@@ -98,7 +97,7 @@ export class Xtsn {
       sectorOffset++;
     }
 
-    while (currentSectorOffset < input.byteLength) {
+    while (blockOffset < input.byteLength) {
       const tweak = this.createTweak(sectorOffset);
       processBlock(tweak, Math.floor(this.sectorSize / 16));
       sectorOffset++;

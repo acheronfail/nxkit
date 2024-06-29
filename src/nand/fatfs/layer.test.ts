@@ -21,8 +21,8 @@ class MockIo implements Io {
   }
 }
 
-const BLOCK_SIZE = 12;
-const CLUSTER_SIZE = 12;
+const BLOCK_SIZE = 16;
+const CLUSTER_SIZE = 16;
 const DISK_SIZE = CLUSTER_SIZE * 8;
 
 export class XorOffsetCrypto implements Crypto {

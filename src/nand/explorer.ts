@@ -17,6 +17,9 @@ import { Crypto, NxCrypto } from './fatfs/crypto';
 import { Xtsn } from './xtsn';
 import timers from '../timers';
 
+// TODO: all this error handling is getting unwieldy, improve that
+// TODO: run all of this in another process, and emit copy progress so we can render it nicely without freezing
+
 interface Nand {
   io: Io | null;
   fs: Fat32FileSystem | null;

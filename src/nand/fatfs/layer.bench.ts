@@ -5,7 +5,7 @@ import { NxCrypto } from './crypto';
 import { Xtsn } from '../xtsn';
 
 describe('benchmarks', () => {
-  const size = 518264;
+  const size = 524288;
 
   const data = crypto.randomBytes(size);
   const opts = { time: 2000 };
