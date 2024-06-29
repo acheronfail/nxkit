@@ -59,25 +59,28 @@ export class Xtsn {
 
   private doCrypt(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean) {
     const cipher = encrypt ? this.cryptoCipher : this.cryptoDecipher;
+    const input8 = new Uint8Array(input.buffer, input.byteOffset, input.byteLength);
+    const input64 = new BigInt64Array(input8.buffer, input.byteOffset, input.byteLength / 8);
 
-    let blockOffset = 0;
+    let block8Offset = 0;
+    let block64Offset = 0;
     const processBlock = (tweak: Tweak, runs: number) => {
       for (let i = 0; i < runs; i++) {
-        if (blockOffset >= input.length) return;
+        if (block8Offset >= input.length) return;
 
-        const block = new Uint8Array(input.buffer, input.byteOffset + blockOffset, 16);
-        const blockView = new BigUint64Array(block.buffer, block.byteOffset, 2);
+        const block = new Uint8Array(input8.buffer, input8.byteOffset + block8Offset, 16);
 
-        blockView[0] ^= tweak[0];
-        blockView[1] ^= tweak[1];
+        input64[block64Offset + 0] ^= tweak[0];
+        input64[block64Offset + 1] ^= tweak[1];
         cipher.update(block).copy(block);
-        blockView[0] ^= tweak[0];
-        blockView[1] ^= tweak[1];
+        input64[block64Offset + 0] ^= tweak[0];
+        input64[block64Offset + 1] ^= tweak[1];
 
         this.updateTweak(tweak);
-        input.set(block, blockOffset);
+        input.set(block, block8Offset);
 
-        blockOffset += 16;
+        block8Offset += 16;
+        block64Offset += 2;
       }
     };
 
@@ -97,7 +100,7 @@ export class Xtsn {
       sectorOffset++;
     }
 
-    while (blockOffset < input.byteLength) {
+    while (block8Offset < input.byteLength) {
       const tweak = this.createTweak(sectorOffset);
       processBlock(tweak, Math.floor(this.sectorSize / 16));
       sectorOffset++;
