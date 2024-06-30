@@ -1,3 +1,4 @@
+#include <math.h>
 #include <node.h>
 #include <node_buffer.h>
 #include <openssl/evp.h>
@@ -18,66 +19,162 @@ using v8::Persistent;
 using v8::String;
 using v8::Value;
 
-void CreateThingInstance(const FunctionCallbackInfo<Value> &args) {
+void CreateXtsnCipherInstance(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
 
   if (!args.IsConstructCall()) {
-    isolate->ThrowException(String::NewFromUtf8(isolate, "Constructor Cipher requires 'new'").ToLocalChecked());
+    isolate->ThrowException(String::NewFromUtf8(isolate, "Constructor XtsnCipher requires 'new'").ToLocalChecked());
     return;
   }
 
-  if (args.Length() < 2 || !node::Buffer::HasInstance(args[0])) {
+  if (args.Length() < 3 || !node::Buffer::HasInstance(args[0]) || !node::Buffer::HasInstance(args[1]) ||
+      !args[2]->IsNumber()) {
     isolate->ThrowException(String::NewFromUtf8(isolate, "invalid arguments").ToLocalChecked());
     return;
   }
 
-  // Convert the first argument to a Buffer and extract the data.
-  const unsigned char *keyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
+  const unsigned char *cryptoKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
   if (node::Buffer::Length(args[0]) != 16) {
-    isolate->ThrowException(String::NewFromUtf8(isolate, "key must be 16 bytes exactly").ToLocalChecked());
+    isolate->ThrowException(String::NewFromUtf8(isolate, "crypto key must be 16 bytes exactly").ToLocalChecked());
     return;
   }
 
-  bool encrypt = args[1]->BooleanValue(isolate);
-
-  EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-  if (encrypt) {
-    EVP_EncryptInit(ctx, EVP_aes_128_ecb(), keyData, nullptr);
-  } else {
-    EVP_DecryptInit(ctx, EVP_aes_128_ecb(), keyData, nullptr);
+  const unsigned char *tweakKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[1]));
+  if (node::Buffer::Length(args[1]) != 16) {
+    isolate->ThrowException(String::NewFromUtf8(isolate, "tweak key must be 16 bytes exactly").ToLocalChecked());
+    return;
   }
-  EVP_CIPHER_CTX_set_padding(ctx, 0);
 
-  args.This()->SetAlignedPointerInInternalField(0, ctx);
+  EVP_CIPHER_CTX *ctx_tweak = EVP_CIPHER_CTX_new();
+  EVP_CIPHER_CTX *ctx_crypto_encrypt = EVP_CIPHER_CTX_new();
+  EVP_CIPHER_CTX *ctx_crypto_decrypt = EVP_CIPHER_CTX_new();
+
+  assert(EVP_EncryptInit(ctx_tweak, EVP_aes_128_ecb(), tweakKeyData, nullptr));
+  assert(EVP_EncryptInit(ctx_crypto_encrypt, EVP_aes_128_ecb(), cryptoKeyData, nullptr));
+  assert(EVP_DecryptInit(ctx_crypto_decrypt, EVP_aes_128_ecb(), cryptoKeyData, nullptr));
+
+  assert(EVP_CIPHER_CTX_set_padding(ctx_tweak, 0));
+  assert(EVP_CIPHER_CTX_set_padding(ctx_crypto_encrypt, 0));
+  assert(EVP_CIPHER_CTX_set_padding(ctx_crypto_decrypt, 0));
+
+  args.This()->SetAlignedPointerInInternalField(0, ctx_tweak);
+  args.This()->SetAlignedPointerInInternalField(1, ctx_crypto_encrypt);
+  args.This()->SetAlignedPointerInInternalField(2, ctx_crypto_decrypt);
+  args.This()->SetInternalField(3, args[2]);
+
   args.GetReturnValue().Set(args.This());
 }
 
-void UpdateMethod(const FunctionCallbackInfo<Value> &args) {
-  Isolate *isolate = args.GetIsolate();
-
-  EVP_CIPHER_CTX *ctx = reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(0));
-  unsigned char *data = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
-  int offset = args[1]->IsUndefined() ? 0 : args[1]->NumberValue(isolate->GetCurrentContext()).FromJust();
+void CreateTweak(EVP_CIPHER_CTX *ctx_tweak, unsigned char *tweak, uint64_t sectorOffset) {
+#if defined(__GNUC__) || defined(__clang__)
+  uint64_t sectorOffsetBigEndian = __builtin_bswap64(sectorOffset);
+  memcpy(tweak + 8, &sectorOffsetBigEndian, sizeof(uint64_t));
+#elif defined(_MSC_VER)
+  uint64_t sectorOffsetBigEndian = _byteswap_uint64(sectorOffset);
+  memcpy(tweak + 8, &sectorOffsetBigEndian, sizeof(uint64_t));
+#else
+  for (int i = 0; i < sizeof(uint64_t); i++)
+    tweak[15 - i] = ((unsigned char *)&sectorOffset)[i];
+#endif
 
   int outputLen = 0;
-  if (!EVP_CipherUpdate(ctx, data + offset, &outputLen, data + offset, 16)) {
-    isolate->ThrowException(String::NewFromUtf8(isolate, "encryption failed").ToLocalChecked());
+  assert(EVP_CipherUpdate(ctx_tweak, tweak, &outputLen, tweak, 16));
+}
+
+inline void UpdateTweak(unsigned char *tweak) {
+  bool last_high = (bool)(tweak[15] & 0x80);
+  for (int j = 15; j > 0; j--)
+    tweak[j] = (unsigned char)(((tweak[j] << 1) & ~1) | (tweak[j - 1] & 0x80 ? 1 : 0));
+
+  tweak[0] = (unsigned char)(((tweak[0] << 1) & ~1) ^ (last_high ? 0x87 : 0));
+}
+
+inline void ProcessBlock(EVP_CIPHER_CTX *ctx_crypto, unsigned char *input, unsigned char *tweak, int *offset8,
+                         int *offset64, int inputLen, int runs) {
+
+  uint64_t *tweak64bit = reinterpret_cast<uint64_t *>(tweak);
+  uint64_t *input64bit = reinterpret_cast<uint64_t *>(input);
+
+  int outputLen = 0;
+  for (int i = 0; i < runs; i++) {
+    if (*offset8 >= inputLen)
+      return;
+
+    input64bit[*offset64 + 0] ^= tweak64bit[0];
+    input64bit[*offset64 + 1] ^= tweak64bit[1];
+
+    unsigned char *block = input + *offset8;
+    assert(EVP_CipherUpdate(ctx_crypto, block, &outputLen, block, 16));
+
+    input64bit[*offset64 + 0] ^= tweak64bit[0];
+    input64bit[*offset64 + 1] ^= tweak64bit[1];
+
+    UpdateTweak(tweak);
+
+    *offset8 += 16;
+    *offset64 += 2;
+  }
+}
+
+void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
+  Isolate *isolate = args.GetIsolate();
+
+  if (args.Length() < 4 || !node::Buffer::HasInstance(args[0]) || !args[1]->IsNumber() || !args[2]->IsNumber()) {
+    isolate->ThrowException(String::NewFromUtf8(isolate, "invalid arguments").ToLocalChecked());
     return;
   }
 
-  args.GetReturnValue().Set(Number::New(isolate, outputLen));
+  int sectorSize = args.This()->GetInternalField(3)->Int32Value(isolate->GetCurrentContext()).FromJust();
+
+  unsigned char *input = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
+  int inputLen = node::Buffer::Length(args[0]);
+  int sectorOffset = args[1]->NumberValue(isolate->GetCurrentContext()).FromJust();
+  int skippedBytes = args[2]->NumberValue(isolate->GetCurrentContext()).FromJust();
+  bool encrypt = args[3]->BooleanValue(isolate);
+  EVP_CIPHER_CTX *ctx_tweak = reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(0));
+  EVP_CIPHER_CTX *ctx_crypto =
+      reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(encrypt ? 1 : 2));
+
+  int offset8 = 0;
+  int offset64 = 0;
+
+  if (skippedBytes > 0) {
+    int fullSectorsToSkip = std::floor(skippedBytes / sectorSize);
+    sectorOffset += fullSectorsToSkip;
+    skippedBytes %= sectorSize;
+  }
+
+  if (skippedBytes > 0) {
+    unsigned char tweak[16] = {0};
+    CreateTweak(ctx_tweak, tweak, sectorOffset);
+
+    for (int i = 0; i < std::floor(skippedBytes / 16); i++) {
+      UpdateTweak(tweak);
+    }
+
+    ProcessBlock(ctx_crypto, input, tweak, &offset8, &offset64, inputLen, std::floor((sectorSize - skippedBytes) / 16));
+    sectorOffset++;
+  }
+
+  while (offset8 < inputLen) {
+    unsigned char tweak[16] = {0};
+    CreateTweak(ctx_tweak, tweak, sectorOffset);
+
+    ProcessBlock(ctx_crypto, input, tweak, &offset8, &offset64, inputLen, std::floor(sectorSize / 16));
+    sectorOffset++;
+  }
+
+  args.GetReturnValue().Set(args[0]);
 }
 
 void Initialize(Local<Object> exports, Local<Object> module) {
   Isolate *isolate = exports->GetIsolate();
 
-  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, CreateThingInstance);
+  Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, CreateXtsnCipherInstance);
   tpl->SetClassName(String::NewFromUtf8(isolate, "XtsnCipher").ToLocalChecked());
+  tpl->InstanceTemplate()->SetInternalFieldCount(4);
 
-  // allocate 1 internal field to stort the cipher ctx
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
-
-  NODE_SET_PROTOTYPE_METHOD(tpl, "update", UpdateMethod);
+  NODE_SET_PROTOTYPE_METHOD(tpl, "run", RunCipherMethod);
   auto constructorFunction = tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked();
   module
       ->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "exports").ToLocalChecked(), constructorFunction)

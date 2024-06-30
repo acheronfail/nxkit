@@ -52,16 +52,16 @@ rebuild-node:
   cd src/nand/xtsn && npm rebuild
 
 # runs all tests and checks
-test:
+test-all:
   npm run test
 
 # runs vitest in watch mode
-testw:
-  npm run test:vitest
+test *ARGS:
+  npm run test:vitest -- {{ARGS}}
 
 # runs vitest in bench mode
-bench: rebuild-node
-  npm exec vitest -- bench
+bench *ARGS: rebuild-node
+  npm exec vitest -- bench --run -- {{ARGS}}
 
 # runs a benchmark copying a 100M file into an Xtsn-enxrypted FAT32 disk image, outputs a cpuprofile
 bench100m: rebuild-node
@@ -122,7 +122,7 @@ pre-commit:
     git apply -R "$saved"
   fi
   just format
-  just test
+  just test-all
   if [ -f "$saved" ]; then
     git apply "$saved"
     rm "$saved"
