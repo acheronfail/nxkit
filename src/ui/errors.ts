@@ -30,9 +30,9 @@ export function handleNandResult<T>(result: NandResult<T>, actionDescription: st
     case NandError.AlreadyExists:
       alert(`Failed to ${actionDescription}.\n\nAn item already exists with that name!`);
       return null;
-    case NandError.Unknown:
+    case NandError.Generic:
       console.error(result);
-      alert(`An unknown error occurred while ${actionDescription}!`);
+      alert(`Failed to ${actionDescription}.\n\n${result.description}`);
       return null;
   }
 }

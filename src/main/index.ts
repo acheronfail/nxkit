@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { Channels, MainChannelImpl, NandError } from '../channels';
 import { findProdKeys } from './keys';
-import * as nand from '../nand/explorer';
+import explorer from '../nand/explorer';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
@@ -119,24 +119,27 @@ app.on('ready', () => {
       findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
     [Channels.ProdKeysSearchPaths]: async (_event) => prodKeysSearchPaths,
 
-    [Channels.NandOpen]: async (_event, path) => nand.open(path),
-    [Channels.NandClose]: async (_event) => nand.close(),
+    [Channels.NandOpen]: async (_event, path) => explorer.open(path),
+    [Channels.NandClose]: async (_event) => explorer.close(),
     [Channels.NandMountPartition]: async (_event, partName, readonly, keysFromUser) =>
-      nand.mount(partName, readonly, keysFromUser),
-    [Channels.NandReaddir]: async (_event, path) => nand.readdir(path),
+      explorer.mount(partName, readonly, keysFromUser),
+    [Channels.NandReaddir]: async (_event, path) => explorer.readdir(path),
     [Channels.NandCopyFileOut]: async (_event, pathInNand) => {
       if (!mainWindow) {
-        return { error: NandError.Unknown };
+        return { error: NandError.Generic, description: 'Failed to find the main application window' };
       }
 
-      return nand.copyFileOut(pathInNand, mainWindow);
+      return explorer.copyFileOut(pathInNand, mainWindow);
     },
-    [Channels.NandCopyFilesIn]: async (_event, dirPathInNand, filePaths) => nand.copyFilesIn(dirPathInNand, filePaths),
-    [Channels.NandCheckExists]: async (_event, dirPathInNand, filePaths) => nand.checkExists(dirPathInNand, filePaths),
-    [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) => nand.move(oldPathInNand, newPathInNand),
-    [Channels.NandDeleteEntry]: async (_event, pathInNand) => nand.del(pathInNand),
+    [Channels.NandCopyFilesIn]: async (_event, dirPathInNand, filePaths) =>
+      explorer.copyFilesIn(dirPathInNand, filePaths),
+    [Channels.NandCheckExists]: async (_event, dirPathInNand, filePaths) =>
+      explorer.checkExists(dirPathInNand, filePaths),
+    [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) =>
+      explorer.move(oldPathInNand, newPathInNand),
+    [Channels.NandDeleteEntry]: async (_event, pathInNand) => explorer.del(pathInNand),
     [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>
-      nand.format(partName, readonly, keysFromUser),
+      explorer.format(partName, readonly, keysFromUser),
   };
 
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {

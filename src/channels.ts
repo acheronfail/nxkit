@@ -16,9 +16,10 @@ export interface Partition {
   freeHuman?: string;
 }
 
+// TODO: do we need the enum, or can we just make them all generic?
 export enum NandError {
   None,
-  Unknown,
+  Generic,
   NoProdKeys,
   InvalidProdKeys,
   InvalidPartitionTable,
@@ -30,7 +31,8 @@ export enum NandError {
 
 export type NandResult<T = void> =
   | (T extends void ? { error: NandError.None } : { error: NandError.None; data: T })
-  | { error: Exclude<NandError, NandError.None> };
+  | { error: NandError.Generic; description: string }
+  | { error: Exclude<NandError, NandError.None | NandError.Generic> };
 
 export interface ExposedPreloadAPIs extends NXKitBridge {
   openLink: RendererChannelImpl[Channels.OpenLink];
