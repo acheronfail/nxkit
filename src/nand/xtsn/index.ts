@@ -27,13 +27,15 @@ interface NativeCipherConstructor {
 
 interface NativeCipher {
   /**
-   * Perform the cipher operation and encrypt or decrypt the provided data
+   * Perform the cipher operation and encrypt or decrypt the provided data.
+   * The operation runs in-place; that is, it mutates the input buffer.
    * @param input data to run the cipher on
    * @param sectorOffset starting sector offset
    * @param skippedBytes number of bytes skipped in the current sector offset
    * @param encrypt whether to encrypt or decrypt
+   * @returns the input buffer
    */
-  run(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean): unknown;
+  run(input: Buffer, sectorOffset: number, skippedBytes: number, encrypt: boolean): void;
 }
 
 /**

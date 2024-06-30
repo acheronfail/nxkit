@@ -65,7 +65,7 @@ void CreateXtsnCipherInstance(const FunctionCallbackInfo<Value> &args) {
   args.GetReturnValue().Set(args.This());
 }
 
-void CreateTweak(EVP_CIPHER_CTX *ctx_tweak, unsigned char *tweak, uint64_t sectorOffset) {
+void InitTweak(EVP_CIPHER_CTX *ctx_tweak, unsigned char *tweak, uint64_t sectorOffset) {
 #if defined(__GNUC__) || defined(__clang__)
   uint64_t sectorOffsetBigEndian = __builtin_bswap64(sectorOffset);
   memcpy(tweak + 8, &sectorOffsetBigEndian, sizeof(uint64_t));
@@ -89,92 +89,102 @@ inline void UpdateTweak(unsigned char *tweak) {
   tweak[0] = (unsigned char)(((tweak[0] << 1) & ~1) ^ (last_high ? 0x87 : 0));
 }
 
-inline void ProcessBlock(EVP_CIPHER_CTX *ctx_crypto, unsigned char *input, unsigned char *tweak, int *offset8,
-                         int *offset64, int inputLen, int runs) {
-
+inline void ProcessChunks(EVP_CIPHER_CTX *ctx_crypto, unsigned char *input, unsigned char *tweak, uint64_t *chunkOffset,
+                         uint64_t totalChunks, int runs) {
   uint64_t *tweak64bit = reinterpret_cast<uint64_t *>(tweak);
   uint64_t *input64bit = reinterpret_cast<uint64_t *>(input);
 
-  int outputLen = 0;
+  int unusedOutputLen = 0;
   for (int i = 0; i < runs; i++) {
-    if (*offset8 >= inputLen)
+    if (*chunkOffset >= totalChunks)
       return;
 
-    input64bit[*offset64 + 0] ^= tweak64bit[0];
-    input64bit[*offset64 + 1] ^= tweak64bit[1];
+    input64bit[*chunkOffset + 0] ^= tweak64bit[0];
+    input64bit[*chunkOffset + 1] ^= tweak64bit[1];
 
-    unsigned char *block = input + *offset8;
-    assert(EVP_CipherUpdate(ctx_crypto, block, &outputLen, block, 16));
+    unsigned char *block = input + (*chunkOffset * 8);
+    assert(EVP_CipherUpdate(ctx_crypto, block, &unusedOutputLen, block, 16));
 
-    input64bit[*offset64 + 0] ^= tweak64bit[0];
-    input64bit[*offset64 + 1] ^= tweak64bit[1];
+    input64bit[*chunkOffset + 0] ^= tweak64bit[0];
+    input64bit[*chunkOffset + 1] ^= tweak64bit[1];
 
     UpdateTweak(tweak);
 
-    *offset8 += 16;
-    *offset64 += 2;
+    // we're processing two 64bit chunks at a time (the cipher is a 128bit cipher)
+    *chunkOffset += 2;
   }
 }
 
 void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
 
+  // validate arguments from js
   if (args.Length() < 4 || !node::Buffer::HasInstance(args[0]) || !args[1]->IsNumber() || !args[2]->IsNumber()) {
     isolate->ThrowException(String::NewFromUtf8(isolate, "invalid arguments").ToLocalChecked());
     return;
   }
 
-  int sectorSize = args.This()->GetInternalField(3)->Int32Value(isolate->GetCurrentContext()).FromJust();
-
+  // extract arguments from js
   unsigned char *input = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
-  int inputLen = node::Buffer::Length(args[0]);
-  int sectorOffset = args[1]->NumberValue(isolate->GetCurrentContext()).FromJust();
-  int skippedBytes = args[2]->NumberValue(isolate->GetCurrentContext()).FromJust();
+  uint64_t inputLen = node::Buffer::Length(args[0]);
+  uint64_t sectorOffset = args[1]->NumberValue(isolate->GetCurrentContext()).FromJust();
+  uint64_t skippedBytes = args[2]->NumberValue(isolate->GetCurrentContext()).FromJust();
   bool encrypt = args[3]->BooleanValue(isolate);
+
+  // extract saved fields
+  int sectorSize = args.This()->GetInternalField(3).As<Number>()->NumberValue(isolate->GetCurrentContext()).FromJust();
   EVP_CIPHER_CTX *ctx_tweak = reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(0));
   EVP_CIPHER_CTX *ctx_crypto =
       reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(encrypt ? 1 : 2));
 
-  int offset8 = 0;
-  int offset64 = 0;
+  // we measure our current offset through the input in 64bit chunks
+  uint64_t chunkOffset = 0;
+  uint64_t totalChunks = inputLen / 8;
 
+  // see if we can completely skip any sectors
   if (skippedBytes > 0) {
     int fullSectorsToSkip = std::floor(skippedBytes / sectorSize);
     sectorOffset += fullSectorsToSkip;
     skippedBytes %= sectorSize;
   }
 
+  // if we have remaining skipped bytes, that means we're up to the first sector
+  // we need to run the cipher on
   if (skippedBytes > 0) {
     unsigned char tweak[16] = {0};
-    CreateTweak(ctx_tweak, tweak, sectorOffset);
+    InitTweak(ctx_tweak, tweak, sectorOffset);
 
+    // update the tweak for all chunks before the first chunk we need to process
     for (int i = 0; i < std::floor(skippedBytes / 16); i++) {
       UpdateTweak(tweak);
     }
 
-    ProcessBlock(ctx_crypto, input, tweak, &offset8, &offset64, inputLen, std::floor((sectorSize - skippedBytes) / 16));
+    // finally, process the rest of the chunks in this sector
+    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, std::floor((sectorSize - skippedBytes) / 16));
     sectorOffset++;
   }
 
-  while (offset8 < inputLen) {
+  // now we're sector-aligned and can proceed to process each remaining sector
+  while (chunkOffset < totalChunks) {
     unsigned char tweak[16] = {0};
-    CreateTweak(ctx_tweak, tweak, sectorOffset);
-
-    ProcessBlock(ctx_crypto, input, tweak, &offset8, &offset64, inputLen, std::floor(sectorSize / 16));
+    InitTweak(ctx_tweak, tweak, sectorOffset);
+    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, std::floor(sectorSize / 16));
     sectorOffset++;
   }
-
-  args.GetReturnValue().Set(args[0]);
 }
 
 void Initialize(Local<Object> exports, Local<Object> module) {
   Isolate *isolate = exports->GetIsolate();
 
+  // setup storage for the XtsnCipher class
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, CreateXtsnCipherInstance);
   tpl->SetClassName(String::NewFromUtf8(isolate, "XtsnCipher").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(4);
 
+  // setup methods for XtsnCipher instances
   NODE_SET_PROTOTYPE_METHOD(tpl, "run", RunCipherMethod);
+
+  // set the default export to be the XtsnCipher constructor
   auto constructorFunction = tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked();
   module
       ->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "exports").ToLocalChecked(), constructorFunction)
