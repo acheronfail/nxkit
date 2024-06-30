@@ -97,4 +97,5 @@ precommit.diff
 
 *.cpuprofile
 scripts/*.wasm
+scripts/build/
 scripts/bench100m.js

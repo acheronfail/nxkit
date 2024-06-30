@@ -24,6 +24,10 @@ setup:
 dev *args:
   npm start -- -- {{args}}
 
+# rebuild native modules to work with electron
+rebuild:
+  npm exec electron-rebuild -- --module-dir src/nand/xtsn
+
 # runs all tests and checks
 test:
   npm run test
@@ -37,6 +41,9 @@ bench:
   npm exec vitest -- bench
 
 bench100m:
+  mkdir -p scripts/build/Release
+  cd src/nand/xtsn && npm rebuild
+  cp src/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
   cp node_modules/js-fatfs/dist/fatfs.wasm ./scripts/
   npx esbuild --bundle --platform=node --format=esm ./scripts/bench100m.ts --outfile=scripts/bench100m.js
   node --cpu-prof scripts/bench100m.js

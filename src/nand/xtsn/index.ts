@@ -10,8 +10,35 @@
  *  - https://github.com/ihaveamac/switchfs
  */
 
-import crypto from 'node:crypto';
+import { createRequire } from 'node:module';
 
+const require = createRequire(import.meta.url);
+const XtsnCipher: NativeCipherConstructor = require('./build/Release/xtsn.node');
+
+interface NativeCipher {
+  /**
+   * Run the cipher on `data` at `offset`. Only does 16 bytes at a time.
+   * @param data data to run the cipher on, only 16 bytes are done at a time.
+   * @param offset optional offset to start when running the cipher on data.
+   * @returns the number of bytes processed (should always be 16 unless an error occurred)
+   */
+  update(data: NodeJS.ArrayBufferView, offset?: number): number;
+}
+
+interface NativeCipherConstructor {
+  /**
+   * Create a new instance of the cipher class.
+   * @param key the 16 byte Bis Key (no shorter, no longer)
+   * @param encrypt whether this cipher is used for encrypting or decrypting
+   */
+  new (key: Buffer, encrypt: boolean): NativeCipher;
+}
+
+/**
+ * We use the largest view possible when representing the tweak so when we need
+ * to apply it to the data we can do it in as few cycles as possible. Doing it
+ * this way helps node to do the XOR operation in larger chunks.
+ */
 type Tweak = BigUint64Array;
 
 /**
@@ -24,26 +51,26 @@ type Tweak = BigUint64Array;
  * See https://switchbrew.org/wiki/Flash_Filesystem for more information.
  */
 export class Xtsn {
-  private readonly tweakCipher: crypto.Cipher;
-  private readonly cryptoCipher: crypto.Cipher;
-  private readonly cryptoDecipher: crypto.Decipher;
+  private readonly tweakCipher: NativeCipher;
+  private readonly cryptoCipher: NativeCipher;
+  private readonly cryptoDecipher: NativeCipher;
 
   constructor(
     private readonly cryptoKey: Buffer,
     private readonly tweakKey: Buffer,
     public readonly sectorSize = 0x4000,
   ) {
-    this.tweakCipher = crypto.createCipheriv('aes-128-ecb', tweakKey, null).setAutoPadding(false);
-    this.cryptoCipher = crypto.createCipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
-    this.cryptoDecipher = crypto.createDecipheriv('aes-128-ecb', cryptoKey, null).setAutoPadding(false);
+    this.tweakCipher = new XtsnCipher(tweakKey, true);
+    this.cryptoCipher = new XtsnCipher(cryptoKey, true);
+    this.cryptoDecipher = new XtsnCipher(cryptoKey, false);
   }
 
   private createTweak(sectorOffset: number): Tweak {
     const tweak = Buffer.alloc(16, 0);
     tweak.writeBigInt64BE(BigInt(sectorOffset), 8);
 
-    const tmp = this.tweakCipher.update(tweak);
-    return new BigUint64Array(tmp.buffer, tmp.byteOffset, 2);
+    this.tweakCipher.update(tweak);
+    return new BigUint64Array(tweak.buffer, tweak.byteOffset, 2);
   }
 
   private updateTweak(tweak: Tweak) {
@@ -70,7 +97,7 @@ export class Xtsn {
 
         input64[offset64 + 0] ^= tweak[0];
         input64[offset64 + 1] ^= tweak[1];
-        cipher.update(new Uint8Array(input8.buffer, input8.byteOffset + offset8, 16)).copy(input8, offset8);
+        cipher.update(input8, offset8);
         input64[offset64 + 0] ^= tweak[0];
         input64[offset64 + 1] ^= tweak[1];
 

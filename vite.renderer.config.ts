@@ -5,7 +5,7 @@ import wasm from 'vite-plugin-wasm';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { pluginExposeRenderer } from './vite.base.config';
 
-export const assetsInclude = ['**/exefs/*'];
+export const assetsInclude = ['**/public/**/*'];
 
 // https://vitejs.dev/config
 export default defineConfig((env) => {
