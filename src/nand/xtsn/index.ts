@@ -12,7 +12,7 @@
 
 import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
+const require = globalThis.require ?? createRequire(import.meta.url);
 const XtsnCipher: NativeCipherConstructor = require('./build/Release/xtsn.node');
 
 interface NativeCipherConstructor {

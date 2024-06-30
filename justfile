@@ -46,13 +46,14 @@ dev *args: rebuild-electron
 
 # rebuild native modules to work with electron
 rebuild-electron:
+  cd src/nand/xtsn && npm run clean
   npm exec electron-rebuild -- --module-dir src/nand/xtsn
 # rebuild native modules to work with node
 rebuild-node:
   cd src/nand/xtsn && npm rebuild
 
 # runs all tests and checks
-test-all:
+test-all: rebuild-node
   npm run test
 
 # runs vitest in watch mode
