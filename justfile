@@ -1,3 +1,7 @@
+cyan := '\033[0;36m'
+red := '\033[0;31m'
+reset := '\033[0m'
+
 _default:
   just -l
 
@@ -6,27 +10,46 @@ _default:
 
 # set up the local repository for development
 setup:
+  @echo "{{cyan}}Installing node_modules...{{reset}}"
   npm install --force
-  echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
-  echo "just pre-commit" >> .git/hooks/pre-commit
-  chmod +x .git/hooks/pre-commit
 
+  @echo "{{cyan}}Setting up git hooks...{{reset}}"
+  @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
+  @echo "just pre-commit" >> .git/hooks/pre-commit
+  @chmod +x .git/hooks/pre-commit
+
+  @echo "{{cyan}}Checking for required tools...{{reset}}"
   @just _check "gcc"
   @just _check "make"
   @just _check "emcc" "See https://emscripten.org/docs/getting_started/downloads.html for installation instructions"
   @just _check "dkp-pacman" "See https://devkitpro.org/wiki/Getting_Started for installation instructions"
+
+  @echo "{{cyan}}Checking for devkitpro switch packages...{{reset}}"
+  @if ! dkp-pacman -Qg switch-dev | cut -d' ' -f2 | xargs -n1 sh -c 'dkp-pacman -Qi $0 >/dev/null || exit 255'; then \
+    echo "{{red}}Failed to find devkitpro switch-dev package, installing now...{{reset}}" \
+    sudo dkp-pacman -Sy switch-dev; \
+  fi
+
+  @echo "{{cyan}}Building vendor dependencies...{{reset}}"
+  just vendor
+
+  @echo -n "{{cyan}}Do you want to create a fake nand dump?{{reset}} (y/N): "
+  @read ans; if [[ $ans = *y* ]]; then just create-nand; just rebuild-electron; fi
 
 #
 # Dev Scripts
 #
 
 # start the app in dev mode
-dev *args:
+dev *args: rebuild-electron
   npm start -- -- {{args}}
 
 # rebuild native modules to work with electron
-rebuild:
+rebuild-electron:
   npm exec electron-rebuild -- --module-dir src/nand/xtsn
+# rebuild native modules to work with node
+rebuild-node:
+  cd src/nand/xtsn && npm rebuild
 
 # runs all tests and checks
 test:
@@ -37,15 +60,15 @@ testw:
   npm run test:vitest
 
 # runs vitest in bench mode
-bench:
+bench: rebuild-node
   npm exec vitest -- bench
 
-bench100m:
-  mkdir -p scripts/build/Release
-  cd src/nand/xtsn && npm rebuild
-  cp src/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
-  cp node_modules/js-fatfs/dist/fatfs.wasm ./scripts/
-  npx esbuild --bundle --platform=node --format=esm ./scripts/bench100m.ts --outfile=scripts/bench100m.js
+# runs a benchmark copying a 100M file into an Xtsn-enxrypted FAT32 disk image, outputs a cpuprofile
+bench100m: rebuild-node
+  @mkdir -p scripts/build/Release
+  @cp src/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
+  @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
+  npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
   node --cpu-prof scripts/bench100m.js
 
 # formats all code
@@ -53,7 +76,7 @@ format:
   npm run format
 
 # creates a fake NAND dump for testing
-create-nand *ARGS:
+create-nand *ARGS: rebuild-node
   npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
 
 #
