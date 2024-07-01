@@ -7,6 +7,6 @@ window[NXKitBridgeKey] = {
   isLinux: false,
   isOsx: false,
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  call: vi.fn<any>().mockResolvedValue(undefined),
+  call: vi.fn<[]>().mockResolvedValue(undefined),
+  progressSubscribe: vi.fn(),
 };

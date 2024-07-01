@@ -9,7 +9,7 @@ import { findProdKeys } from '../node/keys';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
-import { ExplorerWorker } from '../node/nand/explorer';
+import { ExplorerWorker } from './explorer';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -152,7 +152,7 @@ app.on('ready', () => {
   }
 
   mainWindow = createMainWindow();
-  explorerWorker = new ExplorerWorker();
+  explorerWorker = new ExplorerWorker(mainWindow);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -168,7 +168,8 @@ app.on('activate', () => {
   // On OS X it's common to re-create a window in the app when the
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
-    createMainWindow();
+    mainWindow = createMainWindow();
+    explorerWorker = new ExplorerWorker(mainWindow);
   }
 });
 

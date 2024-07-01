@@ -36,11 +36,20 @@
   import { handleNandResult } from '../errors';
   import FileTree from '../utility/FileTree/FileTree.svelte';
   import InputTextInline from '../utility/InputTextInline.svelte';
+  import type { Progress } from '../../node/nand/explorer.worker';
+  import { onMount } from 'svelte';
 
   let { readonly, class: propClass = '' }: Props = $props();
 
   let isRenamingId = $state<string | null>(null);
   let disabled = $state(false);
+  let progress = $state<Progress | null>(null);
+
+  onMount(() => {
+    window.nxkit.progressSubscribe((prog) => {
+      progress = prog;
+    });
+  });
 
   const handlers = {
     toggleRename: (node: FileNode) => {
@@ -207,3 +216,14 @@
     </ActionButtons>
   {/snippet}
 </FileTree>
+
+{#if progress}
+  {@const percent = progress.currentFileOffset / progress.currentFileSize}
+  <div class="flex flex-col">
+    <span>Copying: <span class="font-mono text-slate-400">{progress.currentFilePath}</span></span>
+    <div class="flex flex-row justify-center items-center gap-2">
+      <progress class="grow" value={percent}></progress>
+      {(percent * 100).toFixed(2)}%
+    </div>
+  </div>
+{/if}

@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  /* https://github.com/tailwindlabs/tailwindcss/discussions/11432 */
+  progress {
+    border: revert;
+  }
+}
+
 /* TODO: verify light mode styling */
 
 * {

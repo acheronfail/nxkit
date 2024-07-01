@@ -14,9 +14,22 @@ import prettyBytes from 'pretty-bytes';
 import { BiosParameterblock } from './fatfs/bpb';
 import { Crypto, NxCrypto } from './fatfs/crypto';
 import { Xtsn } from './xtsn';
-import timers from '../../timers';
 import { resolveKeys } from '../keys';
 import { Keys } from '../keys.types';
+
+export interface Progress {
+  totalBytesCopied: number;
+  totalFilesCopied: number;
+  currentFilePath: string;
+  currentFileSize: number;
+  currentFileOffset: number;
+}
+
+type ProgressUpdate =
+  | { action: 'start'; path: string; size: number }
+  | { action: 'chunk'; offset: number; size: number }
+  | { action: 'finish' };
+type ProgressCb = (upd: ProgressUpdate) => void;
 
 class ExplorerError<T> extends Error {
   constructor(public readonly result: NandResult<T>) {
@@ -225,15 +238,40 @@ class Explorer {
     });
   }
 
-  // TODO: emit copy progress so we can render it nicely without freezing
   // FIXME: fail if combined size of files won't fit in NAND
   public async copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
+    const progress: Progress = {
+      totalBytesCopied: 0,
+      totalFilesCopied: 0,
+      currentFilePath: '',
+      currentFileSize: 0,
+      currentFileOffset: 0,
+    };
+
     return this.operation(async () => {
       const fat = this.getFat();
       for (const filePath of filePathsOnHost) {
-        await copyEntryOverwriting(fat, filePath, dirPathInNand);
+        await copyEntryOverwriting(fat, filePath, dirPathInNand, (update) => {
+          switch (update.action) {
+            case 'start':
+              progress.totalFilesCopied++;
+              progress.currentFilePath = update.path;
+              progress.currentFileSize = update.size;
+              progress.currentFileOffset = 0;
+              break;
+            case 'chunk':
+              progress.totalBytesCopied += update.size;
+              progress.currentFileOffset = update.offset;
+              break;
+            case 'finish':
+              break;
+          }
+
+          process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
+        });
       }
 
+      process.parentPort.postMessage({ id: 'progress', progress: null } satisfies OutgoingMessage);
       return { error: NandError.None };
     });
   }
@@ -319,37 +357,40 @@ async function checkExistsRecursively(
   return false;
 }
 
-async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string, dirPathInNand: string) {
+async function copyEntryOverwriting(
+  nandFs: Fat32FileSystem,
+  pathOnHost: string,
+  dirPathInNand: string,
+  onProgress: ProgressCb,
+) {
   const pathInNand = join(dirPathInNand, basename(pathOnHost));
 
   const stats = await fsp.stat(pathOnHost);
   if (stats.isFile()) {
-    const timerCopyKey = `copy(${prettyBytes(stats.size)})`;
-    const stop = timers.start(timerCopyKey);
-
+    onProgress({ action: 'start', path: pathOnHost, size: stats.size });
     let offset = 0;
     const handle = await fsp.open(pathOnHost);
     nandFs.writeFile(
       pathInNand,
       (size) => {
         const buf = Buffer.alloc(size);
-        const stop = timers.start('hostReadChunk');
         const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
-        stop();
         offset += bytesRead;
+
+        onProgress({ action: 'chunk', offset, size: stats.size });
+
         return buf.subarray(0, bytesRead);
       },
       true,
     );
     await handle.close();
 
-    stop();
-    timers.completeAll();
+    onProgress({ action: 'finish' });
   } else if (stats.isDirectory()) {
     nandFs.mkdir(pathInNand, true);
     for (const entry of await fsp.readdir(pathOnHost)) {
       const entryPath = join(pathOnHost, entry);
-      await copyEntryOverwriting(nandFs, entryPath, pathInNand);
+      await copyEntryOverwriting(nandFs, entryPath, pathInNand, onProgress);
     }
   } else {
     console.error(`Unsupported type: ${pathOnHost}`);
@@ -361,30 +402,36 @@ async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string,
  * Worker IPC
  */
 
-export interface IncomingMessage<C extends keyof ExplorerIpcDefinition> {
-  id: number;
-  channel: C;
-  args: Parameters<ExplorerIpcDefinition[C]>;
-
-  // can't think of a better way to pass this into the worker right now, but
-  // this will do I suppose
-  isPackaged: boolean;
-}
-
-export interface OutgoingMessage<C extends keyof ExplorerIpcDefinition> {
-  id: number;
-  channel: C;
-  value: ReturnType<ExplorerIpcDefinition[C]>;
-}
-
 const explorer = new Explorer();
 export type ExplorerIpcDefinition = typeof explorer;
+export type ExplorerIpcKey = keyof ExplorerIpcDefinition;
 
-async function reply<C extends keyof ExplorerIpcDefinition>({ id, channel, args, isPackaged }: IncomingMessage<C>) {
-  explorer['isPackaged'] = isPackaged;
+export type IncomingMessage<C extends ExplorerIpcKey = ExplorerIpcKey> =
+  | { id: 'bootstrap'; isPackaged: boolean }
+  | {
+      id: number;
+      channel: C;
+      args: Parameters<ExplorerIpcDefinition[C]>;
+    };
 
-  const value = await (explorer[channel] as PromiseIpcHandler)(...args);
-  return process.parentPort.postMessage({ id, value });
+export type OutgoingMessage<C extends ExplorerIpcKey = ExplorerIpcKey> =
+  | {
+      id: 'progress';
+      progress: Progress | null;
+    }
+  | {
+      id: number;
+      value: ReturnType<ExplorerIpcDefinition[C]>;
+    };
+
+async function handleMessage<C extends ExplorerIpcKey>(msg: IncomingMessage<C>) {
+  const { id } = msg;
+  if (id === 'bootstrap') {
+    explorer['isPackaged'] = msg.isPackaged;
+  } else {
+    const value = await (explorer[msg.channel] as PromiseIpcHandler)(...msg.args);
+    return process.parentPort.postMessage({ id, value });
+  }
 }
 
-process.parentPort.on('message', (event: MessageEvent) => reply(event.data));
+process.parentPort.on('message', (event: MessageEvent) => handleMessage(event.data));
