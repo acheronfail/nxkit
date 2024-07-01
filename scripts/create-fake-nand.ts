@@ -56,6 +56,8 @@ const emptyKeys = (Object.keys(RawKeysSchema.shape) as (keyof RawKeys)[]).reduce
 
 const keys = new Keys('prod.keys', emptyKeys);
 
+const rawnandPath = '.data/rawnand.bin';
+
 await fsp.rm('.data', { recursive: true, force: true });
 await fsp.mkdir('.data', { recursive: true });
 await fsp.writeFile('.data/prod.keys', keys.toString());
@@ -64,7 +66,7 @@ const imageSize = 31268536320;
 const chunkSize = 2147483648;
 
 {
-  const handle = await fsp.open('.data/rawnand.bin', 'w');
+  const handle = await fsp.open(rawnandPath, 'w');
   await handle.truncate(imageSize);
 
   const gpt = new GPT({
@@ -190,10 +192,17 @@ const chunkSize = 2147483648;
   await handle.close();
 }
 
+enum PartName {
+  PRODINFOF = 'PRODINFOF',
+  SAFE = 'SAFE',
+  SYSTEM = 'SYSTEM',
+  USER = 'USER',
+}
+
 // Format partitions with blank keys
-async function formatPartition(name: string) {
+async function formatPartition(name: PartName) {
   console.log(`Formatting ${name}...`);
-  const io = await createIo('.data/rawnand.bin');
+  const io = await createIo(rawnandPath);
   const gpt = getPartitionTable(io);
 
   const partition = gpt.partitions.find((part: PartitionEntry) => part.name === name);
@@ -229,22 +238,18 @@ async function formatPartition(name: string) {
   const opts = {
     fmt: fatType | FatFs.FM_SFD,
     n_fat: 2,
-    au_size: 0,
+    au_size: {
+      [PartName.PRODINFOF]: sectorSize,
+      [PartName.SAFE]: sectorSize,
+      [PartName.SYSTEM]: sectorSize * 32,
+      [PartName.USER]: sectorSize * 32,
+    }[name],
     align: 0,
     n_root: 0,
   };
 
-  switch (name) {
-    case 'PRODINFOF':
-    case 'SAFE':
-      opts.au_size = sectorSize;
-      break;
-    case 'SYSTEM':
-    case 'USER':
-      opts.au_size = sectorSize * 32;
-      break;
-    default:
-      throw new Error(`Unsupport partition: ${name}`);
+  if (opts.au_size === 0) {
+    throw new Error(`Unsupport partition: ${name}`);
   }
 
   const work = ff.malloc(FatFs.FF_MAX_SS);
@@ -254,18 +259,18 @@ async function formatPartition(name: string) {
   io.close();
 }
 
-await formatPartition('PRODINFOF');
-await formatPartition('SAFE');
-await formatPartition('SYSTEM');
-await formatPartition('USER');
+await formatPartition(PartName.PRODINFOF);
+await formatPartition(PartName.SAFE);
+await formatPartition(PartName.SYSTEM);
+await formatPartition(PartName.USER);
 
 if (split) {
-  const fullHandle = await fsp.open('.data/rawnand.bin', 'r+');
+  const fullHandle = await fsp.open(rawnandPath, 'r+');
   let offset = imageSize - (imageSize % chunkSize);
   let count = Math.floor(imageSize / chunkSize);
 
   while (offset > -1) {
-    const splitPath = `.data/rawnand.bin.${count.toString().padStart(2, '0')}`;
+    const splitPath = `${rawnandPath}.${count.toString().padStart(2, '0')}`;
     console.log(`Creating ${splitPath}...`);
 
     const start = offset;
@@ -287,5 +292,5 @@ if (split) {
   }
 
   await fullHandle.close();
-  await fsp.unlink('.data/rawnand.bin');
+  await fsp.unlink(rawnandPath);
 }
