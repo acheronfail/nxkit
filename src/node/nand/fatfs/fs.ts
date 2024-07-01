@@ -1,7 +1,7 @@
 import { basename, join } from 'node:path';
 import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
-import { BiosParameterblock } from './bpb';
+import { BiosParameterBlock } from './bpb';
 import timers from '../../../timers';
 
 const errorToString: Record<number, string> = {
@@ -63,24 +63,25 @@ export type WriteGetChunk = (size: number) => Uint8Array;
 
 export class Fat32FileSystem {
   private readonly fsHandle: number;
+  private readonly driveLabel = '0';
 
   constructor(
     private readonly ff: FatFs.FatFs,
-    private readonly bpb: BiosParameterblock,
+    private readonly bpb: BiosParameterBlock,
     public readonly chunkSize = 16384,
   ) {
     this.fsHandle = this.ff.malloc(FatFs.sizeof_FATFS);
-    check_result(this.ff.f_mount(this.fsHandle, '', 1), 'f_mount');
+    check_result(this.ff.f_mount(this.fsHandle, this.driveLabel, 1), 'f_mount');
   }
 
   close() {
-    check_result(this.ff.f_unmount(''), 'f_close');
+    check_result(this.ff.f_unmount(this.driveLabel), 'f_close');
     this.ff.free(this.fsHandle);
   }
 
   free(): number {
     const freeClustersPtr = this.ff.malloc(4);
-    check_result(this.ff.f_getfree('', freeClustersPtr, 0), 'f_getfree');
+    check_result(this.ff.f_getfree(this.driveLabel, freeClustersPtr, 0), 'f_getfree');
     const free = this.bpb.bytsPerSec * this.bpb.secPerClus * this.ff.getValue(freeClustersPtr, 'i32');
     this.ff.free(freeClustersPtr);
     return free;

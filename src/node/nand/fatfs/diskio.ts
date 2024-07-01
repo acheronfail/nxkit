@@ -9,6 +9,7 @@ export interface PartitionDriverOptions {
    */
   readonly: boolean;
   sectorSize: number;
+  sectorCount: number;
 }
 
 export class ReadonlyError extends Error {}
@@ -16,13 +17,15 @@ export class ReadonlyError extends Error {}
 // eslint-disable-next-line import/namespace
 export class PartitionDriver implements FatFs.DiskIO {
   private readonly sectorSize: number;
+  private readonly sectorCount: number;
   private readonly nandIo: NandIoLayer;
   private readonly readonly: boolean;
 
-  constructor({ readonly, nandIo, sectorSize }: PartitionDriverOptions) {
+  constructor({ readonly, nandIo, sectorSize, sectorCount }: PartitionDriverOptions) {
     this.readonly = readonly;
     this.nandIo = nandIo;
     this.sectorSize = sectorSize;
+    this.sectorCount = sectorCount;
   }
 
   initialize(_ff: FatFs.FatFs, _pdrv: number) {
@@ -63,14 +66,13 @@ export class PartitionDriver implements FatFs.DiskIO {
       case FatFs.CTRL_SYNC:
         return FatFs.RES_OK;
       case FatFs.GET_SECTOR_COUNT:
-        // Use `ff.setValue` to write an integer to the FatFs memory.
-        ff.setValue(buff, this.nandIo.size() / this.sectorSize, 'i32');
+        ff.setValue(buff, this.sectorCount, 'i32');
         return FatFs.RES_OK;
       case FatFs.GET_SECTOR_SIZE:
         ff.setValue(buff, this.sectorSize, 'i16');
         return FatFs.RES_OK;
       case FatFs.GET_BLOCK_SIZE:
-        ff.setValue(buff, 1, 'i32');
+        ff.setValue(buff, 0x200, 'i32');
         return FatFs.RES_OK;
       default:
         console.warn(`ioctl(${cmd}): not implemented`);

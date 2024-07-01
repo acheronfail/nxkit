@@ -11,7 +11,7 @@ import { NandIoLayer } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
 import { NandResult, Partition, ProdKeys } from '../../channels';
 import prettyBytes from 'pretty-bytes';
-import { BiosParameterblock } from './fatfs/bpb';
+import { BiosParameterBlock } from './fatfs/bpb';
 import { Crypto, NxCrypto } from './fatfs/crypto';
 import { Xtsn } from './xtsn';
 import { resolveKeys } from '../keys';
@@ -125,6 +125,16 @@ class Explorer {
     return partition;
   }
 
+  private getNxPartition(io: Io, partName: string): NxPartition {
+    const partition = this.getPartition(io, partName);
+    const nxPartition = NX_PARTITIONS[partition.type];
+    if (!nxPartition) {
+      throw new ExplorerError({ type: 'failure', error: `No partition info found for partition: '${partition.name}'` });
+    }
+
+    return nxPartition;
+  }
+
   //
   // Public api
   //
@@ -175,15 +185,20 @@ class Explorer {
 
   public async mount(partName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
     return this.operation(async () => {
-      const [{ magicOffset, magicBytes }, nandIo] = await this._createLayer(partName, keysFromUser);
+      const {
+        nxPartition: { magicOffset, magicBytes },
+        nandIo,
+        sectorCount,
+      } = await this._createLayer(partName, keysFromUser);
+
       // verify magic if present, as a way to verify we've got the right prod.keys early
       if (typeof magicOffset === 'number' && magicBytes) {
         const data = nandIo.read(magicOffset, magicBytes.byteLength);
         if (!data.equals(magicBytes)) {
           console.error({
             message: 'magic byte mismatch',
-            expected: magicBytes,
-            actual: data,
+            expected: magicBytes.toString(),
+            actual: data.toString(),
           });
           throw new ExplorerError({
             type: 'failure',
@@ -192,8 +207,8 @@ class Explorer {
         }
       }
 
-      const bpb = new BiosParameterblock(nandIo.read(0, 512));
-      const diskio = new PartitionDriver({ nandIo, readonly, sectorSize: bpb.bytsPerSec });
+      const bpb = new BiosParameterBlock(nandIo.read(0, 512));
+      const diskio = new PartitionDriver({ nandIo, readonly, sectorCount, sectorSize: bpb.bytsPerSec });
       const fatFs = await FatFs.create({ diskio });
       this.fs = new Fat32FileSystem(fatFs, bpb);
 
@@ -201,13 +216,21 @@ class Explorer {
     });
   }
 
-  private async _createLayer(partName: string, keysFromUser?: ProdKeys): Promise<[NxPartition, NandIoLayer]> {
+  private async _createLayer(
+    partName: string,
+    keysFromUser?: ProdKeys,
+  ): Promise<{
+    nxPartition: NxPartition;
+    nandIo: NandIoLayer;
+    sectorCount: number;
+  }> {
     const io = this.getIo();
     const keys = await this.resolveKeys(keysFromUser);
 
     const partition = this.getPartition(io, partName);
     const partitionStartOffset = Number(partition.firstLBA) * BLOCK_SIZE;
     const partitionEndOffset = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
+    const sectorCount = Number(partition.lastLBA - partition.firstLBA + 1n);
 
     const nxPartition = NX_PARTITIONS[partition.type];
     const { bisKeyId, magicOffset, magicBytes, format } = nxPartition;
@@ -230,15 +253,16 @@ class Explorer {
       });
     }
 
-    return [
+    return {
       nxPartition,
-      new NandIoLayer({
+      nandIo: new NandIoLayer({
         io,
         partitionStartOffset,
         partitionEndOffset,
         crypto,
       }),
-    ];
+      sectorCount,
+    };
   }
 
   public async readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
@@ -321,13 +345,15 @@ class Explorer {
     return this.operation(async () => {
       // mount fat first so we can format it
       await this.mount(partName, readonly, keysFromUser);
-      const [{ format }] = await this._createLayer(partName, keysFromUser);
+      const { format } = this.getNxPartition(this.getIo(), partName);
       const fat = this.getFat();
       fat.format(format === PartitionFormat.Fat32 ? FatType.Fat32 : FatType.Fat);
+
       return { type: 'success', data: undefined };
 
-      // FIXME: create a "repair" format mode, which doesn't read from the BPB but resets the partition completely
+      // TODO: create a "repair" format mode, which doesn't read from the BPB but resets the partition completely
       // e.g., Fat32FileSystem.prototype.format.call(...)
+      // would be useful for resetting completely borked partitions
     });
   }
 

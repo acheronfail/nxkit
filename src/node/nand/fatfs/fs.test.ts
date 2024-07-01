@@ -1,7 +1,7 @@
 import { describe, beforeEach, test, expect } from 'vitest';
 import * as FatFs from 'js-fatfs';
 import { FSFile, Fat32FileSystem, FatType } from './fs';
-import { BiosParameterblock } from './bpb';
+import { BiosParameterBlock } from './bpb';
 
 class MockDisk implements FatFs.DiskIO {
   readonly sectorSize = 512;
@@ -63,7 +63,7 @@ describe(Fat32FileSystem.name, () => {
       numFats: 2,
       bytsPerSec: 512,
       secPerClus: 1,
-    } as unknown as BiosParameterblock;
+    } as unknown as BiosParameterBlock;
 
     fs = new Fat32FileSystem(ff, bpb, chunkSize);
   });

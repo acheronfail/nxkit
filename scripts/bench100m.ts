@@ -7,7 +7,7 @@ import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { Xtsn } from '../src/node/nand/xtsn';
 import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
 import { Fat32FileSystem, check_result } from '../src/node/nand/fatfs/fs';
-import { BiosParameterblock } from '../src/node/nand/fatfs/bpb';
+import { BiosParameterBlock } from '../src/node/nand/fatfs/bpb';
 
 //
 // create files
@@ -39,7 +39,15 @@ const createFs = async (size: number, crypto?: Crypto) => {
   });
 
   // create FAT32 WASM driver
-  const ff = await FatFs.create({ diskio: new PartitionDriver({ nandIo, readonly: false, sectorSize: 512 }) });
+  const sectorSize = 512;
+  const ff = await FatFs.create({
+    diskio: new PartitionDriver({
+      nandIo,
+      readonly: false,
+      sectorSize,
+      sectorCount: Math.floor(disk.size / sectorSize),
+    }),
+  });
 
   // format the blank disk with an empty FAT32 filesystem
   const work = ff.malloc(FatFs.FF_MAX_SS);
@@ -47,7 +55,7 @@ const createFs = async (size: number, crypto?: Crypto) => {
   ff.free(work);
 
   // setup my "Fat32FileSystem" overlay, which has high level "read and write apis", etc
-  const bpb = new BiosParameterblock(nandIo.read(0, 512));
+  const bpb = new BiosParameterBlock(nandIo.read(0, 512));
   return new Fat32FileSystem(ff, bpb);
 };
 

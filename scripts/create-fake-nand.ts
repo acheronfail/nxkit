@@ -204,6 +204,7 @@ async function formatPartition(name: string) {
 
   const partitionStartOffset = Number(partition.firstLBA) * gpt.blockSize;
   const partitionEndOffset = Number(partition.lastLBA + 1n) * gpt.blockSize;
+  const partitionSectorCount = Number(partition.lastLBA + 1n - partition.firstLBA);
 
   const { bisKeyId } = NX_PARTITIONS[partition.type];
   let crypto: Crypto | undefined = undefined;
@@ -219,28 +220,41 @@ async function formatPartition(name: string) {
     crypto,
   });
 
-  const ff = await FatFs.create({ diskio: new PartitionDriver({ nandIo, readonly: false, sectorSize: 512 }) });
+  const sectorSize = 0x200;
+  const ff = await FatFs.create({
+    diskio: new PartitionDriver({ nandIo, readonly: false, sectorSize, sectorCount: partitionSectorCount }),
+  });
 
+  const fatType = nxPartition.format === PartitionFormat.Fat12 ? FatType.Fat : FatType.Fat32;
   const opts = {
-    fmt: nxPartition.format === PartitionFormat.Fat12 ? FatType.Fat : FatType.Fat32 | FatFs.FM_SFD,
+    fmt: fatType | FatFs.FM_SFD,
     n_fat: 2,
-    au_size: 512 * (nxPartition.format === PartitionFormat.Fat12 ? 1 : 32),
+    au_size: 0,
     align: 0,
     n_root: 0,
   };
 
+  switch (name) {
+    case 'PRODINFOF':
+    case 'SAFE':
+      opts.au_size = sectorSize;
+      break;
+    case 'SYSTEM':
+    case 'USER':
+      opts.au_size = sectorSize * 32;
+      break;
+    default:
+      throw new Error(`Unsupport partition: ${name}`);
+  }
+
   const work = ff.malloc(FatFs.FF_MAX_SS);
-  check_result(ff.f_mkfs('', opts, work, FatFs.FF_MAX_SS), 'f_mkfs');
+  check_result(ff.f_mkfs('0', opts, work, FatFs.FF_MAX_SS), 'f_mkfs');
   ff.free(work);
 
   io.close();
 }
 
-// FIXME: PRODINFOF isn't formatting correctly
-console.error('FIXME: the PRODINFOF partition will not work (needs to be formatted)');
-// await formatPartition('PRODINFOF');
-
-// FIXME: why do these all show 31.3 GB free space? did I format wrong?
+await formatPartition('PRODINFOF');
 await formatPartition('SAFE');
 await formatPartition('SYSTEM');
 await formatPartition('USER');

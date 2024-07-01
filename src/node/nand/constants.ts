@@ -39,7 +39,7 @@ const p = (
 // TODO: support BOOT0 and BOOT1 ?
 export const NX_PARTITIONS: { [guid: string]: NxPartition } = {
   '98109E25-64E2-4C95-8A77-414916F5BCEB': p(PartitionFormat.Unknown, 'PRODINFO', 0, 0, 'CAL0'),
-  'F3056AEC-5449-494C-9F2C-5FDCB75B6E6E': p(PartitionFormat.Fat12, 'PRODINFOF', 0, 0x680, 'CERTIF'),
+  'F3056AEC-5449-494C-9F2C-5FDCB75B6E6E': p(PartitionFormat.Fat12, 'PRODINFOF', 0, 0x2b, 'NO NAME'),
   '5365DE36-911B-4BB4-8FF9-AA1EBCD73990': p(PartitionFormat.Unknown, 'BCPKG2-1-Normal-Main'),
   '8455717B-BD2B-4162-8454-91695218FC38': p(PartitionFormat.Unknown, 'BCPKG2-2-Normal-Sub'),
   '8ED6C9A6-9C48-490B-BBEB-001D17A4C0F7': p(PartitionFormat.Unknown, 'BCPKG2-3-SafeMode-Main'),
