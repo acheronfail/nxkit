@@ -2,7 +2,6 @@ import { basename, join } from 'node:path';
 import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
 import { BiosParameterBlock } from './bpb';
-import timers from '../../../timers';
 
 const errorToString: Record<number, string> = {
   [FatFs.FR_DISK_ERR]: 'FR_DISK_ERR',
@@ -330,16 +329,10 @@ export class Fat32FileSystem {
             );
           }
 
-          {
-            const stop = timers.start('fatfsSetChunk');
-            this.ff.HEAPU8.set(chunk, bufOffset);
-            stop();
-          }
+          this.ff.HEAPU8.set(chunk, bufOffset);
 
-          const stop = timers.start('fatfsWriteChunk');
           check_result(this.ff.f_write(filePtr, bufOffset, chunk.byteLength, bytesWrittenPtr), `f_write ${filePath}`);
           checkBytesWritten(chunk.byteLength);
-          stop();
         }
 
         this.ff.free(bufOffset);

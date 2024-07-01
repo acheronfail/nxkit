@@ -185,11 +185,7 @@ class Explorer {
 
   public async mount(partName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
     return this.operation(async () => {
-      const {
-        nxPartition: { magicOffset, magicBytes },
-        nandIo,
-        sectorCount,
-      } = await this._createLayer(partName, keysFromUser);
+      const [{ magicOffset, magicBytes }, nandIo] = await this._createLayer(partName, keysFromUser);
 
       // verify magic if present, as a way to verify we've got the right prod.keys early
       if (typeof magicOffset === 'number' && magicBytes) {
@@ -208,7 +204,7 @@ class Explorer {
       }
 
       const bpb = new BiosParameterBlock(nandIo.read(0, 512));
-      const diskio = new PartitionDriver({ nandIo, readonly, sectorCount, sectorSize: bpb.bytsPerSec });
+      const diskio = new PartitionDriver({ nandIo, readonly });
       const fatFs = await FatFs.create({ diskio });
       this.fs = new Fat32FileSystem(fatFs, bpb);
 
@@ -216,21 +212,13 @@ class Explorer {
     });
   }
 
-  private async _createLayer(
-    partName: string,
-    keysFromUser?: ProdKeys,
-  ): Promise<{
-    nxPartition: NxPartition;
-    nandIo: NandIoLayer;
-    sectorCount: number;
-  }> {
+  private async _createLayer(partName: string, keysFromUser?: ProdKeys): Promise<[NxPartition, NandIoLayer]> {
     const io = this.getIo();
     const keys = await this.resolveKeys(keysFromUser);
 
     const partition = this.getPartition(io, partName);
     const partitionStartOffset = Number(partition.firstLBA) * BLOCK_SIZE;
     const partitionEndOffset = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
-    const sectorCount = Number(partition.lastLBA - partition.firstLBA + 1n);
 
     const nxPartition = NX_PARTITIONS[partition.type];
     const { bisKeyId, magicOffset, magicBytes, format } = nxPartition;
@@ -253,16 +241,16 @@ class Explorer {
       });
     }
 
-    return {
+    return [
       nxPartition,
-      nandIo: new NandIoLayer({
+      new NandIoLayer({
         io,
         partitionStartOffset,
         partitionEndOffset,
         crypto,
+        sectorSize: BLOCK_SIZE,
       }),
-      sectorCount,
-    };
+    ];
   }
 
   public async readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {

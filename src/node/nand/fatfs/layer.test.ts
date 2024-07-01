@@ -55,6 +55,7 @@ export const getLayer = (disk: Buffer, crypto?: Crypto) =>
     io: new MockIo(disk),
     partitionStartOffset: 0,
     partitionEndOffset: disk.byteLength,
+    sectorSize: 0x200,
     crypto,
   });
 

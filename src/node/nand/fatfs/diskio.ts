@@ -1,6 +1,5 @@
 import * as FatFs from 'js-fatfs';
 import { NandIoLayer } from './layer';
-import timers from '../../../timers';
 
 export interface PartitionDriverOptions {
   nandIo: NandIoLayer;
@@ -8,8 +7,6 @@ export interface PartitionDriverOptions {
    * Whether or not to treat the disk as readonly
    */
   readonly: boolean;
-  sectorSize: number;
-  sectorCount: number;
 }
 
 export class ReadonlyError extends Error {}
@@ -21,11 +18,11 @@ export class PartitionDriver implements FatFs.DiskIO {
   private readonly nandIo: NandIoLayer;
   private readonly readonly: boolean;
 
-  constructor({ readonly, nandIo, sectorSize, sectorCount }: PartitionDriverOptions) {
+  constructor({ readonly, nandIo }: PartitionDriverOptions) {
     this.readonly = readonly;
     this.nandIo = nandIo;
-    this.sectorSize = sectorSize;
-    this.sectorCount = sectorCount;
+    this.sectorSize = nandIo.sectorSize;
+    this.sectorCount = nandIo.sectorCount;
   }
 
   initialize(_ff: FatFs.FatFs, _pdrv: number) {
@@ -43,9 +40,7 @@ export class PartitionDriver implements FatFs.DiskIO {
     const end = (sector + count) * this.sectorSize;
     const size = end - start;
 
-    const stop = timers.start('nandIoRead');
     ff.HEAPU8.set(this.nandIo.read(start, size), buff);
-    stop();
     return FatFs.RES_OK;
   }
 
@@ -55,9 +50,7 @@ export class PartitionDriver implements FatFs.DiskIO {
     }
 
     const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);
-    const stop = timers.start('nandIoWrite');
     this.nandIo.write(sector * this.sectorSize, data);
-    stop();
     return FatFs.RES_OK;
   }
 

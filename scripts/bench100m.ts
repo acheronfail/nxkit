@@ -8,6 +8,7 @@ import { Xtsn } from '../src/node/nand/xtsn';
 import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
 import { Fat32FileSystem, check_result } from '../src/node/nand/fatfs/fs';
 import { BiosParameterBlock } from '../src/node/nand/fatfs/bpb';
+import timers from '../src/timers';
 
 //
 // create files
@@ -28,25 +29,22 @@ const file = await createFile('/tmp/100m.dat', 100_000_000);
 //
 
 const createFs = async (size: number, crypto?: Crypto) => {
+  const sectorSize = 512;
+
   // the "NandIoLayer" wraps the encryption logic (and reading writing to partition offsets)
   const nandIo = new NandIoLayer({
     // the "io" wraps a file descriptor
     io: await createIo(disk.path),
     partitionStartOffset: 0,
     partitionEndOffset: size,
+    sectorSize,
     // this is "undefined" when no encryption used
     crypto,
   });
 
   // create FAT32 WASM driver
-  const sectorSize = 512;
   const ff = await FatFs.create({
-    diskio: new PartitionDriver({
-      nandIo,
-      readonly: false,
-      sectorSize,
-      sectorCount: Math.floor(disk.size / sectorSize),
-    }),
+    diskio: new PartitionDriver({ nandIo, readonly: false }),
   });
 
   // format the blank disk with an empty FAT32 filesystem
@@ -65,7 +63,7 @@ const createFs = async (size: number, crypto?: Crypto) => {
 
 const benchmark = async (name: string, crypto?: Crypto) => {
   const fat32 = await createFs(disk.size, crypto);
-  console.time(name);
+  const stop = timers.start(name);
   let offset = 0;
 
   const handle = await fsp.open(file.path);
@@ -80,12 +78,16 @@ const benchmark = async (name: string, crypto?: Crypto) => {
     true,
   );
   await handle.close();
-  console.timeEnd(name);
+  stop();
 };
 
 //
 // run benchmarks
 //
 
-await benchmark('clear', undefined);
-await benchmark('xtsn', new NxCrypto(new Xtsn(Buffer.alloc(16), Buffer.alloc(16))));
+for (let i = 0; i < 5; i++) {
+  await benchmark('clear', undefined);
+  await benchmark('xtsn', new NxCrypto(new Xtsn(Buffer.alloc(16), Buffer.alloc(16))));
+}
+
+timers.completeAll();

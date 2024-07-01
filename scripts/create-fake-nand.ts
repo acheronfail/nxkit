@@ -204,7 +204,6 @@ async function formatPartition(name: string) {
 
   const partitionStartOffset = Number(partition.firstLBA) * gpt.blockSize;
   const partitionEndOffset = Number(partition.lastLBA + 1n) * gpt.blockSize;
-  const partitionSectorCount = Number(partition.lastLBA + 1n - partition.firstLBA);
 
   const { bisKeyId } = NX_PARTITIONS[partition.type];
   let crypto: Crypto | undefined = undefined;
@@ -213,16 +212,17 @@ async function formatPartition(name: string) {
     crypto = new NxCrypto(new Xtsn(bisKey.crypto, bisKey.tweak));
   }
 
+  const sectorSize = 0x200;
   const nandIo = new NandIoLayer({
     io,
     partitionStartOffset,
     partitionEndOffset,
+    sectorSize,
     crypto,
   });
 
-  const sectorSize = 0x200;
   const ff = await FatFs.create({
-    diskio: new PartitionDriver({ nandIo, readonly: false, sectorSize, sectorCount: partitionSectorCount }),
+    diskio: new PartitionDriver({ nandIo, readonly: false }),
   });
 
   const fatType = nxPartition.format === PartitionFormat.Fat12 ? FatType.Fat : FatType.Fat32;

@@ -5,6 +5,7 @@ export interface NandIoOptions {
   io: Io;
   partitionStartOffset: number;
   partitionEndOffset: number;
+  sectorSize: number;
   crypto?: Crypto;
 }
 
@@ -19,15 +20,17 @@ export class NandIoLayer {
   private readonly partitionEndOffset: number;
   private readonly crypto?: Crypto;
 
+  public readonly sectorSize: number;
+  public readonly sectorCount: number;
+
   constructor(options: NandIoOptions) {
     this.io = options.io;
     this.partitionStartOffset = options.partitionStartOffset;
     this.partitionEndOffset = options.partitionEndOffset;
     this.crypto = options.crypto;
-  }
 
-  public size(): number {
-    return this.io.size();
+    this.sectorSize = options.sectorSize;
+    this.sectorCount = Math.floor((options.partitionEndOffset - options.partitionStartOffset) / options.sectorSize);
   }
 
   public read(offset: number, size: number): Buffer {
