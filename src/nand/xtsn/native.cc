@@ -86,7 +86,7 @@ inline void UpdateTweak(unsigned char *tweak) {
 
   uint64_t *tweak64bit = reinterpret_cast<uint64_t *>(tweak);
   tweak64bit[1] = tweak64bit[1] << 1 | (tweak64bit[0] >> 63);
-  tweak64bit[0] = tweak64bit[0] << 1 ^ (last_high ? 0x87 : 0);
+  tweak64bit[0] = tweak64bit[0] << 1 ^ (last_high * 0x87);
 }
 
 inline void ProcessChunks(EVP_CIPHER_CTX *ctx_crypto, unsigned char *input, unsigned char *tweak, uint64_t *chunkOffset,
