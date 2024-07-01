@@ -69,7 +69,7 @@
       }
     },
     onPartitionChoose: async (partition: Partition) => {
-      handleNandResult(
+      const result = handleNandResult(
         await window.nxkit.call(
           'nandMountPartition',
           partition.name,
@@ -79,7 +79,9 @@
         `mount partition '${partition.name}'`,
       );
 
-      selectedPartition = partition;
+      if (result !== null) {
+        selectedPartition = partition;
+      }
     },
     closePartition: () => {
       selectedPartition = null;

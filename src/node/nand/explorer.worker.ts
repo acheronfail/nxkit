@@ -9,7 +9,7 @@ import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS, PartitionFormat, isFat } from './constants';
 import { NandIoLayer } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
-import { NandError, NandResult, Partition, ProdKeys } from '../../channels';
+import { NandResult, Partition, ProdKeys } from '../../channels';
 import prettyBytes from 'pretty-bytes';
 import { BiosParameterblock } from './fatfs/bpb';
 import { Crypto, NxCrypto } from './fatfs/crypto';
@@ -54,21 +54,21 @@ class Explorer {
     }
   }
 
-  private async operation<T extends NandResult>(op: () => Promise<T>): Promise<T> {
+  private async operation<T>(op: () => Promise<NandResult<T>>): Promise<NandResult<T>> {
     try {
       return await op();
     } catch (err) {
       if (err instanceof ExplorerError) {
-        return err.result as T;
+        return err.result;
       }
 
       if (err instanceof ReadonlyError) {
-        return { error: NandError.Readonly } as T;
+        return { type: 'failure', error: 'Tried to write but the NAND is opened it Read-Only mode' };
       }
 
       if (err instanceof FatError) {
         if (err.code === FatFs.FR_EXIST) {
-          return { error: NandError.AlreadyExists } as T;
+          return { type: 'failure', error: 'An item already exists with that name!' };
         }
       }
 
@@ -80,7 +80,7 @@ class Explorer {
   private async resolveKeys(keysFromUser?: ProdKeys): Promise<Keys> {
     const keys = await resolveKeys(this.isPackaged, keysFromUser);
     if (!keys) {
-      throw new ExplorerError({ error: NandError.NoProdKeys });
+      throw new ExplorerError({ type: 'failure', error: 'prod.keys are required but none were found' });
     }
 
     return keys;
@@ -88,7 +88,7 @@ class Explorer {
 
   private getIo(): Io {
     if (!this.io) {
-      throw new ExplorerError({ error: NandError.NoNandOpened });
+      throw new ExplorerError({ type: 'failure', error: 'No NAND file is currently open.' });
     }
 
     return this.io;
@@ -96,7 +96,7 @@ class Explorer {
 
   private getFat(): Fat32FileSystem {
     if (!this.fs) {
-      throw new ExplorerError({ error: NandError.NoPartitionMounted });
+      throw new ExplorerError({ type: 'failure', error: 'No partition is currently mounted.' });
     }
 
     return this.fs;
@@ -106,7 +106,7 @@ class Explorer {
     const { partitions } = getPartitionTable(io);
     const partition = partitions.find((part) => part.name === partName);
     if (!partition) {
-      throw new ExplorerError({ error: NandError.Generic, description: `No partition found with name: ${partName}` });
+      throw new ExplorerError({ type: 'failure', error: `No partition found with name: '${partName}'` });
     }
 
     return partition;
@@ -129,7 +129,7 @@ class Explorer {
         gpt = getPartitionTable(this.io);
       } catch (err) {
         console.error(err);
-        return { error: NandError.InvalidPartitionTable };
+        return { type: 'failure', error: 'Failed to read partition table, is the file a valid NAND dump?' };
       }
 
       const data: Partition[] = [];
@@ -161,7 +161,7 @@ class Explorer {
       this.fs = null;
 
       return {
-        error: NandError.None,
+        type: 'success',
         data,
       };
     });
@@ -197,14 +197,20 @@ class Explorer {
       });
 
       if (!isFat(format)) {
-        throw new Error(`Unsupported partition format, cannot mount ${partition.name}`);
+        throw new ExplorerError({
+          type: 'failure',
+          error: `Unsupported partition format, cannot mount '${partition.name}'`,
+        });
       }
 
       // verify magic if present, as a way to verify we've got the right prod.keys early
       if (typeof magicOffset === 'number' && magicBytes) {
         const data = nandIo.read(magicOffset, magicBytes.byteLength);
         if (!data.equals(magicBytes)) {
-          return { error: NandError.InvalidProdKeys };
+          return {
+            type: 'failure',
+            error: "Failed to decrypt partition, make sure you're using the right prod.keys file",
+          };
         }
       }
 
@@ -213,14 +219,14 @@ class Explorer {
       const fatFs = await FatFs.create({ diskio });
       this.fs = new Fat32FileSystem(fatFs, bpb);
 
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 
   public async readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
     return this.operation(async () => {
       const fs = this.getFat();
-      return { error: NandError.None, data: fs.readdir(fsPath) };
+      return { type: 'success', data: fs.readdir(fsPath) };
     });
   }
 
@@ -230,11 +236,11 @@ class Explorer {
 
       for (const filePath of filePathsOnHost) {
         if (await checkExistsRecursively(fs, filePath, dirPathInNand)) {
-          return { error: NandError.None, data: true };
+          return { type: 'success', data: true };
         }
       }
 
-      return { error: NandError.None, data: false };
+      return { type: 'success', data: false };
     });
   }
 
@@ -272,7 +278,7 @@ class Explorer {
       }
 
       process.parentPort.postMessage({ id: 'progress', progress: null } satisfies OutgoingMessage);
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 
@@ -289,7 +295,7 @@ class Explorer {
 
       await handle.close();
 
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 
@@ -301,11 +307,11 @@ class Explorer {
 
       const { name, format } = NX_PARTITIONS[part.type];
       if (!isFat(format)) {
-        throw new Error(`Unsupported partition format, cannot format ${name}`);
+        throw new ExplorerError({ type: 'failure', error: `Unsupported partition format, cannot format '${name}'` });
       }
 
       this.getFat().format(format === PartitionFormat.Fat32 ? FatType.Fat32 : FatType.Fat);
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 
@@ -313,14 +319,14 @@ class Explorer {
     return this.operation(async () => {
       console.log(`move: ${oldPathInNand} -> ${newPathInNand}`);
       this.getFat().rename(oldPathInNand, newPathInNand);
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 
   public async del(pathInNand: string): Promise<NandResult> {
     return this.operation(async () => {
       this.getFat().remove(pathInNand);
-      return { error: NandError.None };
+      return { type: 'success', data: undefined };
     });
   }
 }

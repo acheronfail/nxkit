@@ -13,23 +13,7 @@ export interface Partition {
   freeHuman?: string;
 }
 
-// TODO: do we need the enum, or can we just make them all generic?
-export enum NandError {
-  None,
-  Generic,
-  NoProdKeys,
-  InvalidProdKeys,
-  InvalidPartitionTable,
-  NoNandOpened,
-  NoPartitionMounted,
-  Readonly,
-  AlreadyExists,
-}
-
-export type NandResult<T = void> =
-  | (T extends void ? { error: NandError.None } : { error: NandError.None; data: T })
-  | { error: NandError.Generic; description: string }
-  | { error: Exclude<NandError, NandError.None | NandError.Generic> };
+export type NandResult<T = void> = { type: 'success'; data: T } | { type: 'failure'; error: string };
 
 export const NXKitBridgeKey = 'nxkit';
 export type NXKitBridgeKeyType = typeof NXKitBridgeKey;
