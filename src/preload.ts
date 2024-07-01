@@ -3,12 +3,12 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import { NXKitBridgeKey, NXKitBridge, NXKitBridgeKeyType } from './channels';
-import type { ChannelDef } from './main';
+import type { MainIpcDefinition } from './main';
 
-type RendererBridge = <C extends keyof ChannelDef>(
+type RendererBridge = <C extends keyof MainIpcDefinition>(
   channel: C,
-  ...args: Parameters<ChannelDef[C]>
-) => ReturnType<ChannelDef[C]>;
+  ...args: Parameters<MainIpcDefinition[C]>
+) => ReturnType<MainIpcDefinition[C]>;
 
 declare global {
   interface Window {
@@ -21,7 +21,7 @@ declare global {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const invoke: RendererBridge = (channel, ...args) => ipcRenderer.invoke(channel, ...args) as any;
 
-invoke('PreloadBridge').then((bridge) =>
+invoke('preloadBridge').then((bridge) =>
   contextBridge.exposeInMainWorld(NXKitBridgeKey, {
     ...bridge,
     call: invoke,

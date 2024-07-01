@@ -2,14 +2,14 @@
 import NSPWorker from './nsp.worker?worker';
 
 import { NACP, VideoCapture } from '@tootallnate/nacp';
-import { fetchBinary } from '../browser/fetch';
+import { fetchBinary } from '../fetch';
 import { BuildNSPArgs, HacBrewPackResult, StartupUserAccount, Screenshots, LogoType, HacBrewPackArgs } from './types';
 
-import defaultStartupMovie from '../public/StartupMovie.gif';
-import defaultLogo from '../public/NintendoLogo.png';
-import defaultImage from '../public/DefaultNSPImage.jpg';
-import exefsMain from '../public/exefs/main.nso';
-import exefsMainNpdm from '../public/exefs/main.npdm';
+import defaultStartupMovie from '../../public/StartupMovie.gif';
+import defaultLogo from '../../public/NintendoLogo.png';
+import defaultImage from '../../public/DefaultNSPImage.jpg';
+import exefsMain from '../../public/exefs/main.nso';
+import exefsMainNpdm from '../../public/exefs/main.npdm';
 
 export async function buildNsp(args: BuildNSPArgs): Promise<HacBrewPackResult> {
   const nacp = new NACP();

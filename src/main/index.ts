@@ -1,16 +1,15 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { platform } from 'node:os';
 import cp from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { NandError, ProdKeys } from '../channels';
-import { findProdKeys } from './keys';
-import explorer from '../nand/explorer/api';
+import { ProdKeys } from '../channels';
+import { findProdKeys } from '../node/keys';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
-import { ExplorerWorker } from '../nand/explorer';
+import { ExplorerWorker } from '../node/nand/explorer';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -80,7 +79,7 @@ const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(ap
 let explorerWorker: ExplorerWorker;
 let mainWindow: BrowserWindow;
 const mainChannelImpl = {
-  PreloadBridge: async () => {
+  preloadBridge: async () => {
     const plat = platform();
     return {
       isWindows: plat === 'win32',
@@ -89,11 +88,11 @@ const mainChannelImpl = {
     };
   },
 
-  OpenLink: async (link: string) => shell.openExternal(link),
-  PathDirname: async (p: string) => path.dirname(p),
-  PathJoin: async (...parts: string[]) => path.join(...parts),
+  openLink: async (link: string) => shell.openExternal(link),
+  pathDirname: async (p: string) => path.dirname(p),
+  pathJoin: async (...parts: string[]) => path.join(...parts),
 
-  TegraRcmSmash: async (payloadFilePath: string) => {
+  tegraRcmSmash: async (payloadFilePath: string) => {
     interface SmashResult {
       success: boolean;
       stdout: string;
@@ -112,45 +111,44 @@ const mainChannelImpl = {
     });
   },
 
-  PayloadsOpenDirectory: async () => shell.showItemInFolder(payloadDirectory),
-  PayloadsReadFile: (payloadPath: string) => payloads.readPayload(payloadPath),
-  PayloadsCopyIn: (filePaths: string[]) => payloads.copyInFiles(filePaths),
-  PayloadsFind: () => payloads.findPayloads(),
+  payloadsOpenDirectory: async () => shell.showItemInFolder(payloadDirectory),
+  payloadsReadFile: (payloadPath: string) => payloads.readPayload(payloadPath),
+  payloadsCopyIn: (filePaths: string[]) => payloads.copyInFiles(filePaths),
+  payloadsFind: () => payloads.findPayloads(),
 
-  ProdKeysFind: () => findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
-  ProdKeysSearchPaths: async () => prodKeysSearchPaths,
+  prodKeysFind: () =>
+    findProdKeys(app.isPackaged).then((keys) => keys && { location: keys.path, data: keys.toString() }),
+  prodKeysSearchPaths: async () => prodKeysSearchPaths,
 
-  NandOpen: async (path: string, keys?: ProdKeys) => {
-    console.log(await explorerWorker.open(path, keys));
-    return explorer.open(path, keys);
+  nandOpen: async (path: string, keys?: ProdKeys) => explorerWorker.call('open', path, keys),
+  nandClose: async () => explorerWorker.call('close'),
+  nandMountPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
+    explorerWorker.call('mount', partName, readonly, keys),
+  nandReaddir: async (path: string) => explorerWorker.call('readdir', path),
+  nandCopyFileOut: async (pathInNand: string) => {
+    const result = await dialog.showSaveDialog(mainWindow, { defaultPath: path.basename(pathInNand) });
+    if (result.canceled) return;
+
+    return explorerWorker.call('copyFileOut', pathInNand, result.filePath);
   },
-  NandClose: async () => explorer.close(),
-  NandMountPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
-    explorer.mount(partName, readonly, keys),
-  NandReaddir: async (path: string) => explorer.readdir(path),
-  NandCopyFileOut: async (pathInNand: string) => {
-    if (!mainWindow) {
-      return { error: NandError.Generic, description: 'Failed to find the main application window' };
-    }
-
-    return explorer.copyFileOut(pathInNand, mainWindow);
-  },
-  NandCopyFilesIn: async (dirPathInNand: string, filePaths: string[]) => explorer.copyFilesIn(dirPathInNand, filePaths),
-  NandCheckExists: async (dirPathInNand: string, filePaths: string[]) => explorer.checkExists(dirPathInNand, filePaths),
-  NandMoveEntry: async (oldPathInNand: string, newPathInNand: string) => explorer.move(oldPathInNand, newPathInNand),
-  NandDeleteEntry: async (pathInNand: string) => explorer.del(pathInNand),
-  NandFormatPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
-    explorer.format(partName, readonly, keys),
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-} satisfies Record<string, (...args: any[]) => Promise<any>>;
-export type ChannelDef = typeof mainChannelImpl;
+  nandCopyFilesIn: async (dirPathInNand: string, filePaths: string[]) =>
+    explorerWorker.call('copyFilesIn', dirPathInNand, filePaths),
+  nandCheckExists: async (dirPathInNand: string, filePaths: string[]) =>
+    explorerWorker.call('checkExists', dirPathInNand, filePaths),
+  nandMoveEntry: async (oldPathInNand: string, newPathInNand: string) =>
+    explorerWorker.call('move', oldPathInNand, newPathInNand),
+  nandDeleteEntry: async (pathInNand: string) => explorerWorker.call('del', pathInNand),
+  nandFormatPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
+    explorerWorker.call('format', partName, readonly, keys),
+} satisfies PromiseIpc;
+export type MainIpcDefinition = typeof mainChannelImpl;
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {
-    ipcMain.handle(channel, (_event, ...args) => (impl as (...args: unknown[]) => unknown)(...args));
+    ipcMain.handle(channel, (_event, ...args) => (impl as PromiseIpcHandler)(...args));
   }
 
   mainWindow = createMainWindow();

@@ -3,15 +3,15 @@ import CHS from 'chs';
 import MBR from 'mbr';
 import GPT from 'gpt';
 import * as FatFs from 'js-fatfs';
-import { Keys, RawKeys, RawKeysSchema } from '../src/main/keys.types';
-import { NX_PARTITIONS, PartitionFormat } from '../src/nand/constants';
-import { Xtsn } from '../src/nand/xtsn';
-import { NxCrypto, Crypto } from '../src/nand/fatfs/crypto';
-import { NandIoLayer } from '../src/nand/fatfs/layer';
-import { createIo } from '../src/nand/fatfs/io';
-import { FatType, check_result } from '../src/nand/fatfs/fs';
-import { PartitionDriver } from '../src/nand/fatfs/diskio';
-import { PartitionEntry, getPartitionTable } from '../src/nand/gpt';
+import { Keys, RawKeys, RawKeysSchema } from '../src/node/keys.types';
+import { NX_PARTITIONS, PartitionFormat } from '../src/node/nand/constants';
+import { Xtsn } from '../src/node/nand/xtsn';
+import { NxCrypto, Crypto } from '../src/node/nand/fatfs/crypto';
+import { NandIoLayer } from '../src/node/nand/fatfs/layer';
+import { createIo } from '../src/node/nand/fatfs/io';
+import { FatType, check_result } from '../src/node/nand/fatfs/fs';
+import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
+import { PartitionEntry, getPartitionTable } from '../src/node/nand/gpt';
 
 const argv = process.argv.slice(2);
 const split = argv.includes('--split'); // create a split dump

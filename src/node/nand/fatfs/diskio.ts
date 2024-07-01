@@ -1,6 +1,6 @@
 import * as FatFs from 'js-fatfs';
 import { NandIoLayer } from './layer';
-import timers from '../../timers';
+import timers from '../../../timers';
 
 export interface PartitionDriverOptions {
   nandIo: NandIoLayer;

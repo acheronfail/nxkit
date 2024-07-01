@@ -46,11 +46,11 @@ dev *args: rebuild-electron
 
 # rebuild native modules to work with electron
 rebuild-electron:
-  cd src/nand/xtsn && npm run clean
-  npm exec electron-rebuild -- --module-dir src/nand/xtsn
+  cd src/node/nand/xtsn && npm run clean
+  npm exec electron-rebuild -- --module-dir src/node/nand/xtsn
 # rebuild native modules to work with node
 rebuild-node:
-  cd src/nand/xtsn && npm rebuild
+  cd src/node/nand/xtsn && npm rebuild
 
 # runs all tests and checks
 test-all: rebuild-node
@@ -67,7 +67,7 @@ bench *ARGS: rebuild-node
 # runs a benchmark copying a 100M file into an Xtsn-enxrypted FAT32 disk image, outputs a cpuprofile
 bench100m: rebuild-node
   @mkdir -p scripts/build/Release
-  @cp src/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
+  @cp src/node/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
   @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
   npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
   node --cpu-prof scripts/bench100m.js
@@ -101,7 +101,7 @@ fetch-titles:
 #
 
 publish-xtsn:
-  cd src/nand/xtsn && npm run prepublish && npm publish
+  cd src/node/nand/xtsn && npm run prepublish && npm publish
 
 #
 # Hooks

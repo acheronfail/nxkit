@@ -19,7 +19,7 @@
   });
 
   onMount(() => {
-    window.nxkit.call('ProdKeysSearchPaths').then((paths) => (searchPaths = paths));
+    window.nxkit.call('prodKeysSearchPaths').then((paths) => (searchPaths = paths));
   });
 
   function resetKeys() {

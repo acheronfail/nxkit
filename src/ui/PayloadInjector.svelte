@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { findRCMDevices, injectPayload } from '../rcm/inject';
+  import { findRCMDevices, injectPayload } from '../browser/inject';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
   import { onMount } from 'svelte';
-  import type { FSDirectory, FSFile } from '../nand/fatfs/fs';
+  import type { FSDirectory, FSFile } from '../node/nand/fatfs/fs';
   import FileTree from './utility/FileTree/FileTree.svelte';
   import { entryToNode, type FileNode, ROOT_NODE } from './NandExplorer/FileExplorer.svelte';
   import ActionButtons from './utility/FileTree/ActionButtons.svelte';
@@ -19,7 +19,7 @@
   let fileTree = $state<FileTree<FSFile, FSDirectory> | undefined>();
 
   async function updatePayloads() {
-    payloads = await window.nxkit.call('PayloadsFind');
+    payloads = await window.nxkit.call('payloadsFind');
     await fileTree?.reloadDir(ROOT_NODE.id);
   }
 
@@ -30,12 +30,12 @@
   });
 
   const handlers = {
-    openPayloadDir: () => window.nxkit.call('PayloadsOpenDirectory'),
+    openPayloadDir: () => window.nxkit.call('payloadsOpenDirectory'),
     injectPayload: async (payloadPath: string) => {
       output = '';
 
       if (window.nxkit.isWindows) {
-        const result = await window.nxkit.call('TegraRcmSmash', payloadPath);
+        const result = await window.nxkit.call('tegraRcmSmash', payloadPath);
         output = result.stdout;
         if (result.stderr) output += ' -- -- -- \n' + result.stderr;
       } else {
@@ -43,7 +43,7 @@
         if (!dev) return alert('No Switch found in RCM mode!');
 
         try {
-          const payloadBytes = await window.nxkit.call('PayloadsReadFile', payloadPath);
+          const payloadBytes = await window.nxkit.call('payloadsReadFile', payloadPath);
           await injectPayload(dev, payloadBytes, (log) => (output += `${log}\n`));
         } catch (err) {
           output += err instanceof Error ? err.stack : String(err);
@@ -67,7 +67,7 @@
       }
 
       window.nxkit
-        .call('PayloadsCopyIn', filePaths)
+        .call('payloadsCopyIn', filePaths)
         .catch((err) => {
           console.error(err);
           alert(`An error occurred copying files: ${String(err)}`);

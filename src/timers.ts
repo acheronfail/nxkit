@@ -1,5 +1,3 @@
-import chalk from 'chalk';
-
 interface Timer {
   timings: number[];
 }
@@ -23,15 +21,15 @@ class Timers {
     const fmt = (n: number, u: string) => `${n.toFixed(4).padStart(9, ' ')} ${u}`;
 
     if (millis > 1) {
-      return fmt(millis, chalk.red('ms'));
+      return fmt(millis, 'ms');
     }
 
     const pos = Math.floor(Math.abs(Math.log10(millis)));
     if (pos <= 3) {
-      return fmt(millis * 1_000, chalk.yellow('us'));
+      return fmt(millis * 1_000, 'us');
     }
 
-    return fmt(millis * 1_000_000, chalk.magenta('ns'));
+    return fmt(millis * 1_000_000, 'ns');
   }
 
   complete(name: string) {
@@ -42,7 +40,7 @@ class Timers {
     const { timings } = this.timers[name];
     const median = timings.sort((a, b) => a - b)[Math.floor(timings.length / 2)];
 
-    const label = chalk.cyan(name.padStart(this.longestLength, ' '));
+    const label = name.padStart(this.longestLength, ' ');
     console.log(`${label}: ${this.formatTimestamp(median)} (${timings.length} total)`);
 
     delete this.timers[name];

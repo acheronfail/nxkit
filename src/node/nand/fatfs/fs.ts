@@ -2,7 +2,7 @@ import { basename, join } from 'node:path';
 import prettyBytes from 'pretty-bytes';
 import * as FatFs from 'js-fatfs';
 import { BiosParameterblock } from './bpb';
-import timers from '../../timers';
+import timers from '../../../timers';
 
 const errorToString: Record<number, string> = {
   [FatFs.FR_DISK_ERR]: 'FR_DISK_ERR',

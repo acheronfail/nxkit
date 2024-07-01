@@ -1,7 +1,7 @@
 <script lang="ts">
   import { downloadFile } from '../browser/file';
-  import { buildNsp } from '../hacbrewpack/nsp';
-  import { generateTitleId } from '../hacbrewpack/id';
+  import { buildNsp } from '../browser/hacbrewpack/nsp';
+  import { generateTitleId } from '../browser/hacbrewpack/id';
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';

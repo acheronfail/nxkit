@@ -35,7 +35,7 @@
   }
 
   async function loadKeysFromMain() {
-    const keysFromMain = await window.nxkit.call('ProdKeysFind');
+    const keysFromMain = await window.nxkit.call('prodKeysFind');
     if (keysFromMain) {
       keys.setMainKeys(keysFromMain);
     }

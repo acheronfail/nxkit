@@ -1,24 +1,22 @@
+import { MessageEvent } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { BrowserWindow, dialog } from 'electron';
 import * as FatFs from 'js-fatfs';
-import { PartitionDriver, ReadonlyError } from '../fatfs/diskio';
-import { FSEntry, Fat32FileSystem, FatError, FatType } from '../fatfs/fs';
-import { resolveKeys } from '../../main/keys';
-import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from '../gpt';
-import { NX_PARTITIONS, PartitionFormat, isFat } from '../constants';
-import { NandIoLayer } from '../fatfs/layer';
-import { Io, createIo } from '../fatfs/io';
+import { PartitionDriver, ReadonlyError } from './fatfs/diskio';
+import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
+import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
+import { NX_PARTITIONS, PartitionFormat, isFat } from './constants';
+import { NandIoLayer } from './fatfs/layer';
+import { Io, createIo } from './fatfs/io';
 import { NandError, NandResult, Partition, ProdKeys } from '../../channels';
 import prettyBytes from 'pretty-bytes';
-import { BiosParameterblock } from '../fatfs/bpb';
-import { Crypto, NxCrypto } from '../fatfs/crypto';
-import { Xtsn } from '../xtsn';
+import { BiosParameterblock } from './fatfs/bpb';
+import { Crypto, NxCrypto } from './fatfs/crypto';
+import { Xtsn } from './xtsn';
 import timers from '../../timers';
-import { Keys } from '../../main/keys.types';
-
-// TODO: run all of this in another process, and emit copy progress so we can render it nicely without freezing
+import { resolveKeys } from '../keys';
+import { Keys } from '../keys.types';
 
 class ExplorerError<T> extends Error {
   constructor(public readonly result: NandResult<T>) {
@@ -29,6 +27,7 @@ class ExplorerError<T> extends Error {
 class Explorer {
   private io: Io | null = null;
   private fs: Fat32FileSystem | null = null;
+  private isPackaged = false;
 
   async close() {
     if (this.fs) {
@@ -66,7 +65,7 @@ class Explorer {
   }
 
   private async resolveKeys(keysFromUser?: ProdKeys): Promise<Keys> {
-    const keys = await resolveKeys(keysFromUser);
+    const keys = await resolveKeys(this.isPackaged, keysFromUser);
     if (!keys) {
       throw new ExplorerError({ error: NandError.NoProdKeys });
     }
@@ -157,8 +156,8 @@ class Explorer {
 
   public async mount(partName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
     return this.operation(async () => {
-      const keys = await this.resolveKeys(keysFromUser);
       const io = this.getIo();
+      const keys = await this.resolveKeys(keysFromUser);
 
       const partition = this.getPartition(io, partName);
       const partitionStartOffset = Number(partition.firstLBA) * BLOCK_SIZE;
@@ -226,6 +225,7 @@ class Explorer {
     });
   }
 
+  // TODO: emit copy progress so we can render it nicely without freezing
   // FIXME: fail if combined size of files won't fit in NAND
   public async copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
     return this.operation(async () => {
@@ -238,16 +238,10 @@ class Explorer {
     });
   }
 
-  public async copyFileOut(pathInNand: string, window: BrowserWindow): Promise<NandResult> {
+  public async copyFileOut(pathInNand: string, destPath: string): Promise<NandResult> {
     return this.operation(async () => {
       const fat = this.getFat();
-
-      const result = await dialog.showSaveDialog(window, {
-        defaultPath: basename(pathInNand),
-      });
-      if (result.canceled) return { error: NandError.None };
-
-      const handle = await fsp.open(result.filePath, 'w+');
+      const handle = await fsp.open(destPath, 'w+');
       fat.readFile(pathInNand, (chunk) => {
         let bytesWritten = 0;
         while (bytesWritten < chunk.byteLength) {
@@ -363,4 +357,34 @@ async function copyEntryOverwriting(nandFs: Fat32FileSystem, pathOnHost: string,
   }
 }
 
-export default new Explorer();
+/**
+ * Worker IPC
+ */
+
+export interface IncomingMessage<C extends keyof ExplorerIpcDefinition> {
+  id: number;
+  channel: C;
+  args: Parameters<ExplorerIpcDefinition[C]>;
+
+  // can't think of a better way to pass this into the worker right now, but
+  // this will do I suppose
+  isPackaged: boolean;
+}
+
+export interface OutgoingMessage<C extends keyof ExplorerIpcDefinition> {
+  id: number;
+  channel: C;
+  value: ReturnType<ExplorerIpcDefinition[C]>;
+}
+
+const explorer = new Explorer();
+export type ExplorerIpcDefinition = typeof explorer;
+
+async function reply<C extends keyof ExplorerIpcDefinition>({ id, channel, args, isPackaged }: IncomingMessage<C>) {
+  explorer['isPackaged'] = isPackaged;
+
+  const value = await (explorer[channel] as PromiseIpcHandler)(...args);
+  return process.parentPort.postMessage({ id, value });
+}
+
+process.parentPort.on('message', (event: MessageEvent) => reply(event.data));

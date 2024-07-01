@@ -47,6 +47,14 @@ declare module 'gpt' {
 }
 
 /*
+ * Helpers
+ */
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PromiseIpc = Record<string, (...args: any[]) => Promise<any>>;
+type PromiseIpcHandler = (...args: unknown[]) => Promise<unknown>;
+
+/*
  * Misc
  */
 

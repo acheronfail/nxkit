@@ -45,7 +45,7 @@
 
   function downloadPayload() {
     if (selectedPayload) {
-      window.nxkit.call('OpenLink', selectedPayload.link);
+      window.nxkit.call('openLink', selectedPayload.link);
     }
   }
 </script>

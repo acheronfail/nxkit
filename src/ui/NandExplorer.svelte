@@ -60,7 +60,7 @@
     },
     openNand: async () => {
       if (nandFilePath) {
-        const result = handleNandResult(await window.nxkit.call('NandOpen', nandFilePath), 'open NAND');
+        const result = handleNandResult(await window.nxkit.call('nandOpen', nandFilePath), 'open NAND');
         if (result) {
           partitions = result;
         } else {
@@ -71,7 +71,7 @@
     onPartitionChoose: async (partition: Partition) => {
       handleNandResult(
         await window.nxkit.call(
-          'NandMountPartition',
+          'nandMountPartition',
           partition.name,
           $state.snapshot(readonly),
           $state.snapshot(keys.value),
@@ -86,7 +86,7 @@
     },
     reset: () => {
       loading = true;
-      window.nxkit.call('NandClose').finally(() => {
+      window.nxkit.call('nandClose').finally(() => {
         loading = false;
         partitions = null;
         selectedPartition = null;

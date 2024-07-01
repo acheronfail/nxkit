@@ -3,7 +3,7 @@ import { basename, join, resolve } from 'node:path';
 import { app } from 'electron';
 import prettyBytes from 'pretty-bytes';
 import { getResources } from '../resources';
-import { FSFile } from '../nand/fatfs/fs';
+import { FSFile } from '../node/nand/fatfs/fs';
 
 export async function readPayload(payloadPath: string): Promise<Uint8Array> {
   const { payloadDirectory } = getResources(app.isPackaged);

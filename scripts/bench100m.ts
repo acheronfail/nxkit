@@ -1,13 +1,13 @@
 import fsp from 'node:fs/promises';
 import fs from 'node:fs';
 import * as FatFs from 'js-fatfs';
-import { Crypto, NxCrypto } from '../src/nand/fatfs/crypto';
-import { createIo } from '../src/nand/fatfs/io';
-import { NandIoLayer } from '../src/nand/fatfs/layer';
-import { Xtsn } from '../src/nand/xtsn';
-import { PartitionDriver } from '../src/nand/fatfs/diskio';
-import { Fat32FileSystem, check_result } from '../src/nand/fatfs/fs';
-import { BiosParameterblock } from '../src/nand/fatfs/bpb';
+import { Crypto, NxCrypto } from '../src/node/nand/fatfs/crypto';
+import { createIo } from '../src/node/nand/fatfs/io';
+import { NandIoLayer } from '../src/node/nand/fatfs/layer';
+import { Xtsn } from '../src/node/nand/xtsn';
+import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
+import { Fat32FileSystem, check_result } from '../src/node/nand/fatfs/fs';
+import { BiosParameterblock } from '../src/node/nand/fatfs/bpb';
 
 //
 // create files

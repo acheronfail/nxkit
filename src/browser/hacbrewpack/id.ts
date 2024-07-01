@@ -1,4 +1,4 @@
-import GameTitles from '../../vendor/tinfoil/titles.json';
+import GameTitles from '../../../vendor/tinfoil/titles.json';
 
 const systemTitleIds = {
   systemModules: [
