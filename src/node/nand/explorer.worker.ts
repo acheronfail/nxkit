@@ -6,7 +6,7 @@ import * as FatFs from 'js-fatfs';
 import { PartitionDriver, ReadonlyError } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
 import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
-import { NX_PARTITIONS, PartitionFormat, isFat } from './constants';
+import { NX_PARTITIONS, NxPartition, PartitionFormat, isFat } from './constants';
 import { NandIoLayer } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
 import { NandResult, Partition, ProdKeys } from '../../channels';
@@ -32,8 +32,8 @@ type ProgressUpdate =
 type ProgressCb = (upd: ProgressUpdate) => void;
 
 class ExplorerError<T> extends Error {
-  constructor(public readonly result: NandResult<T>) {
-    super();
+  constructor(public readonly result: Exclude<NandResult<T>, { type: 'success' }>) {
+    super(result.error);
   }
 }
 
@@ -58,6 +58,8 @@ class Explorer {
     try {
       return await op();
     } catch (err) {
+      console.error(err);
+
       if (err instanceof ExplorerError) {
         return err.result;
       }
@@ -72,8 +74,7 @@ class Explorer {
         }
       }
 
-      console.error(err);
-      throw err;
+      return { type: 'failure', error: `An unexpected error occurred: ${err}` };
     }
   }
 
@@ -102,8 +103,20 @@ class Explorer {
     return this.fs;
   }
 
+  private getPartitionTable(io: Io): GptTable {
+    try {
+      return getPartitionTable(io);
+    } catch (err) {
+      console.error(err);
+      throw new ExplorerError({
+        type: 'failure',
+        error: 'Failed to read partition table, is the file a valid NAND dump?',
+      });
+    }
+  }
+
   private getPartition(io: Io, partName: string): PartitionEntry {
-    const { partitions } = getPartitionTable(io);
+    const { partitions } = this.getPartitionTable(io);
     const partition = partitions.find((part) => part.name === partName);
     if (!partition) {
       throw new ExplorerError({ type: 'failure', error: `No partition found with name: '${partName}'` });
@@ -123,14 +136,7 @@ class Explorer {
       }
 
       this.io = await createIo(nandPath);
-
-      let gpt: GptTable;
-      try {
-        gpt = getPartitionTable(this.io);
-      } catch (err) {
-        console.error(err);
-        return { type: 'failure', error: 'Failed to read partition table, is the file a valid NAND dump?' };
-      }
+      const gpt = this.getPartitionTable(this.io);
 
       const data: Partition[] = [];
       for (const part of gpt.partitions) {
@@ -169,48 +175,20 @@ class Explorer {
 
   public async mount(partName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
     return this.operation(async () => {
-      const io = this.getIo();
-      const keys = await this.resolveKeys(keysFromUser);
-
-      const partition = this.getPartition(io, partName);
-      const partitionStartOffset = Number(partition.firstLBA) * BLOCK_SIZE;
-      const partitionEndOffset = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
-
-      const { bisKeyId, magicOffset, magicBytes, format } = NX_PARTITIONS[partition.type];
-
-      const isClearText =
-        magicOffset && magicBytes
-          ? io.read(magicOffset + partitionStartOffset, magicBytes.byteLength).equals(magicBytes)
-          : false;
-
-      let crypto: Crypto | undefined = undefined;
-      if (!isClearText && typeof bisKeyId === 'number') {
-        const bisKey = keys.getBisKey(bisKeyId);
-        crypto = new NxCrypto(new Xtsn(bisKey.crypto, bisKey.tweak));
-      }
-
-      const nandIo = new NandIoLayer({
-        io,
-        partitionStartOffset,
-        partitionEndOffset,
-        crypto,
-      });
-
-      if (!isFat(format)) {
-        throw new ExplorerError({
-          type: 'failure',
-          error: `Unsupported partition format, cannot mount '${partition.name}'`,
-        });
-      }
-
+      const [{ magicOffset, magicBytes }, nandIo] = await this._createLayer(partName, keysFromUser);
       // verify magic if present, as a way to verify we've got the right prod.keys early
       if (typeof magicOffset === 'number' && magicBytes) {
         const data = nandIo.read(magicOffset, magicBytes.byteLength);
         if (!data.equals(magicBytes)) {
-          return {
+          console.error({
+            message: 'magic byte mismatch',
+            expected: magicBytes,
+            actual: data,
+          });
+          throw new ExplorerError({
             type: 'failure',
             error: "Failed to decrypt partition, make sure you're using the right prod.keys file",
-          };
+          });
         }
       }
 
@@ -221,6 +199,46 @@ class Explorer {
 
       return { type: 'success', data: undefined };
     });
+  }
+
+  private async _createLayer(partName: string, keysFromUser?: ProdKeys): Promise<[NxPartition, NandIoLayer]> {
+    const io = this.getIo();
+    const keys = await this.resolveKeys(keysFromUser);
+
+    const partition = this.getPartition(io, partName);
+    const partitionStartOffset = Number(partition.firstLBA) * BLOCK_SIZE;
+    const partitionEndOffset = Number(partition.lastLBA + 1n) * BLOCK_SIZE;
+
+    const nxPartition = NX_PARTITIONS[partition.type];
+    const { bisKeyId, magicOffset, magicBytes, format } = nxPartition;
+
+    const isClearText =
+      magicOffset && magicBytes
+        ? io.read(magicOffset + partitionStartOffset, magicBytes.byteLength).equals(magicBytes)
+        : false;
+
+    let crypto: Crypto | undefined = undefined;
+    if (!isClearText && typeof bisKeyId === 'number') {
+      const bisKey = keys.getBisKey(bisKeyId);
+      crypto = new NxCrypto(new Xtsn(bisKey.crypto, bisKey.tweak));
+    }
+
+    if (!isFat(format)) {
+      throw new ExplorerError({
+        type: 'failure',
+        error: `Unsupported partition format, cannot mount '${partition.name}'`,
+      });
+    }
+
+    return [
+      nxPartition,
+      new NandIoLayer({
+        io,
+        partitionStartOffset,
+        partitionEndOffset,
+        crypto,
+      }),
+    ];
   }
 
   public async readdir(fsPath: string): Promise<NandResult<FSEntry[]>> {
@@ -301,17 +319,15 @@ class Explorer {
 
   public async format(partName: string, readonly: boolean, keysFromUser?: ProdKeys): Promise<NandResult> {
     return this.operation(async () => {
+      // mount fat first so we can format it
       await this.mount(partName, readonly, keysFromUser);
-      const io = this.getIo();
-      const part = this.getPartition(io, partName);
-
-      const { name, format } = NX_PARTITIONS[part.type];
-      if (!isFat(format)) {
-        throw new ExplorerError({ type: 'failure', error: `Unsupported partition format, cannot format '${name}'` });
-      }
-
-      this.getFat().format(format === PartitionFormat.Fat32 ? FatType.Fat32 : FatType.Fat);
+      const [{ format }] = await this._createLayer(partName, keysFromUser);
+      const fat = this.getFat();
+      fat.format(format === PartitionFormat.Fat32 ? FatType.Fat32 : FatType.Fat);
       return { type: 'success', data: undefined };
+
+      // FIXME: create a "repair" format mode, which doesn't read from the BPB but resets the partition completely
+      // e.g., Fat32FileSystem.prototype.format.call(...)
     });
   }
 
