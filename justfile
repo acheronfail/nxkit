@@ -34,7 +34,7 @@ setup:
   just vendor
 
   @echo -n "{{cyan}}Do you want to create a fake nand dump?{{reset}} (y/N): "
-  @read ans; if [[ $ans = *y* ]]; then just create-nand; just rebuild-electron; fi
+  @read ans; if [[ $ans = *y* ]]; then just create-nand; fi
 
 #
 # Dev Scripts
