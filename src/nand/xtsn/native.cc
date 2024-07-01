@@ -83,14 +83,14 @@ void InitTweak(EVP_CIPHER_CTX *ctx_tweak, unsigned char *tweak, uint64_t sectorO
 
 inline void UpdateTweak(unsigned char *tweak) {
   bool last_high = (bool)(tweak[15] & 0x80);
-  for (int j = 15; j > 0; j--)
-    tweak[j] = (unsigned char)(((tweak[j] << 1) & ~1) | (tweak[j - 1] & 0x80 ? 1 : 0));
 
-  tweak[0] = (unsigned char)(((tweak[0] << 1) & ~1) ^ (last_high ? 0x87 : 0));
+  uint64_t *tweak64bit = reinterpret_cast<uint64_t *>(tweak);
+  tweak64bit[1] = tweak64bit[1] << 1 | (tweak64bit[0] >> 63);
+  tweak64bit[0] = tweak64bit[0] << 1 ^ (last_high ? 0x87 : 0);
 }
 
 inline void ProcessChunks(EVP_CIPHER_CTX *ctx_crypto, unsigned char *input, unsigned char *tweak, uint64_t *chunkOffset,
-                         uint64_t totalChunks, int runs) {
+                          uint64_t totalChunks, int runs) {
   uint64_t *tweak64bit = reinterpret_cast<uint64_t *>(tweak);
   uint64_t *input64bit = reinterpret_cast<uint64_t *>(input);
 
