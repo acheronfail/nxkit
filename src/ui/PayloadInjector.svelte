@@ -19,7 +19,7 @@
   let fileTree = $state<FileTree<FSFile, FSDirectory> | undefined>();
 
   async function updatePayloads() {
-    payloads = await window.nxkit.payloadsFind();
+    payloads = await window.nxkit.call('PayloadsFind');
     await fileTree?.reloadDir(ROOT_NODE.id);
   }
 
@@ -30,12 +30,12 @@
   });
 
   const handlers = {
-    openPayloadDir: () => window.nxkit.payloadsOpenDirectory(),
+    openPayloadDir: () => window.nxkit.call('PayloadsOpenDirectory'),
     injectPayload: async (payloadPath: string) => {
       output = '';
 
       if (window.nxkit.isWindows) {
-        const result = await window.nxkit.runTegraRcmSmash(payloadPath);
+        const result = await window.nxkit.call('TegraRcmSmash', payloadPath);
         output = result.stdout;
         if (result.stderr) output += ' -- -- -- \n' + result.stderr;
       } else {
@@ -43,7 +43,7 @@
         if (!dev) return alert('No Switch found in RCM mode!');
 
         try {
-          const payloadBytes = await window.nxkit.payloadsReadFile(payloadPath);
+          const payloadBytes = await window.nxkit.call('PayloadsReadFile', payloadPath);
           await injectPayload(dev, payloadBytes, (log) => (output += `${log}\n`));
         } catch (err) {
           output += err instanceof Error ? err.stack : String(err);
@@ -67,7 +67,7 @@
       }
 
       window.nxkit
-        .payloadsCopyIn(filePaths)
+        .call('PayloadsCopyIn', filePaths)
         .catch((err) => {
           console.error(err);
           alert(`An error occurred copying files: ${String(err)}`);

@@ -41,7 +41,7 @@
         formattingPartitionId = partition.id;
         disabled = true;
         window.nxkit
-          .nandFormatPartition(partition.name, readonly, $state.snapshot(keys.value))
+          .call('NandFormatPartition', partition.name, readonly, $state.snapshot(keys.value))
           .then((result) => handleNandResult(result, `format partition '${partition.name}'`))
           .finally(() => {
             disabled = false;

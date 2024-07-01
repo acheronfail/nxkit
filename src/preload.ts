@@ -2,50 +2,28 @@
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
 import { contextBridge, ipcRenderer } from 'electron';
-import { Channels, ChannelImplDefinition, ExposedPreloadAPIs, NXKitBridgeKey, NXKitBridgeKeyType } from './channels';
+import { NXKitBridgeKey, NXKitBridge, NXKitBridgeKeyType } from './channels';
+import type { ChannelDef } from './main';
+
+type RendererBridge = <C extends keyof ChannelDef>(
+  channel: C,
+  ...args: Parameters<ChannelDef[C]>
+) => ReturnType<ChannelDef[C]>;
 
 declare global {
   interface Window {
-    [NXKitBridgeKey]: ExposedPreloadAPIs;
+    [NXKitBridgeKey]: NXKitBridge & {
+      call: RendererBridge;
+    };
   }
 }
 
-function invoke<C extends Channels>(channel: C, ...args: ChannelImplDefinition<C>[0]): ChannelImplDefinition<C>[1] {
-  return ipcRenderer.invoke(channel.toString(), ...args);
-}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const invoke: RendererBridge = (channel, ...args) => ipcRenderer.invoke(channel, ...args) as any;
 
-function exposeInMainWorld<K extends NXKitBridgeKeyType>(key: K, value: Window[K]) {
-  contextBridge.exposeInMainWorld(key, value);
-}
-
-// -----------------------------------------------------------------------------
-
-invoke(Channels.PreloadBridge).then((bridge) =>
-  exposeInMainWorld(NXKitBridgeKey, {
+invoke('PreloadBridge').then((bridge) =>
+  contextBridge.exposeInMainWorld(NXKitBridgeKey, {
     ...bridge,
-    openLink: (link) => invoke(Channels.OpenLink, link),
-    pathDirname: (path) => invoke(Channels.PathDirname, path),
-    pathJoin: (...parts) => invoke(Channels.PathJoin, ...parts),
-
-    runTegraRcmSmash: (payloadPath) => invoke(Channels.TegraRcmSmash, payloadPath),
-
-    payloadsOpenDirectory: () => invoke(Channels.PayloadsOpenDirectory),
-    payloadsReadFile: (payloadPath) => invoke(Channels.PayloadsReadFile, payloadPath),
-    payloadsCopyIn: (filePaths) => invoke(Channels.PayloadsCopyIn, filePaths),
-    payloadsFind: () => invoke(Channels.PayloadsFind),
-
-    keysFind: () => invoke(Channels.ProdKeysFind),
-    keysSearchPaths: () => invoke(Channels.ProdKeysSearchPaths),
-
-    nandOpen: (nandPath) => invoke(Channels.NandOpen, nandPath),
-    nandClose: () => invoke(Channels.NandClose),
-    nandMount: (partName, readonly, keys) => invoke(Channels.NandMountPartition, partName, readonly, keys),
-    nandReaddir: (path) => invoke(Channels.NandReaddir, path),
-    nandCopyFileOut: (pathInNand) => invoke(Channels.NandCopyFileOut, pathInNand),
-    nandCopyFilesIn: (dirPathInNand, filePaths) => invoke(Channels.NandCopyFilesIn, dirPathInNand, filePaths),
-    nandCheckExists: (dirPathInNand, filePaths) => invoke(Channels.NandCheckExists, dirPathInNand, filePaths),
-    nandMoveEntry: (oldPathInNand, newPathInNand) => invoke(Channels.NandMoveEntry, oldPathInNand, newPathInNand),
-    nandDeleteEntry: (pathInNand) => invoke(Channels.NandDeleteEntry, pathInNand),
-    nandFormatPartition: (partName, readonly, keys) => invoke(Channels.NandFormatPartition, partName, readonly, keys),
-  }),
+    call: invoke,
+  } satisfies Window[NXKitBridgeKeyType]),
 );

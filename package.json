@@ -4,7 +4,7 @@
   "productName": "NKXit",
   "version": "1.0.0",
   "description": "Utilities for Nintendo Switch (NX) Homebrew",
-  "main": ".vite/build/main.js",
+  "main": ".vite/build/src_main_index.js",
   "scripts": {
     "start": "electron-forge start",
     "package": "electron-forge package",

@@ -24,7 +24,7 @@ export default defineConfig((env) => {
     build: {
       lib: {
         entry,
-        fileName: () => 'main.js',
+        fileName: `${(entry as string).replace(/\//g, '_').replace(/\.ts$/, '')}`,
         formats: ['es'],
       },
       rollupOptions: {

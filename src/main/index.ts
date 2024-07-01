@@ -4,12 +4,13 @@ import cp from 'node:child_process';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { Channels, MainChannelImpl, NandError } from '../channels';
+import { NandError, ProdKeys } from '../channels';
 import { findProdKeys } from './keys';
-import explorer from '../nand/explorer';
+import explorer from '../nand/explorer/api';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
+import { ExplorerWorker } from '../nand/explorer';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -75,78 +76,85 @@ const createMainWindow = (): BrowserWindow => {
   return win;
 };
 
+const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
+let explorerWorker: ExplorerWorker;
+let mainWindow: BrowserWindow;
+const mainChannelImpl = {
+  PreloadBridge: async () => {
+    const plat = platform();
+    return {
+      isWindows: plat === 'win32',
+      isLinux: plat === 'linux',
+      isOsx: plat === 'darwin',
+    };
+  },
+
+  OpenLink: async (link: string) => shell.openExternal(link),
+  PathDirname: async (p: string) => path.dirname(p),
+  PathJoin: async (...parts: string[]) => path.join(...parts),
+
+  TegraRcmSmash: async (payloadFilePath: string) => {
+    interface SmashResult {
+      success: boolean;
+      stdout: string;
+      stderr: string;
+    }
+
+    return new Promise<SmashResult>((resolve) => {
+      // TODO: compile TegraRcmSmash ourselves
+      cp.execFile(tegraRcmSmash, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
+        resolve({
+          success: !err,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+        });
+      });
+    });
+  },
+
+  PayloadsOpenDirectory: async () => shell.showItemInFolder(payloadDirectory),
+  PayloadsReadFile: (payloadPath: string) => payloads.readPayload(payloadPath),
+  PayloadsCopyIn: (filePaths: string[]) => payloads.copyInFiles(filePaths),
+  PayloadsFind: () => payloads.findPayloads(),
+
+  ProdKeysFind: () => findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
+  ProdKeysSearchPaths: async () => prodKeysSearchPaths,
+
+  NandOpen: async (path: string, keys?: ProdKeys) => {
+    console.log(await explorerWorker.open(path, keys));
+    return explorer.open(path, keys);
+  },
+  NandClose: async () => explorer.close(),
+  NandMountPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
+    explorer.mount(partName, readonly, keys),
+  NandReaddir: async (path: string) => explorer.readdir(path),
+  NandCopyFileOut: async (pathInNand: string) => {
+    if (!mainWindow) {
+      return { error: NandError.Generic, description: 'Failed to find the main application window' };
+    }
+
+    return explorer.copyFileOut(pathInNand, mainWindow);
+  },
+  NandCopyFilesIn: async (dirPathInNand: string, filePaths: string[]) => explorer.copyFilesIn(dirPathInNand, filePaths),
+  NandCheckExists: async (dirPathInNand: string, filePaths: string[]) => explorer.checkExists(dirPathInNand, filePaths),
+  NandMoveEntry: async (oldPathInNand: string, newPathInNand: string) => explorer.move(oldPathInNand, newPathInNand),
+  NandDeleteEntry: async (pathInNand: string) => explorer.del(pathInNand),
+  NandFormatPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
+    explorer.format(partName, readonly, keys),
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+} satisfies Record<string, (...args: any[]) => Promise<any>>;
+export type ChannelDef = typeof mainChannelImpl;
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.on('ready', () => {
-  const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
-
-  let mainWindow: BrowserWindow | undefined = undefined;
-  const mainChannelImpl: MainChannelImpl = {
-    [Channels.PreloadBridge]: async () => {
-      const plat = platform();
-      return {
-        isWindows: plat === 'win32',
-        isLinux: plat === 'linux',
-        isOsx: plat === 'darwin',
-      };
-    },
-
-    [Channels.OpenLink]: async (_event, link) => shell.openExternal(link),
-    [Channels.PathDirname]: async (_event, p) => path.dirname(p),
-    [Channels.PathJoin]: async (_event, ...parts) => path.join(...parts),
-
-    [Channels.TegraRcmSmash]: async (_event, payloadFilePath) => {
-      return new Promise((resolve) => {
-        // TODO: compile TegraRcmSmash ourselves
-
-        cp.execFile(tegraRcmSmash, [payloadFilePath], { encoding: 'ucs-2' }, (err, stdout, stderr) => {
-          resolve({
-            success: !err,
-            stdout: stdout.trim(),
-            stderr: stderr.trim(),
-          });
-        });
-      });
-    },
-
-    [Channels.PayloadsOpenDirectory]: async (_event) => shell.showItemInFolder(payloadDirectory),
-    [Channels.PayloadsReadFile]: (_event, payloadPath) => payloads.readPayload(payloadPath),
-    [Channels.PayloadsCopyIn]: (_event, filePaths) => payloads.copyInFiles(filePaths),
-    [Channels.PayloadsFind]: (_event) => payloads.findPayloads(),
-
-    [Channels.ProdKeysFind]: (_event) =>
-      findProdKeys().then((keys) => keys && { location: keys.path, data: keys.toString() }),
-    [Channels.ProdKeysSearchPaths]: async (_event) => prodKeysSearchPaths,
-
-    [Channels.NandOpen]: async (_event, path) => explorer.open(path),
-    [Channels.NandClose]: async (_event) => explorer.close(),
-    [Channels.NandMountPartition]: async (_event, partName, readonly, keysFromUser) =>
-      explorer.mount(partName, readonly, keysFromUser),
-    [Channels.NandReaddir]: async (_event, path) => explorer.readdir(path),
-    [Channels.NandCopyFileOut]: async (_event, pathInNand) => {
-      if (!mainWindow) {
-        return { error: NandError.Generic, description: 'Failed to find the main application window' };
-      }
-
-      return explorer.copyFileOut(pathInNand, mainWindow);
-    },
-    [Channels.NandCopyFilesIn]: async (_event, dirPathInNand, filePaths) =>
-      explorer.copyFilesIn(dirPathInNand, filePaths),
-    [Channels.NandCheckExists]: async (_event, dirPathInNand, filePaths) =>
-      explorer.checkExists(dirPathInNand, filePaths),
-    [Channels.NandMoveEntry]: async (_event, oldPathInNand, newPathInNand) =>
-      explorer.move(oldPathInNand, newPathInNand),
-    [Channels.NandDeleteEntry]: async (_event, pathInNand) => explorer.del(pathInNand),
-    [Channels.NandFormatPartition]: async (_event, partName, readonly, keysFromUser) =>
-      explorer.format(partName, readonly, keysFromUser),
-  };
-
   for (const [channel, impl] of Object.entries(mainChannelImpl)) {
-    ipcMain.handle(channel, impl);
+    ipcMain.handle(channel, (_event, ...args) => (impl as (...args: unknown[]) => unknown)(...args));
   }
 
   mainWindow = createMainWindow();
+  explorerWorker = new ExplorerWorker();
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
