@@ -1,7 +1,6 @@
 import { MessageEvent } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
-import { basename, join } from 'node:path';
 import * as FatFs from 'js-fatfs';
 import { NxDiskIo, ReadonlyError } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
@@ -16,20 +15,22 @@ import { Crypto, NxCrypto } from './fatfs/crypto';
 import { Xtsn } from './xtsn';
 import { resolveKeys } from '../keys';
 import { Keys } from '../keys.types';
+import { checkExistsRecursively, preCopyCheck } from './explorer.utils';
 
 export interface Progress {
-  totalBytesCopied: number;
-  totalFilesCopied: number;
-  currentFilePath: string;
-  currentFileSize: number;
   currentFileOffset: number;
-}
+  currentFileSize: number;
+  currentFilePath: string;
 
-type ProgressUpdate =
-  | { action: 'start'; path: string; size: number }
-  | { action: 'chunk'; offset: number; size: number }
-  | { action: 'finish' };
-type ProgressCb = (upd: ProgressUpdate) => void;
+  totalBytes: number;
+  totalBytesCopied: number;
+
+  totalFiles: number;
+  totalFilesCopied: number;
+
+  totalDirectories: number;
+  totalDirectoriesCopied: number;
+}
 
 class ExplorerError<T> extends Error {
   constructor(public readonly result: Exclude<NandResult<T>, { type: 'success' }>) {
@@ -263,48 +264,75 @@ class Explorer {
   public async checkExists(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult<boolean>> {
     return this.operation(async () => {
       const fs = this.getFat();
-
-      for (const filePath of filePathsOnHost) {
-        if (await checkExistsRecursively(fs, filePath, dirPathInNand)) {
-          return { type: 'success', data: true };
-        }
-      }
-
-      return { type: 'success', data: false };
+      return { type: 'success', data: await checkExistsRecursively(fs, filePathsOnHost, dirPathInNand) };
     });
   }
 
-  // FIXME: fail if combined size of files won't fit in NAND
   public async copyFilesIn(dirPathInNand: string, filePathsOnHost: string[]): Promise<NandResult> {
-    const progress: Progress = {
-      totalBytesCopied: 0,
-      totalFilesCopied: 0,
-      currentFilePath: '',
-      currentFileSize: 0,
-      currentFileOffset: 0,
-    };
-
     return this.operation(async () => {
       const fat = this.getFat();
-      for (const filePath of filePathsOnHost) {
-        await copyEntryOverwriting(fat, filePath, dirPathInNand, (update) => {
-          switch (update.action) {
-            case 'start':
-              progress.totalFilesCopied++;
-              progress.currentFilePath = update.path;
-              progress.currentFileSize = update.size;
-              progress.currentFileOffset = 0;
-              break;
-            case 'chunk':
-              progress.totalBytesCopied += update.size;
-              progress.currentFileOffset = update.offset;
-              break;
-            case 'finish':
-              break;
-          }
 
-          process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
+      const { copyPaths, totalBytes, totalDirectories, totalFiles } = await preCopyCheck(
+        fat,
+        filePathsOnHost,
+        dirPathInNand,
+      );
+
+      // include a threshold, since files and directories fs entries also take up space
+      // not sure how much, but I'm estimating
+      const freeSpace = fat.free();
+      const totalBytesEstimated = totalBytes + (totalDirectories + totalFiles) * 512;
+      if (totalBytesEstimated >= freeSpace) {
+        throw new ExplorerError({
+          type: 'failure',
+          error: `There is not enough free space in the volume to copy ${prettyBytes(totalBytesEstimated)}`,
         });
+      }
+
+      const progress: Progress = {
+        currentFilePath: '',
+        currentFileSize: 0,
+        currentFileOffset: 0,
+
+        totalBytes,
+        totalBytesCopied: 0,
+        totalFiles,
+        totalFilesCopied: 0,
+        totalDirectories,
+        totalDirectoriesCopied: 0,
+      };
+
+      for (const { pathOnHost, pathOnHostStats, pathInNand } of copyPaths) {
+        if (pathOnHostStats.isDirectory()) {
+          fat.mkdir(pathInNand, true);
+          progress.totalDirectoriesCopied++;
+        }
+
+        if (pathOnHostStats.isFile()) {
+          progress.currentFilePath = pathOnHost;
+          progress.currentFileSize = pathOnHostStats.size;
+
+          let offset = 0;
+          const handle = await fsp.open(pathOnHost);
+          fat.writeFile(
+            pathInNand,
+            (size) => {
+              const buf = Buffer.alloc(size);
+              const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
+              offset += bytesRead;
+
+              progress.currentFileOffset = offset;
+              progress.totalBytesCopied += offset;
+              process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
+
+              return buf.subarray(0, bytesRead);
+            },
+            true,
+          );
+          await handle.close();
+
+          progress.totalFilesCopied++;
+        }
       }
 
       process.parentPort.postMessage({ id: 'progress', progress: null } satisfies OutgoingMessage);
@@ -358,79 +386,6 @@ class Explorer {
       this.getFat().remove(pathInNand);
       return { type: 'success', data: undefined };
     });
-  }
-}
-
-async function checkExistsRecursively(
-  fs: Fat32FileSystem,
-  pathOnHost: string,
-  dirPathInNand: string,
-): Promise<boolean> {
-  const pathInNand = join(dirPathInNand, basename(pathOnHost));
-
-  const stats = await fsp.stat(pathOnHost);
-  const entry = fs.read(pathInNand);
-
-  // there's nothing in the nand here, so no conflict
-  if (!entry) return false;
-
-  // if there's a file and an entry of any kind, that's a conflict
-  if (stats.isFile() && entry) {
-    return true;
-  }
-
-  if (stats.isDirectory()) {
-    // conflict if exists in the nand and it's not a directory
-    if (entry.type !== 'd') return true;
-
-    for (const entry of await fsp.readdir(pathOnHost)) {
-      if (await checkExistsRecursively(fs, join(pathOnHost, entry), pathInNand)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
-
-async function copyEntryOverwriting(
-  nandFs: Fat32FileSystem,
-  pathOnHost: string,
-  dirPathInNand: string,
-  onProgress: ProgressCb,
-) {
-  const pathInNand = join(dirPathInNand, basename(pathOnHost));
-
-  const stats = await fsp.stat(pathOnHost);
-  if (stats.isFile()) {
-    onProgress({ action: 'start', path: pathOnHost, size: stats.size });
-    let offset = 0;
-    const handle = await fsp.open(pathOnHost);
-    nandFs.writeFile(
-      pathInNand,
-      (size) => {
-        const buf = Buffer.alloc(size);
-        const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
-        offset += bytesRead;
-
-        onProgress({ action: 'chunk', offset, size: stats.size });
-
-        return buf.subarray(0, bytesRead);
-      },
-      true,
-    );
-    await handle.close();
-
-    onProgress({ action: 'finish' });
-  } else if (stats.isDirectory()) {
-    nandFs.mkdir(pathInNand, true);
-    for (const entry of await fsp.readdir(pathOnHost)) {
-      const entryPath = join(pathOnHost, entry);
-      await copyEntryOverwriting(nandFs, entryPath, pathInNand, onProgress);
-    }
-  } else {
-    console.error(`Unsupported type: ${pathOnHost}`);
-    return;
   }
 }
 

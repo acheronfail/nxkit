@@ -1,3 +1,4 @@
+// TODO: add rule to check all promises awaited
 {
   "env": {
     "browser": true,
