@@ -29,39 +29,54 @@ export async function createIo(nandPath: string): Promise<Io> {
     );
   }
 
-  const fd = fs.openSync(nandPath, 'r+');
-  return new CombinedDumpIo(fd);
+  return new CombinedDumpIo(nandPath);
 }
 
 /**
  * IO implementation for a combined NAND dump, i.e. `rawnand.bin`.
  */
 export class CombinedDumpIo implements Io {
-  constructor(private readonly fd: number) {}
+  private readonly fd: FdWrapper;
+
+  constructor(filePath: string) {
+    this.fd = new FdWrapper(filePath);
+  }
 
   close() {
-    fs.closeSync(this.fd);
+    this.fd.close();
   }
 
   size(): number {
-    return fs.fstatSync(this.fd).size;
+    return fs.fstatSync(this.fd.get(false)).size;
   }
 
   read(offset: number, length: number): Buffer {
-    const buf = Buffer.alloc(length, 0);
-    fs.readSync(this.fd, buf, 0, length, offset);
+    const fileSize = this.size();
+    const end = offset + length;
+    const readSize = Math.min(fileSize, end) - offset;
+    if (readSize <= 0) {
+      return Buffer.alloc(0);
+    }
+
+    const buf = Buffer.alloc(readSize, 0);
+    fs.readSync(this.fd.get(false), buf, 0, readSize, offset);
     return buf;
   }
 
   write(offset: number, data: Buffer): number {
-    return fs.writeSync(this.fd, data, 0, data.byteLength, offset);
+    const writeLength = Math.min(this.size() - offset, data.byteLength);
+    if (writeLength <= 0) {
+      return 0;
+    }
+
+    return fs.writeSync(this.fd.get(true), data, 0, writeLength, offset);
   }
 }
 
 class FdWrapper {
   private fd: number | null;
   private openedForWriting: boolean;
-  private readonly filePath: string;
+  public readonly filePath: string;
 
   constructor(filePath: string) {
     this.fd = null;
@@ -135,7 +150,7 @@ export class SplitDumpIo implements Io {
     return this.totalSize;
   }
 
-  findStartingFileIdx(offset: number): number {
+  findStartingFileIdx(offset: number): number | null {
     for (let i = 0; i < this.files.length; i++) {
       const file = this.files[i];
       if (offset == file.offset) return i;
@@ -143,61 +158,73 @@ export class SplitDumpIo implements Io {
       if (offset < file.offset + file.length) return i;
     }
 
-    throw new Error(`Failed to find file for offset: ${offset}`);
+    return null;
   }
 
-  read(offset: number, length: number): Buffer {
-    let currentFileIdx = this.findStartingFileIdx(offset);
-    let bytesLeftToRead = length;
+  read(globalOffset: number, length: number): Buffer {
+    const realLength = Math.min(length, this.size() - globalOffset);
+    let currentFileIdx = this.findStartingFileIdx(globalOffset);
+    if (currentFileIdx === null) {
+      // EOF
+      return Buffer.alloc(0);
+    }
 
-    const buf = Buffer.alloc(length);
-    while (bytesLeftToRead > 0) {
+    let bytesRead = 0;
+    const buf = Buffer.alloc(realLength);
+    while (bytesRead < realLength) {
       const splitFile = this.files[currentFileIdx];
       if (!splitFile) {
         // EOF
         break;
       }
 
-      const bytesRemaining = length - bytesLeftToRead;
-      const bytesRead = fs.readSync(
-        splitFile.fd.get(false),
-        buf,
-        bytesRemaining,
-        length,
-        offset + bytesRemaining - splitFile.offset,
-      );
-      bytesLeftToRead -= bytesRead;
+      const fd = splitFile.fd.get(false);
+      const localOffset = globalOffset - splitFile.offset + bytesRead;
+
+      const { size } = fs.fstatSync(fd);
+      const bytesLeftInFile = size - localOffset;
+      if (bytesLeftInFile <= 0) {
+        continue;
+      }
+
+      const bytesToRead = Math.min(bytesLeftInFile, realLength - bytesRead);
+      bytesRead += fs.readSync(fd, buf, bytesRead, bytesToRead, localOffset);
       currentFileIdx++;
     }
 
     return buf;
   }
 
-  write(offset: number, data: Buffer): number {
-    let currentFileIdx = this.findStartingFileIdx(offset);
-    const length = data.byteLength;
-    let bytesLeftToWrite = length;
+  write(globalOffset: number, data: Buffer): number {
+    const realLength = Math.min(data.byteLength, this.size() - globalOffset);
+    let currentFileIdx = this.findStartingFileIdx(globalOffset);
+    if (currentFileIdx === null) {
+      // EOF
+      return 0;
+    }
 
-    while (bytesLeftToWrite > 0) {
+    let bytesWritten = 0;
+    while (bytesWritten < realLength) {
       const splitFile = this.files[currentFileIdx];
       if (!splitFile) {
         // EOF
         break;
       }
 
-      const bytesRemaining = length - bytesLeftToWrite;
-      const bytesWritten = fs.writeSync(
-        splitFile.fd.get(true),
-        data,
-        bytesRemaining,
-        length,
-        offset + bytesRemaining - splitFile.offset,
-      );
+      const fd = splitFile.fd.get(true);
+      const localOffset = globalOffset - splitFile.offset + bytesWritten;
 
-      bytesLeftToWrite -= bytesWritten;
+      const { size } = fs.fstatSync(fd);
+      const bytesLeftInFile = size - localOffset;
+      if (bytesLeftInFile <= 0) {
+        continue;
+      }
+
+      const bytesToWrite = Math.min(bytesLeftInFile, realLength - bytesWritten);
+      bytesWritten += fs.writeSync(fd, data, bytesWritten, bytesToWrite, localOffset);
       currentFileIdx++;
     }
 
-    return length;
+    return realLength;
   }
 }

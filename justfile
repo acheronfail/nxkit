@@ -57,7 +57,7 @@ test-all: rebuild-node
   npm run test
 
 # runs vitest in watch mode
-test *ARGS:
+test *ARGS: rebuild-node
   npm run test:vitest -- {{ARGS}}
 
 # runs vitest in bench mode

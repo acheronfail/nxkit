@@ -205,7 +205,21 @@ describe(Fat32FileSystem.name, () => {
       expect(data.byteLength).toBe(0);
     });
 
-    // TODO: test conflict and overwrite
+    test('file exists', () => {
+      fs.writeFile('/exists');
+      expect(() => fs.writeFile('/exists')).toThrowError('Failed to f_open /exists: FR_EXIST');
+    });
+
+    test('dir exists', () => {
+      fs.mkdir('/exists');
+      expect(() => fs.writeFile('/exists')).toThrowError('Failed to f_open /exists: FR_DENIED');
+    });
+
+    test('overwrite', () => {
+      fs.writeFile('/exists', Buffer.from('1'));
+      fs.writeFile('/exists', Buffer.from('2'), true);
+      expect(fs.readFile('/exists')).toEqual(Buffer.from('2'));
+    });
 
     test('contents', () => {
       fs.writeFile('/stuff', Buffer.from('asdf'));
