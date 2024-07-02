@@ -58,8 +58,52 @@ export class CombinedDumpIo implements Io {
   }
 }
 
+class FdWrapper {
+  private fd: number | null;
+  private openedForWriting: boolean;
+  private readonly filePath: string;
+
+  constructor(filePath: string) {
+    this.fd = null;
+    this.openedForWriting = false;
+    this.filePath = filePath;
+  }
+
+  get(forWriting = false): number {
+    // if we already have a descriptor...
+    if (this.fd !== null) {
+      // and it's opened for writing, just use it
+      if (this.openedForWriting) {
+        return this.fd;
+      }
+
+      // if it's only for reading, but we don't want to write, just use it
+      if (!forWriting) {
+        return this.fd;
+      }
+
+      // otherwise we'll need to close it and re-open it for writing
+      console.log(`Upgrading file descriptor (${this.fd}) for writing: (${this.filePath})`);
+      this.close();
+    }
+
+    // https://nodejs.org/api/fs.html#file-system-flags
+    this.fd = fs.openSync(this.filePath, forWriting ? 'r+' : 'r');
+    this.openedForWriting = forWriting;
+
+    return this.fd;
+  }
+
+  close() {
+    if (this.fd !== null) {
+      fs.closeSync(this.fd);
+      this.fd = null;
+    }
+  }
+}
+
 interface SplitFile {
-  path: string;
+  fd: FdWrapper;
   offset: number;
   length: number;
 }
@@ -75,7 +119,7 @@ export class SplitDumpIo implements Io {
     let offset = 0;
     this.files = parts.map((path) => {
       const stat = fs.statSync(path);
-      const file: SplitFile = { path, offset, length: stat.size };
+      const file: SplitFile = { offset, length: stat.size, fd: new FdWrapper(path) };
       offset += stat.size;
       return file;
     });
@@ -84,7 +128,7 @@ export class SplitDumpIo implements Io {
   }
 
   close() {
-    // we don't keep any descriptors open, so nothing to close
+    this.files.forEach(({ fd }) => fd.close());
   }
 
   size(): number {
@@ -114,9 +158,14 @@ export class SplitDumpIo implements Io {
         break;
       }
 
-      const fd = fs.openSync(splitFile.path, 'r');
       const bytesRemaining = length - bytesLeftToRead;
-      const bytesRead = fs.readSync(fd, buf, bytesRemaining, length, offset + bytesRemaining - splitFile.offset);
+      const bytesRead = fs.readSync(
+        splitFile.fd.get(false),
+        buf,
+        bytesRemaining,
+        length,
+        offset + bytesRemaining - splitFile.offset,
+      );
       bytesLeftToRead -= bytesRead;
       currentFileIdx++;
     }
@@ -136,9 +185,15 @@ export class SplitDumpIo implements Io {
         break;
       }
 
-      const fd = fs.openSync(splitFile.path, 'w+');
       const bytesRemaining = length - bytesLeftToWrite;
-      const bytesWritten = fs.writeSync(fd, data, bytesRemaining, length, offset + bytesRemaining - splitFile.offset);
+      const bytesWritten = fs.writeSync(
+        splitFile.fd.get(true),
+        data,
+        bytesRemaining,
+        length,
+        offset + bytesRemaining - splitFile.offset,
+      );
+
       bytesLeftToWrite -= bytesWritten;
       currentFileIdx++;
     }

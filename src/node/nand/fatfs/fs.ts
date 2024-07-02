@@ -310,7 +310,7 @@ export class Fat32FileSystem {
     if (contentsOrFn) {
       const bytesWrittenPtr = this.ff.malloc(4);
       const checkBytesWritten = (expectedLength: number) => {
-        const bytesWritten = this.ff.getValue(bytesWrittenPtr, '*');
+        const bytesWritten = this.ff.getValue(bytesWrittenPtr, 'i32');
         if (bytesWritten != expectedLength) {
           throw new Error(`expected to write ${expectedLength} bytes, but wrote ${bytesWritten}`);
         }
