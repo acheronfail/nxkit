@@ -122,7 +122,10 @@ export interface HacBrewPackArgs {
    */
   fileName?: string;
 
-  // FIXME: https://github.com/rlaphoenix/nton/issues/31
+  /**
+   * Files required to build the Nintendo Switch executable.
+   * Compiled by vendor/Forwarder-Mod
+   */
   main: Data;
   mainNpdm: Data;
 }
