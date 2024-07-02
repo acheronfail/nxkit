@@ -10,7 +10,7 @@ import { NxCrypto, Crypto } from '../src/node/nand/fatfs/crypto';
 import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { createIo } from '../src/node/nand/fatfs/io';
 import { FatType, check_result } from '../src/node/nand/fatfs/fs';
-import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
+import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
 import { PartitionEntry, getPartitionTable } from '../src/node/nand/gpt';
 
 const argv = process.argv.slice(2);
@@ -231,7 +231,7 @@ async function formatPartition(name: PartName) {
   });
 
   const ff = await FatFs.create({
-    diskio: new PartitionDriver({ nandIo, readonly: false }),
+    diskio: new NxDiskIo({ ioLayer: nandIo, readonly: false }),
   });
 
   const fatType = nxPartition.format === PartitionFormat.Fat12 ? FatType.Fat : FatType.Fat32;

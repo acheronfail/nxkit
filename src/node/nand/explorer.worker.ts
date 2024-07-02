@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import * as FatFs from 'js-fatfs';
-import { PartitionDriver, ReadonlyError } from './fatfs/diskio';
+import { NxDiskIo, ReadonlyError } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
 import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
 import { NX_PARTITIONS, NxPartition, PartitionFormat, isFat } from './constants';
@@ -204,7 +204,7 @@ class Explorer {
       }
 
       const bpb = new BiosParameterBlock(nandIo.read(0, 512));
-      const diskio = new PartitionDriver({ nandIo, readonly });
+      const diskio = new NxDiskIo({ ioLayer: nandIo, readonly });
       const fatFs = await FatFs.create({ diskio });
       this.fs = new Fat32FileSystem(fatFs, bpb);
 

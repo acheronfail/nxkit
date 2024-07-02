@@ -1,6 +1,6 @@
 import { describe, bench } from 'vitest';
 import crypto from 'node:crypto';
-import { XorOffsetCrypto, getLayer } from './layer.test';
+import { XorOffsetCrypto, getLayer } from './layer.test.util';
 import { NxCrypto } from './crypto';
 import { Xtsn } from '../xtsn';
 

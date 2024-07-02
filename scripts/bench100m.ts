@@ -5,7 +5,7 @@ import { Crypto, NxCrypto } from '../src/node/nand/fatfs/crypto';
 import { createIo } from '../src/node/nand/fatfs/io';
 import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { Xtsn } from '../src/node/nand/xtsn';
-import { PartitionDriver } from '../src/node/nand/fatfs/diskio';
+import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
 import { Fat32FileSystem, check_result } from '../src/node/nand/fatfs/fs';
 import { BiosParameterBlock } from '../src/node/nand/fatfs/bpb';
 import timers from '../src/timers';
@@ -44,7 +44,7 @@ const createFs = async (size: number, crypto?: Crypto) => {
 
   // create FAT32 WASM driver
   const ff = await FatFs.create({
-    diskio: new PartitionDriver({ nandIo, readonly: false }),
+    diskio: new NxDiskIo({ ioLayer: nandIo, readonly: false }),
   });
 
   // format the blank disk with an empty FAT32 filesystem

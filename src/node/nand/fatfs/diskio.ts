@@ -2,7 +2,7 @@ import * as FatFs from 'js-fatfs';
 import { NandIoLayer } from './layer';
 
 export interface PartitionDriverOptions {
-  nandIo: NandIoLayer;
+  ioLayer: NandIoLayer;
   /**
    * Whether or not to treat the disk as readonly
    */
@@ -12,17 +12,19 @@ export interface PartitionDriverOptions {
 export class ReadonlyError extends Error {}
 
 // eslint-disable-next-line import/namespace
-export class PartitionDriver implements FatFs.DiskIO {
+export class NxDiskIo implements FatFs.DiskIO {
+  private readonly blockSize: number;
   private readonly sectorSize: number;
   private readonly sectorCount: number;
-  private readonly nandIo: NandIoLayer;
+  private readonly ioLayer: NandIoLayer;
   private readonly readonly: boolean;
 
-  constructor({ readonly, nandIo }: PartitionDriverOptions) {
+  constructor({ readonly, ioLayer }: PartitionDriverOptions) {
     this.readonly = readonly;
-    this.nandIo = nandIo;
-    this.sectorSize = nandIo.sectorSize;
-    this.sectorCount = nandIo.sectorCount;
+    this.ioLayer = ioLayer;
+    this.blockSize = ioLayer.blockSize;
+    this.sectorSize = ioLayer.sectorSize;
+    this.sectorCount = ioLayer.sectorCount;
   }
 
   initialize(_ff: FatFs.FatFs, _pdrv: number) {
@@ -40,7 +42,7 @@ export class PartitionDriver implements FatFs.DiskIO {
     const end = (sector + count) * this.sectorSize;
     const size = end - start;
 
-    ff.HEAPU8.set(this.nandIo.read(start, size), buff);
+    ff.HEAPU8.set(this.ioLayer.read(start, size), buff);
     return FatFs.RES_OK;
   }
 
@@ -49,8 +51,8 @@ export class PartitionDriver implements FatFs.DiskIO {
       throw new ReadonlyError('Tried to write to a disk in readonly mode!');
     }
 
-    const data = ff.HEAPU8.subarray(buff, buff + count * this.sectorSize);
-    this.nandIo.write(sector * this.sectorSize, data);
+    const bytesToWrite = new Uint8Array(ff.HEAPU8.buffer, buff, count * this.sectorSize);
+    this.ioLayer.write(sector * this.sectorSize, bytesToWrite);
     return FatFs.RES_OK;
   }
 
@@ -65,7 +67,7 @@ export class PartitionDriver implements FatFs.DiskIO {
         ff.setValue(buff, this.sectorSize, 'i16');
         return FatFs.RES_OK;
       case FatFs.GET_BLOCK_SIZE:
-        ff.setValue(buff, 0x200, 'i32');
+        ff.setValue(buff, this.blockSize, 'i32');
         return FatFs.RES_OK;
       default:
         console.warn(`ioctl(${cmd}): not implemented`);

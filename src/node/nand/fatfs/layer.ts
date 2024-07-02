@@ -20,6 +20,7 @@ export class NandIoLayer {
   private readonly partitionEndOffset: number;
   private readonly crypto?: Crypto;
 
+  public readonly blockSize: number;
   public readonly sectorSize: number;
   public readonly sectorCount: number;
 
@@ -29,6 +30,7 @@ export class NandIoLayer {
     this.partitionEndOffset = options.partitionEndOffset;
     this.crypto = options.crypto;
 
+    this.blockSize = options.crypto?.blockSize() ?? 16;
     this.sectorSize = options.sectorSize;
     this.sectorCount = Math.floor((options.partitionEndOffset - options.partitionStartOffset) / options.sectorSize);
   }
@@ -59,11 +61,9 @@ export class NandIoLayer {
     // the second chunk. We then read both chunks and decrypt them, and return the
     // desired bytes (discarding `before` and `after`)
 
-    const blockSize = this.crypto.blockSize();
-
-    const before = offset % blockSize;
-    let after = (offset + size) % blockSize;
-    if (after) after = blockSize - after;
+    const before = offset % this.blockSize;
+    let after = (offset + size) % this.blockSize;
+    if (after) after = this.blockSize - after;
 
     const readSize = before + size + after;
     const alignedDiskOffset = diskOffset - before;
@@ -100,10 +100,9 @@ export class NandIoLayer {
     //  BBBBBBBBBBBBBB^    AAAAAAAAAAAAAA   B = before, A = after, ^ = offset
     //  xxxxxxxxxxxxxxWW WWyyyyyyyyyyyyyy   x = before chunk, y = after chunk, W = data to write
 
-    const blockSize = this.crypto.blockSize();
     const chunks: Uint8Array[] = [];
 
-    const before = offset % blockSize;
+    const before = offset % this.blockSize;
     const partByteOffset = offset - before;
     if (before) {
       chunks.push(this.read(partByteOffset, before));
@@ -111,9 +110,9 @@ export class NandIoLayer {
 
     chunks.push(data);
 
-    let after = (offset + data.byteLength) % blockSize;
+    let after = (offset + data.byteLength) % this.blockSize;
     if (after) {
-      after = blockSize - after;
+      after = this.blockSize - after;
       chunks.push(this.read(offset + data.byteLength, after));
     }
 
