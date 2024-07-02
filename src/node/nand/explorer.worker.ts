@@ -302,37 +302,53 @@ class Explorer {
         totalDirectoriesCopied: 0,
       };
 
-      for (const { pathOnHost, pathOnHostStats, pathInNand } of copyPaths) {
-        if (pathOnHostStats.isDirectory()) {
-          fat.mkdir(pathInNand, true);
-          progress.totalDirectoriesCopied++;
+      function split<T>(arr: T[], predicate: (t: T) => boolean): [T[], T[]] {
+        const truthy: T[] = [];
+        const falsy: T[] = [];
+        for (const t of arr) {
+          if (predicate(t)) {
+            truthy.push(t);
+          } else {
+            falsy.push(t);
+          }
         }
 
-        if (pathOnHostStats.isFile()) {
-          progress.currentFilePath = pathOnHost;
-          progress.currentFileSize = pathOnHostStats.size;
+        return [truthy, falsy];
+      }
 
-          let offset = 0;
-          const handle = await fsp.open(pathOnHost);
-          fat.writeFile(
-            pathInNand,
-            (size) => {
-              const buf = Buffer.alloc(size);
-              const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
-              offset += bytesRead;
+      const [dirs, files] = split(copyPaths, ({ pathOnHostStats }) => pathOnHostStats.isDirectory());
 
-              progress.currentFileOffset = offset;
-              progress.totalBytesCopied += offset;
-              process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
+      // create all directories first
+      for (const { pathInNand } of dirs) {
+        fat.mkdir(pathInNand, true);
+        progress.totalDirectoriesCopied++;
+      }
 
-              return buf.subarray(0, bytesRead);
-            },
-            true,
-          );
-          await handle.close();
+      // then copy all the files
+      for (const { pathOnHost, pathOnHostStats, pathInNand } of files) {
+        progress.currentFilePath = pathOnHost;
+        progress.currentFileSize = pathOnHostStats.size;
 
-          progress.totalFilesCopied++;
-        }
+        let offset = 0;
+        const handle = await fsp.open(pathOnHost);
+        fat.writeFile(
+          pathInNand,
+          (size) => {
+            const buf = Buffer.alloc(size);
+            const bytesRead = fs.readSync(handle.fd, buf, 0, size, offset);
+            offset += bytesRead;
+
+            progress.currentFileOffset = offset;
+            progress.totalBytesCopied += offset;
+            process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
+
+            return buf.subarray(0, bytesRead);
+          },
+          true,
+        );
+        await handle.close();
+
+        progress.totalFilesCopied++;
       }
 
       process.parentPort.postMessage({ id: 'progress', progress: null } satisfies OutgoingMessage);

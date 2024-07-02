@@ -217,6 +217,7 @@
   {/snippet}
 </FileTree>
 
+<!-- TODO: improve this vis since we have better progress information now -->
 {#if progress}
   {@const percent = progress.currentFileOffset / progress.currentFileSize}
   <div class="flex flex-col">
