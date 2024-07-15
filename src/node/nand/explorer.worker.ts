@@ -339,7 +339,7 @@ class Explorer {
             offset += bytesRead;
 
             progress.currentFileOffset = offset;
-            progress.totalBytesCopied += offset;
+            progress.totalBytesCopied += bytesRead;
             process.parentPort.postMessage({ id: 'progress', progress } satisfies OutgoingMessage);
 
             return buf.subarray(0, bytesRead);

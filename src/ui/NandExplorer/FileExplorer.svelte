@@ -41,9 +41,20 @@
 
   let { readonly, class: propClass = '' }: Props = $props();
 
-  let isRenamingId = $state<string | null>(null);
+  let isRenamingId = $state<string | undefined>();
   let disabled = $state(false);
-  let progress = $state<Progress | null>(null);
+  let progress = $state<Progress | undefined>();
+
+  let totalPercent = $derived(progress && progress.totalBytesCopied / progress.totalBytes);
+  let currentFilePercent = $derived(progress && progress.currentFileOffset / progress.currentFileSize);
+
+  function progressValue(n = 0): number {
+    return Number.isFinite(n) ? n : 0;
+  }
+
+  function formatPercent(n = 0): string {
+    return ((n ?? 0) * 100).toFixed(2).padStart(6);
+  }
 
   onMount(() => {
     window.nxkit.progressSubscribe((prog) => {
@@ -53,7 +64,7 @@
 
   const handlers = {
     toggleRename: (node: FileNode) => {
-      isRenamingId = isRenamingId === node.id ? null : node.id;
+      isRenamingId = isRenamingId === node.id ? undefined : node.id;
     },
     doRename: (node: FileNode, reloadDir: ReloadFn) => async (newName: string) => {
       const parentDir = await window.nxkit.call('pathDirname', node.data.path);
@@ -184,7 +195,7 @@
         class="grow mr-2"
         initialValue={node.name}
         onEnter={handlers.doRename(node, reloadDir)}
-        onEscape={() => (isRenamingId = null)}
+        onEscape={() => (isRenamingId = undefined)}
       />
     {:else}
       {node.name}
@@ -217,14 +228,37 @@
   {/snippet}
 </FileTree>
 
-<!-- TODO: improve this vis since we have better progress information now -->
 {#if progress}
-  {@const percent = progress.currentFileOffset / progress.currentFileSize}
-  <div class="flex flex-col">
-    <span>Copying: <span class="font-mono text-slate-400">{progress.currentFilePath}</span></span>
+  <div class="flex flex-col relative">
+    <span class="flex flex-row justify-between">
+      <span>Total progress</span>
+      <span>
+        Directories: <span class="font-mono text-slate-400">
+          {progress.totalDirectoriesCopied}/{progress.totalDirectories}
+        </span>
+        Files: <span class="font-mono text-slate-400">{progress.totalFilesCopied}/{progress.totalFiles}</span>
+      </span>
+    </span>
     <div class="flex flex-row justify-center items-center gap-2">
-      <progress class="grow" value={percent}></progress>
-      {(percent * 100).toFixed(2)}%
+      <progress class="grow" value={progressValue(totalPercent)}></progress>
+      <pre>{formatPercent(totalPercent)}%</pre>
+    </div>
+    <Tooltip>
+      <p class="truncate text-slate-400">
+        <span class="text-white">Copying: </span>
+        <span class="font-mono">{progress.currentFilePath}</span>
+      </p>
+      {#snippet tooltip()}
+        <p class="text-center w-96 leading-6">
+          {#each (progress?.currentFilePath ?? '').split('/').filter(Boolean) as part}
+            {' / '}<Code>{part}</Code>
+          {/each}
+        </p>
+      {/snippet}
+    </Tooltip>
+    <div class="flex flex-row justify-center items-center gap-2">
+      <progress class="grow" value={progressValue(currentFilePercent)}></progress>
+      <pre>{formatPercent(currentFilePercent)}%</pre>
     </div>
   </div>
 {/if}
