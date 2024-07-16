@@ -9,7 +9,7 @@ import { Xtsn } from '../src/node/nand/xtsn';
 import { NxCrypto, Crypto } from '../src/node/nand/fatfs/crypto';
 import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { createIo } from '../src/node/nand/fatfs/io';
-import { FatType, check_result } from '../src/node/nand/fatfs/fs';
+import { FatError, FatType } from '../src/node/nand/fatfs/fs';
 import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
 import { PartitionEntry, getPartitionTable } from '../src/node/nand/gpt';
 
@@ -253,7 +253,11 @@ async function formatPartition(name: PartName) {
   }
 
   const work = ff.malloc(FatFs.FF_MAX_SS);
-  check_result(ff.f_mkfs('0', opts, work, FatFs.FF_MAX_SS), 'f_mkfs');
+  const res = ff.f_mkfs('0', opts, work, FatFs.FF_MAX_SS);
+  if (res !== FatFs.RES_OK) {
+    throw new FatError(res, 'Failed to format partition');
+  }
+
   ff.free(work);
 
   io.close();

@@ -6,7 +6,7 @@ import { createIo } from '../src/node/nand/fatfs/io';
 import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { Xtsn } from '../src/node/nand/xtsn';
 import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
-import { Fat32FileSystem, check_result } from '../src/node/nand/fatfs/fs';
+import { Fat32FileSystem, FatError } from '../src/node/nand/fatfs/fs';
 import { BiosParameterBlock } from '../src/node/nand/fatfs/bpb';
 import timers from '../src/timers';
 
@@ -49,7 +49,10 @@ const createFs = async (size: number, crypto?: Crypto) => {
 
   // format the blank disk with an empty FAT32 filesystem
   const work = ff.malloc(FatFs.FF_MAX_SS);
-  check_result(ff.f_mkfs('', 0, work, FatFs.FF_MAX_SS), 'f_mkfs');
+  const res = ff.f_mkfs('', 0, work, FatFs.FF_MAX_SS);
+  if (res !== FatFs.RES_OK) {
+    throw new FatError(res, 'Failed to format partition for benchmarking');
+  }
   ff.free(work);
 
   // setup my "Fat32FileSystem" overlay, which has high level "read and write apis", etc
