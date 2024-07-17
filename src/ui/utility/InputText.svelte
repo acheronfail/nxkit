@@ -26,7 +26,7 @@
     {...rest}
   />
   {#if infoTooltip}
-    <span class="has-tooltip p-2 cursor-default hover:text-slate-400">
+    <span class="p-2 cursor-default hover:text-slate-400">
       <Tooltip placement="left">
         {#snippet tooltip()}
           <span class="text-white">

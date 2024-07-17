@@ -5,6 +5,7 @@
   export interface Props {
     placement?: Placement;
     disabled?: boolean;
+    class?: string;
     children: Snippet;
     tooltip?: Snippet;
   }
@@ -14,7 +15,7 @@
   import { computePosition, flip, shift, offset, arrow } from '@floating-ui/dom';
   import { onMount } from 'svelte';
 
-  let { children, tooltip, placement, disabled = false }: Props = $props();
+  let { children, tooltip, placement, class: propClass, disabled = false }: Props = $props();
 
   let referenceEl = $state<HTMLElement | null>(null);
   let tooltipEl = $state<HTMLElement | null>(null);
@@ -94,7 +95,15 @@
   };
 </script>
 
-<span bind:this={referenceEl} role="tooltip" onmouseenter={show} onmouseleave={hide} onfocus={show} onblur={hide}>
+<span
+  bind:this={referenceEl}
+  role="tooltip"
+  class={propClass}
+  onmouseenter={show}
+  onmouseleave={hide}
+  onfocus={show}
+  onblur={hide}
+>
   {@render children()}
 </span>
 

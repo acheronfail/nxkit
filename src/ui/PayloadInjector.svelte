@@ -77,7 +77,7 @@
   };
 </script>
 
-<Container fillContainer data-testid="injector">
+<Container fillParent data-testid="injector">
   <div class="grow flex flex-col gap-2 h-full">
     {#if payloads?.length}
       <p class="text-center">Choose a payload to inject to a Switch in RCM mode</p>

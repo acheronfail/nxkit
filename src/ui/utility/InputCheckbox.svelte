@@ -3,9 +3,11 @@
   import type { Snippet } from 'svelte';
   import type { Placement } from '@floating-ui/dom';
 
+  export type Appearance = 'default' | 'pronounced';
   export interface Props extends HTMLInputAttributes {
-    id?: string;
-    label: Snippet;
+    id: string;
+    label: string | Snippet;
+    appearance?: Appearance;
     checked?: boolean;
     tooltip?: Snippet;
     tooltipPlacement?: Placement;
@@ -19,6 +21,7 @@
   let {
     label,
     id,
+    appearance = 'default',
     disabled,
     checked = $bindable(false),
     tooltip: tooltipProp,
@@ -29,25 +32,37 @@
   const iconClass = 'absolute inline-block align-baseline h-[1.5rem]';
   const toggleClass = 'h-[1.5rem] w-[3rem]';
 
+  const checkedIconClass = appearance == 'pronounced' ? 'fill-green-500' : 'fill-green-300';
+  const checkedBorderClass = appearance == 'pronounced' ? 'shadow-green-500' : 'shadow-slate-400';
+  const uncheckedIconClass = appearance == 'pronounced' ? 'fill-red-500' : 'fill-red-300';
+  const uncheckedBorderClass = appearance == 'pronounced' ? 'shadow-red-500' : 'shadow-slate-400';
+
   const enabledClass = 'cursor-pointer';
   const disabledClass = 'text-slate-500';
 </script>
 
 {#snippet renderCheckbox()}
-  <div class="select-none flex justify-between items-center">
-    <label class="min-w-32 flex justify-between items-center gap-2 {disabled ? disabledClass : enabledClass}" for={id}>
-      {@render label()}
+  <div class="select-none inline-flex justify-between items-center">
+    <label
+      class="min-w-32 inline-flex justify-between items-center gap-2 {disabled ? disabledClass : enabledClass}"
+      for={id}
+    >
+      {#if typeof label === 'string'}
+        {label}:
+      {:else}
+        {@render label()}
+      {/if}
       <div
         class="relative rounded-full bg-slate-900 shadow-inset-border {toggleClass} {disabled
           ? 'shadow-slate-500'
           : checked
-            ? 'shadow-green-500'
-            : 'shadow-red-500'}"
+            ? checkedBorderClass
+            : uncheckedBorderClass}"
       >
         {#if checked}
-          <CheckCircleIcon class="fill-green-500 right-0 {iconClass}" />
+          <CheckCircleIcon class="{checkedIconClass} right-0 {iconClass}" />
         {:else}
-          <XCircleIcon class="fill-red-500 left-0 {iconClass}" />
+          <XCircleIcon class="{uncheckedIconClass} left-0 {iconClass}" />
         {/if}
       </div>
     </label>
@@ -57,7 +72,7 @@
 {/snippet}
 
 {#if tooltipProp}
-  <span class="has-tooltip p-2">
+  <span class="p-2">
     <Tooltip placement={tooltipPlacement}>
       {#snippet tooltip()}
         {@render tooltipProp()}

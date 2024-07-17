@@ -12,7 +12,7 @@
   let { content, class: propClass = '' }: Props = $props();
 
   // TODO: support images (ensure vite bundles them in, etc)
-  const tokens = lexer(content);
+  const tokens = $derived(lexer(content));
 </script>
 
 {#snippet renderText({ token })}

@@ -99,7 +99,7 @@
   };
 </script>
 
-<Container fillContainer data-testid="nandexplorer">
+<Container fillParent data-testid="nandexplorer">
   <div class="flex flex-col">
     <Tooltip>
       {#snippet tooltip()}
@@ -174,7 +174,13 @@
   </div>
 
   <div class="flex justify-center">
-    <InputCheckbox id="readonly" disabled={readonlyDisabled} bind:checked={readonly} tooltipPlacement="top">
+    <InputCheckbox
+      id="readonly"
+      appearance="pronounced"
+      disabled={readonlyDisabled}
+      bind:checked={readonly}
+      tooltipPlacement="top"
+    >
       {#snippet tooltip()}
         <div class="w-96 text-center">
           <Markdown content={readonlyMd} />

@@ -4,17 +4,17 @@
 
   export interface Props extends HTMLAttributes<HTMLDivElement> {
     class?: string;
-    fillContainer?: boolean;
+    fillParent?: boolean;
     children: Snippet;
   }
 </script>
 
 <script lang="ts">
-  let { children, class: cls, fillContainer, ...rest }: Props = $props();
+  let { children, class: cls, fillParent, ...rest }: Props = $props();
 
-  const fillClass = fillContainer ? 'h-full w-full' : '';
+  const fillClass = fillParent ? 'h-full w-full' : '';
 </script>
 
-<div class="grow flex flex-col gap-px gap-3 py-2 {fillClass} {cls}" {...rest}>
+<div class="grow flex flex-col gap-3 py-2 {fillClass} {cls}" {...rest}>
   {@render children()}
 </div>

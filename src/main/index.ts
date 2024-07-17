@@ -10,6 +10,7 @@ import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
 import { ExplorerWorker } from './explorer';
+import { merge, split } from '../node/split';
 
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -78,6 +79,7 @@ const createMainWindow = (): BrowserWindow => {
 const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
 let explorerWorker: ExplorerWorker;
 let mainWindow: BrowserWindow;
+
 const mainChannelImpl = {
   preloadBridge: async () => {
     const plat = platform();
@@ -89,6 +91,7 @@ const mainChannelImpl = {
   },
 
   openLink: async (link: string) => shell.openExternal(link),
+  openPath: async (p: string) => shell.openPath(p),
   pathDirname: async (p: string) => path.dirname(p),
   pathJoin: async (...parts: string[]) => path.join(...parts),
 
@@ -110,6 +113,9 @@ const mainChannelImpl = {
       });
     });
   },
+
+  splitFile: async (filePath: string, asArchive: boolean, inPlace: boolean) => split(filePath, asArchive, inPlace),
+  mergeFile: async (filePath: string, inPlace: boolean) => merge(filePath, inPlace),
 
   payloadsOpenDirectory: async () => shell.showItemInFolder(payloadDirectory),
   payloadsReadFile: (payloadPath: string) => payloads.readPayload(payloadPath),

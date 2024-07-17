@@ -12,9 +12,10 @@ import { createIo } from '../src/node/nand/fatfs/io';
 import { FatError, FatType } from '../src/node/nand/fatfs/fs';
 import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
 import { PartitionEntry, getPartitionTable } from '../src/node/nand/gpt';
+import { split } from '../src/node/split';
 
 const argv = process.argv.slice(2);
-const split = argv.includes('--split'); // create a split dump
+const splitDump = argv.includes('--split'); // create a split dump
 const clear = argv.includes('--clear'); // do not encrypt partitions
 
 const emptyKeys = (Object.keys(RawKeysSchema.shape) as (keyof RawKeys)[]).reduce<RawKeys>((keys, prop) => {
@@ -63,7 +64,6 @@ await fsp.mkdir('.data', { recursive: true });
 await fsp.writeFile('.data/prod.keys', keys.toString());
 
 const imageSize = 31268536320;
-const chunkSize = 2147483648;
 
 {
   const handle = await fsp.open(rawnandPath, 'w');
@@ -268,33 +268,6 @@ await formatPartition(PartName.SAFE);
 await formatPartition(PartName.SYSTEM);
 await formatPartition(PartName.USER);
 
-if (split) {
-  const fullHandle = await fsp.open(rawnandPath, 'r+');
-  let offset = imageSize - (imageSize % chunkSize);
-  let count = Math.floor(imageSize / chunkSize);
-
-  while (offset > -1) {
-    const splitPath = `${rawnandPath}.${count.toString().padStart(2, '0')}`;
-    console.log(`Creating ${splitPath}...`);
-
-    const start = offset;
-    const end = Math.min(imageSize, offset + chunkSize - 1);
-    const splitHandle = await fsp.open(splitPath, 'w');
-    const src = fullHandle.createReadStream({ start, end, autoClose: false });
-    const dst = splitHandle.createWriteStream();
-    await new Promise((resolve, reject) => {
-      src.pipe(dst);
-      dst.on('finish', resolve);
-      src.on('error', reject);
-      dst.on('error', reject);
-    });
-
-    await splitHandle.close();
-    await fullHandle.truncate(offset);
-    offset -= chunkSize;
-    count--;
-  }
-
-  await fullHandle.close();
-  await fsp.unlink(rawnandPath);
+if (splitDump) {
+  await split(rawnandPath, false, true);
 }

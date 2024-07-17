@@ -5,7 +5,7 @@
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
-  import InputFile from './utility/InputText.svelte';
+  import InputText from './utility/InputText.svelte';
   import InputImage, { type Image } from './utility/InputImage.svelte';
   import LogOutput from './utility/LogOutput.svelte';
   import { Tabs, TabList, TabContent, Tab } from './utility/Tabs';
@@ -82,7 +82,7 @@
   const tooltipClass = 'w-60 text-center';
 </script>
 
-<Container class="gap-4" data-testid="nro-forwarder">
+<Container data-testid="nro-forwarder">
   <Tabs>
     <TabList>
       <Tab>Application</Tab>
@@ -91,54 +91,54 @@
 
     <TabContent class="justify-around">
       <InputImage onCropComplete={(img) => (image = img)} />
-      <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
+      <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.id}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="App Title" placeholder="NX Shell" bind:value={title}>
+      </InputText>
+      <InputText label="App Title" placeholder="NX Shell" bind:value={title}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.title}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="App Publisher" placeholder="joel16" bind:value={author}>
+      </InputText>
+      <InputText label="App Publisher" placeholder="joel16" bind:value={author}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.author}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
+      </InputText>
+      <InputText label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.nroPath.app}</div>
         {/snippet}
-      </InputFile>
+      </InputText>
     </TabContent>
     <TabContent class="justify-around">
       <InputImage onCropComplete={(img) => (image = img)} />
-      <InputFile label="App ID" placeholder="01..........0000" bind:value={id}>
+      <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.id}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
+      </InputText>
+      <InputText label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.title}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="Game Publisher" placeholder="Nintendo" bind:value={author}>
+      </InputText>
+      <InputText label="Game Publisher" placeholder="Nintendo" bind:value={author}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.author}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
+      </InputText>
+      <InputText label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.nroPath.rom}</div>
         {/snippet}
-      </InputFile>
-      <InputFile label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
+      </InputText>
+      <InputText label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.romPath}</div>
         {/snippet}
-      </InputFile>
+      </InputText>
     </TabContent>
   </Tabs>
 

@@ -2,6 +2,7 @@
   import NroForwarder from '../ui/NroForwarder.svelte';
   import PayloadInjector from '../ui/PayloadInjector.svelte';
   import NandExplorer from '../ui/NandExplorer.svelte';
+  import Tools from '../ui/Tools.svelte';
   import Settings from '../ui/Settings.svelte';
   import { keys } from '../ui/stores/keys.svelte';
   import { onMount } from 'svelte';
@@ -11,7 +12,9 @@
   const params = new URLSearchParams(window.location.search);
   const [nandFilePath, partitionName, nandReadonlyString = '1'] = params.get('rawnand')?.split(':') ?? [];
   const nandReadonly = Boolean(parseInt(nandReadonlyString));
-  const defaultOpen = ['forwarder', 'injector', 'explorer', 'settings'].findIndex((n) => n === params.get('tab'));
+  const defaultOpen = ['forwarder', 'injector', 'explorer', 'tools', 'settings'].findIndex(
+    (n) => n === params.get('tab'),
+  );
 
   let selected = $state(defaultOpen);
 
@@ -24,6 +27,7 @@
       case '2':
       case '3':
       case '4':
+      case '5':
         event.preventDefault();
         selected = parseInt(event.key) - 1;
         if (document.activeElement instanceof HTMLElement) {
@@ -63,6 +67,7 @@
     <Tab>NRO Forwarder</Tab>
     <Tab>Payload Injector</Tab>
     <Tab>NAND Explorer</Tab>
+    <Tab>Tools</Tab>
     <Tab>
       Settings
       {#if !keys.value}
@@ -80,7 +85,9 @@
   <TabContent class={widthClass}>
     <NandExplorer {nandFilePath} {partitionName} readonlyDefault={nandReadonly} />
   </TabContent>
-  <!-- TODO: tool to split/merge files to/from fat32 chunks-->
+  <TabContent class={widthClass}>
+    <Tools />
+  </TabContent>
   <TabContent class={widthClass}>
     <Settings />
   </TabContent>
