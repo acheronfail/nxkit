@@ -29,21 +29,82 @@ declare module '*?raw' {
  */
 
 declare module 'chs' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod: any;
-  export default mod;
+  class CHS {
+    constructor(cylinder: number, head: number, sector: number);
+  }
+
+  export default CHS;
 }
 
 declare module 'mbr' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod: any;
-  export default mod;
+  export class Partition {
+    type: number;
+    firstLBA: number;
+    status: number;
+    sectors: number;
+    firstCHS: CHS;
+    lastCHS: CHS;
+  }
+
+  // https://github.com/jhermsmeier/node-mbr/blob/master/lib/mbr.js
+  class MBR {
+    buffer: Buffer;
+    partitions: Partition[];
+    getEFIPart: () => EfiPartition;
+    static createBuffer(): Buffer;
+    static parse(buffer: Buffer): MBR;
+  }
+
+  export default MBR;
 }
 
+/**
+ * https://github.com/jhermsmeier/node-gpt/blob/89036390dd401a295566ffdc7ca422f1f075f0af/lib/gpt.js#L15
+ */
 declare module 'gpt' {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const mod: any;
-  export default mod;
+  export class PartitionEntry {
+    constructor(options: { type: string; guid: string; name: string; firstLBA: bigint; lastLBA: bigint; attr: bigint });
+    type: string;
+    guid: string;
+    name: string;
+    firstLBA: bigint;
+    lastLBA: bigint;
+    attr: bigint;
+  }
+
+  class GPT {
+    constructor(options: {
+      blockSize: number;
+      guid?: string;
+      headerSize?: number;
+      currentLBA?: bigint;
+      backupLBA?: bigint;
+      firstLBA?: bigint;
+      lastLBA?: bigint;
+      tableOffset?: bigint;
+      entrySize?: number;
+    });
+    blockSize: number;
+    backupLBA: bigint;
+    partitions: PartitionEntry[];
+    tableSize: number;
+    tableOffset: bigint;
+    tableChecksum: number;
+    headerChecksum: number;
+    checksumTable: () => number;
+    verify(): boolean;
+    verifyHeader(): boolean;
+    verifyTable(): boolean;
+    parseHeader(buffer: Buffer): void;
+    parseTable(buffer: Buffer, offset?: number, end?: number): void;
+    parseBackup(buffer: Buffer): void;
+    write(buffer: Buffer, offset?: number): Buffer;
+    writeBackupFromPrimary(buffer: Buffer, offset?: number): Buffer;
+
+    static PartitionEntry: typeof PartitionEntry;
+  }
+
+  export default GPT;
 }
 
 /*

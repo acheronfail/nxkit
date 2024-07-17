@@ -21,6 +21,8 @@
   import Markdown from './utility/Markdown.svelte';
   import readonlyMd from './markdown/nand-readonly.md?raw';
 
+  // TODO: support working directly with a connected switch, not just with dumps
+
   let { nandFilePath, partitionName, readonlyDefault = true }: Props = $props();
 
   let input = $state<HTMLInputElement | null>(null);
@@ -60,12 +62,29 @@
     },
     openNand: async () => {
       if (nandFilePath) {
-        const result = handleNandResult(await window.nxkit.call('nandOpen', nandFilePath), 'open NAND');
+        const result = handleNandResult(await window.nxkit.call('nandOpen', nandFilePath), 'Open NAND');
         if (result) {
           partitions = result;
         } else {
           handlers.reset();
         }
+      }
+    },
+    verifyPartitionTable: async () => {
+      const result = handleNandResult(await window.nxkit.call('nandVerifyPartitionTable'), 'Verify partition table');
+
+      if (result !== null) {
+        alert('Partition table is valid!');
+      }
+    },
+    repairBackupPartitionTable: async () => {
+      const result = handleNandResult(
+        await window.nxkit.call('nandRepairBackupPartitionTable'),
+        'Repair backup partition table',
+      );
+
+      if (result !== null) {
+        alert('Repair of backup partition table complete!');
       }
     },
     onPartitionChoose: async (partition: Partition) => {
@@ -76,7 +95,7 @@
           $state.snapshot(readonly),
           $state.snapshot(keys.value),
         ),
-        `mount partition '${partition.name}'`,
+        `Mount partition '${partition.name}'`,
       );
 
       if (result !== null) {
@@ -147,12 +166,28 @@
       <p class="text-center">
         Currently exploring <strong class="font-mono text-red-300">{selectedPartition.name}</strong>
       </p>
-      <div class="text-center">
+      <div class="flex justify-center items-center gap-2 mt-2">
         <Button size="inline" onclick={handlers.closePartition}>choose another partition</Button>
       </div>
       <FileExplorer {readonly} class="overflow-auto grow h-0" />
     {:else if partitions}
       <p class="text-center">Choose a partition to explore</p>
+      <div class="flex justify-center items-center gap-2 mt-2">
+        <Button size="inline" onclick={handlers.verifyPartitionTable}>verify partition table</Button>
+        <Tooltip>
+          <Button size="inline" onclick={handlers.repairBackupPartitionTable} appearance="danger" disabled={readonly}>
+            repair backup gpt table
+          </Button>
+          {#snippet tooltip()}
+            <div class="w-96">
+              <p class="text-center">
+                Attempt to repair the Backup GPT partition table by re-creating it from the Primary GPT partition table.
+              </p>
+              <p class="text-center">Only do this if you know what you're doing!</p>
+            </div>
+          {/snippet}
+        </Tooltip>
+      </div>
       <PartitionExplorer
         class="overflow-auto grow h-0"
         {readonly}

@@ -5,8 +5,6 @@ export function handleNandResult<T>(result: NandResult<T>, actionDescription: st
     return result.data;
   }
 
-  let message = `Failed to ${actionDescription}.\n\n${result.error}`;
-  if (!message.endsWith('.')) message += '.';
-  alert(message);
+  alert(`${actionDescription} failed!\n\n${result.error}`);
   return null;
 }

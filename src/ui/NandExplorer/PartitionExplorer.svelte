@@ -42,7 +42,7 @@
         disabled = true;
         window.nxkit
           .call('nandFormatPartition', partition.name, readonly, $state.snapshot(keys.value))
-          .then((result) => handleNandResult(result, `format partition '${partition.name}'`))
+          .then((result) => handleNandResult(result, `Format partition '${partition.name}'`))
           .finally(() => {
             disabled = false;
             formattingPartitionId = null;

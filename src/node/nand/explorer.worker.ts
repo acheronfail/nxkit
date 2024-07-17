@@ -2,9 +2,10 @@ import { MessageEvent } from 'electron';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as FatFs from 'js-fatfs';
+import GPT, { PartitionEntry } from 'gpt';
 import { NxDiskIo, ReadonlyError } from './fatfs/diskio';
 import { FSEntry, Fat32FileSystem, FatError, FatType } from './fatfs/fs';
-import { BLOCK_SIZE, GptTable, PartitionEntry, getPartitionTable } from './gpt';
+import { BLOCK_SIZE, getPartitionTable, readBackupGpt, repairBackupGptTable } from './gpt';
 import { NX_PARTITIONS, NxPartition, PartitionFormat, isFat } from './constants';
 import { NandIoLayer } from './fatfs/layer';
 import { Io, createIo } from './fatfs/io';
@@ -104,7 +105,7 @@ class Explorer {
     return this.fs;
   }
 
-  private getPartitionTable(io: Io): GptTable {
+  private getPartitionTable(io: Io): GPT {
     try {
       return getPartitionTable(io);
     } catch (err) {
@@ -400,6 +401,67 @@ class Explorer {
   public async del(pathInNand: string): Promise<NandResult> {
     return this.operation(async () => {
       this.getFat().remove(pathInNand);
+      return { type: 'success', data: undefined };
+    });
+  }
+
+  public async verifyPartitionTable(): Promise<NandResult> {
+    return this.operation(async () => {
+      const io = this.getIo();
+      const primaryGpt = this.getPartitionTable(io);
+
+      if (!primaryGpt.verifyHeader()) {
+        return { type: 'failure', error: `The primary GPT header is invalid!` };
+      }
+
+      if (!primaryGpt.verifyTable()) {
+        return { type: 'failure', error: `The primary GPT table is invalid!` };
+      }
+
+      let backupGpt: GPT;
+      try {
+        backupGpt = readBackupGpt(io, primaryGpt);
+      } catch (err) {
+        console.warn(err);
+        const msg = err instanceof Error ? err.message : String(err);
+        return { type: 'failure', error: `Failed to parse backup GPT table: ${msg}` };
+      }
+
+      if (!backupGpt.verifyHeader()) {
+        return { type: 'failure', error: `The backup GPT header is invalid!` };
+      }
+
+      if (!backupGpt.verifyTable()) {
+        return { type: 'failure', error: `The backup GPT table is invalid!` };
+      }
+
+      // compare primary & backup GPT table checksums to verify both are in the same state
+      if (primaryGpt.tableChecksum !== backupGpt.tableChecksum) {
+        return { type: 'failure', error: `The primary and backup GPT tables don't match` };
+      }
+
+      // if there's a `gpt.headerChecksum` match, something's wrong, as the primary and backup
+      // should refer to each other in offsets
+      if (primaryGpt.headerChecksum === backupGpt.headerChecksum) {
+        return { type: 'failure', error: `GPT table header checksums are invalid` };
+      }
+
+      return { type: 'success', data: undefined };
+    });
+  }
+
+  public repairBackupPartitionTable(): Promise<NandResult> {
+    return this.operation(async () => {
+      const io = this.getIo();
+      const primaryGpt = this.getPartitionTable(io);
+
+      try {
+        repairBackupGptTable(io, primaryGpt);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        return { type: 'failure', error: `Failed to write backup GPT table: ${msg}` };
+      }
+
       return { type: 'success', data: undefined };
     });
   }

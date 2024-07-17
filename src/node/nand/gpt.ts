@@ -1,38 +1,37 @@
 import GPT from 'gpt';
-import { EfiPartition, findEfiPartition } from './mbr';
+import { Partition } from 'mbr';
+import { findEfiPartition } from './mbr';
 import { Io } from './fatfs/io';
-
-export interface PartitionEntry {
-  type: string;
-  guid: string;
-  name: string;
-  firstLBA: bigint;
-  lastLBA: bigint;
-  attr: bigint;
-}
-
-/**
- * https://github.com/jhermsmeier/node-gpt/blob/89036390dd401a295566ffdc7ca422f1f075f0af/lib/gpt.js#L15
- */
-export interface GptTable {
-  blockSize: number;
-  backupLBA: bigint;
-  partitions: PartitionEntry[];
-  verify(): boolean;
-  verifyHeader(): boolean;
-  verifyTable(): boolean;
-  writeBackupFromPrimary(): Buffer;
-}
 
 export const BLOCK_SIZE = 512;
 
-export function getPartitionTable(io: Io): GptTable {
+export function getPartitionTable(io: Io): GPT {
   const efiPart = findEfiPartition(io);
   const primaryGpt = readPrimaryGpt(io, BLOCK_SIZE, efiPart);
   return primaryGpt;
 }
 
-function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTable {
+export function readBackupGpt(io: Io, primaryGpt: GPT): GPT {
+  const backupGpt = new GPT({ blockSize: primaryGpt.blockSize });
+  // the backup gpt has the partition table first, followed by the header, so start reading at the table
+  const backupGptTableBlockOffset = Number(primaryGpt.backupLBA) - 32;
+  const offset = backupGptTableBlockOffset * primaryGpt.blockSize;
+  // table takes up 32 blocks, header takes up 1 block
+  backupGpt.parseBackup(io.read(offset, 33 * primaryGpt.blockSize));
+
+  return backupGpt;
+}
+
+export function repairBackupGptTable(io: Io, primaryGpt: GPT) {
+  // create backup gpt table from primary
+  const backupGpt = Buffer.alloc(33 * primaryGpt.blockSize);
+  primaryGpt.writeBackupFromPrimary(backupGpt);
+
+  // write backup gpt table
+  io.write(Number(primaryGpt.backupLBA) * primaryGpt.blockSize - primaryGpt.tableSize, backupGpt);
+}
+
+function readPrimaryGpt(io: Io, blockSize: number, efiPart: Partition): GPT {
   const gpt = new GPT({ blockSize });
 
   // NOTE: For protective GPTs (0xEF), the MBR's partitions
@@ -48,7 +47,6 @@ function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTa
   gpt.parseHeader(headerBuffer);
 
   // Now on to reading the actual partition table
-  // NOTE: gpt.tableOffset is a BigInt
   const tableOffset = Number(gpt.tableOffset) * gpt.blockSize;
   const tableBuffer = io.read(tableOffset, gpt.tableSize);
 
@@ -59,14 +57,4 @@ function readPrimaryGpt(io: Io, blockSize: number, efiPart: EfiPartition): GptTa
   gpt.parseTable(tableBuffer, gpt.blockSize, gpt.tableSize);
 
   return gpt;
-}
-
-// @ts-expect-error TODO: support repairing the backup gpt + all gpt tables (are they unique or static?)
-function _readBackupGpt(io: Io, primaryGpt: GptTable): GptTable {
-  const backupGpt = new GPT({ blockSize: primaryGpt.blockSize });
-  const offset = (Number(primaryGpt.backupLBA) - 32) * primaryGpt.blockSize;
-  const buffer = io.read(offset, 33 * primaryGpt.blockSize);
-  backupGpt.parseBackup(buffer);
-
-  return backupGpt;
 }

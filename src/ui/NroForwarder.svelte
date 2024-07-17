@@ -11,8 +11,6 @@
   import { Tabs, TabList, TabContent, Tab } from './utility/Tabs';
   import Tooltip from './utility/Tooltip.svelte';
 
-  // TODO: choose mounted Switch SD card for path autocomplete and validation?
-
   const nroPathDesc = (name: string) => `File path to the ${name} NRO file on the Nintendo Switch SD card.`;
   const descriptions = {
     id: `A hexadecimal id for the title. This value isn't shown in the UI, but it makes sure titles don't conflict with each other.`,

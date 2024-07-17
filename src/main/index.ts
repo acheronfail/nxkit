@@ -128,6 +128,8 @@ const mainChannelImpl = {
 
   nandOpen: async (path: string, keys?: ProdKeys) => explorerWorker.call('open', path, keys),
   nandClose: async () => explorerWorker.call('close'),
+  nandVerifyPartitionTable: async () => explorerWorker.call('verifyPartitionTable'),
+  nandRepairBackupPartitionTable: async () => explorerWorker.call('repairBackupPartitionTable'),
   nandMountPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
     explorerWorker.call('mount', partName, readonly, keys),
   nandReaddir: async (path: string) => explorerWorker.call('readdir', path),

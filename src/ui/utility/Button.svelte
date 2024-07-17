@@ -36,13 +36,13 @@
     primary: `text-white bg-blue-500`,
     default: `text-white bg-slate-700`,
     warning: `text-white bg-orange-600`,
-    danger: `text-white bg-red-500`,
+    danger: `text-white bg-red-700`,
   };
   const appearanceClassInteraction: Record<Appearance, string> = {
     primary: `hover:bg-blue-700 active:bg-blue-500`,
     default: `hover:bg-slate-500 active:bg-slate-700`,
-    warning: `hover:bg-orange-700 active:bg-orange-600`,
-    danger: `hover:bg-red-700 active:bg-red-500`,
+    warning: `hover:bg-orange-700 active:bg-orange-800`,
+    danger: `hover:bg-red-900 active:bg-red-500`,
   };
   const sizeClass: Record<Size, string> = {
     large: 'py-2 px-4 font-bold',

@@ -1,7 +1,7 @@
 import fsp from 'node:fs/promises';
 import CHS from 'chs';
 import MBR from 'mbr';
-import GPT from 'gpt';
+import GPT, { PartitionEntry } from 'gpt';
 import * as FatFs from 'js-fatfs';
 import { Keys, RawKeys, RawKeysSchema } from '../src/node/keys.types';
 import { NX_PARTITIONS, PartitionFormat } from '../src/node/nand/constants';
@@ -11,7 +11,7 @@ import { NandIoLayer } from '../src/node/nand/fatfs/layer';
 import { createIo } from '../src/node/nand/fatfs/io';
 import { FatError, FatType } from '../src/node/nand/fatfs/fs';
 import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
-import { PartitionEntry, getPartitionTable } from '../src/node/nand/gpt';
+import { getPartitionTable } from '../src/node/nand/gpt';
 import { split } from '../src/node/split';
 
 const argv = process.argv.slice(2);
@@ -188,7 +188,13 @@ const imageSize = 31268536320;
   gpt.writeBackupFromPrimary(backupGpt);
 
   await handle.write(primaryGpt, 0, primaryGpt.byteLength, 0);
-  await handle.write(backupGpt, 0, backupGpt.byteLength, Number(gpt.backupLBA) * gpt.blockSize);
+
+  // the backup header is in the last block, also pointed to from the primary gpt
+  const backupHeaderOffset = Number(gpt.backupLBA) * gpt.blockSize;
+  // the backup gpt is "part table + header", so allow space for the table
+  const backupGptTableOffset = backupHeaderOffset - gpt.tableSize;
+  await handle.write(backupGpt, 0, backupGpt.byteLength, backupGptTableOffset);
+
   await handle.close();
 }
 

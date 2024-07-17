@@ -71,7 +71,7 @@
       const targetPath = await window.nxkit.call('pathJoin', parentDir, newName);
       await window.nxkit
         .call('nandMoveEntry', node.data.path, targetPath)
-        .then((result) => handleNandResult(result, `rename ${node.data.name}`))
+        .then((result) => handleNandResult(result, `Rename ${node.data.name}`))
         .finally(() => reloadDir(parentDir));
     },
     moveEntry: async (target: FileNode<true>, item: FileNode, reloadDir: ReloadFn) => {
@@ -87,7 +87,7 @@
 
       await window.nxkit
         .call('nandMoveEntry', item.data.path, targetPath)
-        .then((result) => handleNandResult(result, `move ${item.data.name}`))
+        .then((result) => handleNandResult(result, `Move ${item.data.name}`))
         .finally(() => {
           reloadDir(parentDir);
           reloadDir(target.data.path);
@@ -108,7 +108,7 @@
 
       const exists = await window.nxkit
         .call('nandCheckExists', target.data.path, filePaths)
-        .then((result) => handleNandResult(result, `copy in ${filePaths.join(', ')}`));
+        .then((result) => handleNandResult(result, `Copy in ${filePaths.join(', ')}`));
 
       if (exists) {
         const yes = confirm(
@@ -122,7 +122,7 @@
 
       await window.nxkit
         .call('nandCopyFilesIn', target.data.path, filePaths)
-        .then((result) => handleNandResult(result, `copy in ${filePaths.join(', ')}`))
+        .then((result) => handleNandResult(result, `Copy in ${filePaths.join(', ')}`))
         .finally(() => {
           reloadDir(target.data.path);
           disabled = false;
@@ -134,7 +134,7 @@
         const parentDir = await window.nxkit.call('pathDirname', node.data.path);
         await window.nxkit
           .call('nandDeleteEntry', node.data.path)
-          .then((result) => handleNandResult(result, `delete ${node.data.name}`))
+          .then((result) => handleNandResult(result, `Delete ${node.data.name}`))
           .finally(() => reloadDir(parentDir));
       }
     },
@@ -142,7 +142,7 @@
       await window.nxkit.call('nandCopyFileOut', file.path);
     },
     openNandDirectory: async (path: string): Promise<FileNode[]> => {
-      const result = handleNandResult(await window.nxkit.call('nandReaddir', path), `readdir /`);
+      const result = handleNandResult(await window.nxkit.call('nandReaddir', path), `Read directory /`);
       return (result ?? []).map(entryToNode);
     },
   };
