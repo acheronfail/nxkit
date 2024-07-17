@@ -61,7 +61,8 @@
       <Button
         class="block w-full"
         appearance="primary"
-        disabled={!splitSelected || splitting}
+        disabled={!splitSelected}
+        loading={splitting}
         onclick={() => {
           if (splitFileList) {
             splitting = true;
@@ -79,7 +80,11 @@
         {/if}
       </Button>
       {#snippet tooltip()}
-        Select a file first
+        {#if splitting}
+          Splitting file, please wait...
+        {:else}
+          Select a file first
+        {/if}
       {/snippet}
     </Tooltip>
     <Tooltip>
@@ -115,7 +120,8 @@
       <Button
         class="block w-full"
         appearance="primary"
-        disabled={!mergeSelected || merging}
+        disabled={!mergeSelected}
+        loading={merging}
         onclick={() => {
           if (mergeFileList) {
             merging = true;
@@ -133,7 +139,11 @@
         {/if}
       </Button>
       {#snippet tooltip()}
-        Select a file first
+        {#if merging}
+          Merging file, please wait...
+        {:else}
+          Select a file first
+        {/if}
       {/snippet}
     </Tooltip>
     <Tooltip>
