@@ -95,7 +95,10 @@ out/
 precommit.diff
 .data/
 
+*.o
 *.cpuprofile
 scripts/*.wasm
 scripts/build/
 scripts/bench100m.js
+vendor/hacbrewpack/hacbrewpack
+vendor/hacbrewpack/hacbrewpack.wasm

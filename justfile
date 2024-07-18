@@ -8,6 +8,14 @@ _default:
 @_check CMD MSG="":
     if ! command -v {{CMD}} >/dev/null 2>&1 /dev/null; then echo "{{CMD}} is required! {{MSG}}"; exit 1; fi
 
+@_setup_pacman pac:
+  @just _check "{{pac}}" "See https://devkitpro.org/wiki/Getting_Started for installation instructions"
+  @echo "{{cyan}}Checking for devkitpro switch packages...{{reset}}"
+  @if ! {{pac}} -Qg switch-dev | cut -d' ' -f2 | xargs -n1 sh -c '{{pac}} -Qi $0 >/dev/null || exit 255'; then \
+    echo "{{red}}Failed to find devkitpro switch-dev package, installing now...{{reset}}" \
+    sudo {{pac}} -Sy switch-dev; \
+  fi
+
 # set up the local repository for development
 setup:
   @echo "{{cyan}}Installing node_modules...{{reset}}"
@@ -22,13 +30,7 @@ setup:
   @just _check "gcc"
   @just _check "make"
   @just _check "emcc" "See https://emscripten.org/docs/getting_started/downloads.html for installation instructions"
-  @just _check "dkp-pacman" "See https://devkitpro.org/wiki/Getting_Started for installation instructions"
-
-  @echo "{{cyan}}Checking for devkitpro switch packages...{{reset}}"
-  @if ! dkp-pacman -Qg switch-dev | cut -d' ' -f2 | xargs -n1 sh -c 'dkp-pacman -Qi $0 >/dev/null || exit 255'; then \
-    echo "{{red}}Failed to find devkitpro switch-dev package, installing now...{{reset}}" \
-    sudo dkp-pacman -Sy switch-dev; \
-  fi
+  @if command -v pacman &> /dev/null; then just _setup_pacman pacman; else just _setup_pacman dkp-pacman; fi
 
   @echo "{{cyan}}Building vendor dependencies...{{reset}}"
   just vendor
