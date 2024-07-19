@@ -1,4 +1,5 @@
-import { MessageEvent } from 'electron';
+import type { MessageEvent } from 'electron';
+import net from 'node:net';
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as FatFs from 'js-fatfs';
@@ -17,6 +18,7 @@ import { Xtsn } from './xtsn';
 import { resolveKeys } from '../keys';
 import { Keys } from '../keys.types';
 import { checkExistsRecursively, preCopyCheck } from './explorer.utils';
+import { sendSocketMessage, setupSocket } from './explorer.socket';
 
 export interface Progress {
   currentFileOffset: number;
@@ -494,14 +496,37 @@ export type OutgoingMessage<C extends ExplorerIpcKey = ExplorerIpcKey> =
       value: ReturnType<ExplorerIpcDefinition[C]>;
     };
 
-async function handleMessage<C extends ExplorerIpcKey>(msg: IncomingMessage<C>) {
+async function handleMessage<C extends ExplorerIpcKey>(
+  msg: IncomingMessage<C>,
+  onReply: (response: OutgoingMessage<C>) => void,
+) {
   const { id } = msg;
   if (id === 'bootstrap') {
     explorer['isPackaged'] = msg.isPackaged;
   } else {
-    const value = await (explorer[msg.channel] as PromiseIpcHandler)(...msg.args);
-    return process.parentPort.postMessage({ id, value });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const value: any = await (explorer[msg.channel] as PromiseIpcHandler)(...msg.args);
+    onReply({ id, value } satisfies OutgoingMessage<C>);
   }
 }
 
-process.parentPort.on('message', (event: MessageEvent) => handleMessage(event.data));
+/**
+ * Check if we're running as a separate process or just a worker
+ */
+
+if (process.env.NXKIT_DISK_PIPE) {
+  // We're a separate process, connect to the pipe and listen for messages there
+  const client = net.connect(process.env.NXKIT_DISK_PIPE);
+  client.on('close', () => process.exit(1));
+  client.on('error', () => process.exit(2));
+  setupSocket<IncomingMessage>(
+    client,
+    (msg) => handleMessage(msg, (response) => sendSocketMessage(client, JSON.stringify(response))),
+    () => process.exit(0),
+  );
+} else {
+  // We're a standard worker process, listen for IPC messages
+  process.parentPort.on('message', (event: MessageEvent) =>
+    handleMessage(event.data, (response) => process.parentPort.postMessage(response)),
+  );
+}

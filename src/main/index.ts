@@ -9,7 +9,7 @@ import { findProdKeys } from '../node/keys';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
 import { getResources } from '../resources';
-import { ExplorerWorker } from './explorer';
+import { ExplorerController } from './explorer';
 import { merge, split } from '../node/split';
 
 const require = createRequire(import.meta.url);
@@ -77,7 +77,7 @@ const createMainWindow = (): BrowserWindow => {
 };
 
 const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
-let explorerWorker: ExplorerWorker;
+let explorerController: ExplorerController;
 let mainWindow: BrowserWindow;
 
 const mainChannelImpl = {
@@ -126,28 +126,29 @@ const mainChannelImpl = {
     findProdKeys(app.isPackaged).then((keys) => keys && { location: keys.path, data: keys.toString() }),
   prodKeysSearchPaths: async () => prodKeysSearchPaths,
 
-  nandOpen: async (path: string, keys?: ProdKeys) => explorerWorker.call('open', path, keys),
-  nandClose: async () => explorerWorker.call('close'),
-  nandVerifyPartitionTable: async () => explorerWorker.call('verifyPartitionTable'),
-  nandRepairBackupPartitionTable: async () => explorerWorker.call('repairBackupPartitionTable'),
+  nandOpen: async (path: string, keys?: ProdKeys) => explorerController.open(path, keys),
+  nandClose: async () => explorerController.close(),
+
+  nandVerifyPartitionTable: async () => explorerController.call('verifyPartitionTable'),
+  nandRepairBackupPartitionTable: async () => explorerController.call('repairBackupPartitionTable'),
   nandMountPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
-    explorerWorker.call('mount', partName, readonly, keys),
-  nandReaddir: async (path: string) => explorerWorker.call('readdir', path),
+    explorerController.call('mount', partName, readonly, keys),
+  nandReaddir: async (path: string) => explorerController.call('readdir', path),
   nandCopyFileOut: async (pathInNand: string) => {
     const result = await dialog.showSaveDialog(mainWindow, { defaultPath: path.basename(pathInNand) });
     if (result.canceled) return;
 
-    return explorerWorker.call('copyFileOut', pathInNand, result.filePath);
+    return explorerController.call('copyFileOut', pathInNand, result.filePath);
   },
   nandCopyFilesIn: async (dirPathInNand: string, filePaths: string[]) =>
-    explorerWorker.call('copyFilesIn', dirPathInNand, filePaths),
+    explorerController.call('copyFilesIn', dirPathInNand, filePaths),
   nandCheckExists: async (dirPathInNand: string, filePaths: string[]) =>
-    explorerWorker.call('checkExists', dirPathInNand, filePaths),
+    explorerController.call('checkExists', dirPathInNand, filePaths),
   nandMoveEntry: async (oldPathInNand: string, newPathInNand: string) =>
-    explorerWorker.call('move', oldPathInNand, newPathInNand),
-  nandDeleteEntry: async (pathInNand: string) => explorerWorker.call('del', pathInNand),
+    explorerController.call('move', oldPathInNand, newPathInNand),
+  nandDeleteEntry: async (pathInNand: string) => explorerController.call('del', pathInNand),
   nandFormatPartition: async (partName: string, readonly: boolean, keys?: ProdKeys) =>
-    explorerWorker.call('format', partName, readonly, keys),
+    explorerController.call('format', partName, readonly, keys),
 } satisfies PromiseIpc;
 export type MainIpcDefinition = typeof mainChannelImpl;
 
@@ -160,7 +161,7 @@ app.on('ready', () => {
   }
 
   mainWindow = createMainWindow();
-  explorerWorker = new ExplorerWorker(mainWindow);
+  explorerController = new ExplorerController(mainWindow);
 });
 
 // Quit when all windows are closed, except on macOS. There, it's common
@@ -177,7 +178,7 @@ app.on('activate', () => {
   // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     mainWindow = createMainWindow();
-    explorerWorker = new ExplorerWorker(mainWindow);
+    explorerController.setMainWindow(mainWindow);
   }
 });
 
