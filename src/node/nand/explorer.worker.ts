@@ -110,9 +110,10 @@ class Explorer {
       return getPartitionTable(io);
     } catch (err) {
       console.error(err);
+      const msg = err instanceof Error ? err.message : String(err);
       throw new ExplorerError({
         type: 'failure',
-        error: 'Failed to read partition table, is the file a valid NAND dump?',
+        error: `Failed to read partition table: ${msg}`,
       });
     }
   }
