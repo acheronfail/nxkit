@@ -1,5 +1,4 @@
 import { fileURLToPath } from 'node:url';
-import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import net, { Server, Socket } from 'node:net';
@@ -126,20 +125,12 @@ export class ExplorerController {
     this.mainWindow = mainWindow;
   }
 
-  private async canUserAccessNand(nandPath: string): Promise<boolean> {
-    try {
-      await fsp.access(nandPath, fsp.constants.R_OK | fsp.constants.W_OK);
-      return true;
-    } catch (err) {
-      console.warn(err);
-      return false;
+  public async open(options: { asSudo: boolean; nandPath: string; keysFromUser?: ProdKeys }) {
+    if (this.proc) {
+      await this.close();
     }
-  }
 
-  public async open(nandPath: string, keysFromUser?: ProdKeys) {
-    this.proc = (await this.canUserAccessNand(nandPath))
-      ? await UtilityProcessWorker.create()
-      : await SudoProcessWorker.create();
+    this.proc = options.asSudo ? await UtilityProcessWorker.create() : await SudoProcessWorker.create();
 
     this.proc.sendMessage({ id: 'bootstrap', isPackaged: app.isPackaged } satisfies IncomingMessage<ExplorerIpcKey>);
     this.proc.addExitListener(() => (this.proc = null));
@@ -150,7 +141,7 @@ export class ExplorerController {
       }
     });
 
-    return this.call('open', nandPath, keysFromUser);
+    return this.call('open', options.nandPath, options.keysFromUser);
   }
 
   public async close() {

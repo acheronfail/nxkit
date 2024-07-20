@@ -22,6 +22,7 @@
   import readonlyMd from './markdown/nand-readonly.md?raw';
 
   // TODO: support working directly with a connected switch, not just with dumps
+  // can we auto-detect the device? then use "nandOpenDisk" to open it with sudo
 
   let { nandFilePath, partitionName, readonlyDefault = true }: Props = $props();
 
@@ -62,7 +63,7 @@
     },
     openNand: async () => {
       if (nandFilePath) {
-        const result = handleNandResult(await window.nxkit.call('nandOpen', nandFilePath), 'Open NAND');
+        const result = handleNandResult(await window.nxkit.call('nandOpenDump', nandFilePath), 'Open NAND dump');
         if (result) {
           partitions = result;
         } else {

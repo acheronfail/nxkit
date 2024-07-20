@@ -126,7 +126,10 @@ const mainChannelImpl = {
     findProdKeys(app.isPackaged).then((keys) => keys && { location: keys.path, data: keys.toString() }),
   prodKeysSearchPaths: async () => prodKeysSearchPaths,
 
-  nandOpen: async (path: string, keys?: ProdKeys) => explorerController.open(path, keys),
+  nandOpenDisk: async (nandPath: string, keysFromUser?: ProdKeys) =>
+    explorerController.open({ nandPath, keysFromUser, asSudo: true }),
+  nandOpenDump: async (nandPath: string, keysFromUser?: ProdKeys) =>
+    explorerController.open({ nandPath, keysFromUser, asSudo: false }),
   nandClose: async () => explorerController.close(),
 
   nandVerifyPartitionTable: async () => explorerController.call('verifyPartitionTable'),
