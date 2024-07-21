@@ -2,8 +2,8 @@ import { describe, expect, test, vi } from 'vitest';
 import fsp from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { temporaryDirectoryTask } from 'tempy';
-import { WalkAction, preCopyCheck, checkExistsRecursively, walkHostPaths } from './explorer.utils';
-import { Fat32FileSystem } from './fatfs/fs';
+import { WalkAction, preCopyCheck, checkExistsRecursively, walkHostPaths } from './utils';
+import { Fat32FileSystem } from '../fatfs/fs';
 
 const mockFat = () => {
   return vi.mocked({

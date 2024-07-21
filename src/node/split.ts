@@ -36,6 +36,8 @@ export async function split(
     const limit = inPlace ? 0 : -1;
     while (offset > limit) {
       const splitPath = getSplitPath();
+      // TODO: rather than using `console`, use some sort of logger so it's easy for users to see
+      // the logs (either a log window, or at least a log file that can be inspected)
       console.log(`Creating ${splitPath}...`);
       if (asArchive) {
         await fsp.mkdir(path.dirname(splitPath), { recursive: true });

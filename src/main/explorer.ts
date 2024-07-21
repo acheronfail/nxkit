@@ -4,12 +4,12 @@ import { EventEmitter } from 'node:events';
 import net, { Server, Socket } from 'node:net';
 import { app, BrowserWindow, UtilityProcess, utilityProcess, dialog } from 'electron';
 import { exec } from '@vscode/sudo-prompt';
-import { ExplorerIpcDefinition, ExplorerIpcKey, IncomingMessage, OutgoingMessage } from '../node/nand/explorer.worker';
+import { ExplorerIpcDefinition, ExplorerIpcKey, IncomingMessage, OutgoingMessage } from '../node/nand/explorer/worker';
 import { ProdKeys } from '../channels';
-import { sendSocketMessage, setupSocket } from '../node/nand/explorer.socket';
+import { sendSocketMessage, setupSocket } from '../node/nand/explorer/socket';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const WORKER_PATH = path.join(__dirname, 'src_node_nand_explorer.worker.js');
+const WORKER_PATH = path.join(__dirname, 'src_node_nand_explorer_worker.js');
 
 interface WorkerProcess {
   close(): void;
@@ -70,21 +70,38 @@ class SudoProcessWorker implements WorkerProcess {
       const server = net.createServer();
       const exePath = app.getPath('exe');
 
+      const cmd: string[] = [`"${exePath}"`, '--no-sandbox', `"${WORKER_PATH}"`];
+
+      // NOTE: `sudo-prompt` doesn't pass `env` correctly on linux
+      const env: Record<string, string> = { NXKIT_DISK_PIPE: pipePath };
+      if (process.platform === 'linux') {
+        const add = (key: string) => {
+          const value = process.env[key];
+          if (value) env[key] = value;
+        };
+
+        add('DISPLAY');
+        add('XAUTHORITY');
+
+        for (const [key, value] of Object.entries(env)) {
+          cmd.unshift(`${key}="${value.replace(/"/g, '\\"')}"`);
+        }
+
+        // NOTE: `sudo-prompt` also doesn't maintain the CWD properly, either
+        cmd.unshift(`cd "${process.cwd()}";`);
+      }
+
       server.listen(pipePath, () => {
         server.once('connection', (client) => resolve(new SudoProcessWorker(server, client)));
-        exec(
-          `"${exePath}" "${WORKER_PATH}"`,
-          { name: app.getName(), env: { NXKIT_DISK_PIPE: pipePath } },
-          (err, stdout, stderr) => {
-            if (err) {
-              console.error('sudo-prompt:err', err);
-              reject(err);
-            }
+        exec(cmd.join(' '), { name: app.getName(), env }, (err, stdout, stderr) => {
+          if (err) {
+            console.error('sudo-prompt:err', err);
+            reject(err);
+          }
 
-            if (stdout?.length) console.log('sudo-prompt:stdout:', stdout);
-            if (stderr?.length) console.log('sudo-prompt:stderr:', stderr);
-          },
-        );
+          if (stdout?.length) console.log('sudo-prompt:stdout:', stdout);
+          if (stderr?.length) console.log('sudo-prompt:stderr:', stderr);
+        });
       });
     });
   }
@@ -130,7 +147,7 @@ export class ExplorerController {
       await this.close();
     }
 
-    this.proc = options.asSudo ? await UtilityProcessWorker.create() : await SudoProcessWorker.create();
+    this.proc = options.asSudo ? await SudoProcessWorker.create() : await UtilityProcessWorker.create();
 
     this.proc.sendMessage({ id: 'bootstrap', isPackaged: app.isPackaged } satisfies IncomingMessage<ExplorerIpcKey>);
     this.proc.addExitListener(() => (this.proc = null));

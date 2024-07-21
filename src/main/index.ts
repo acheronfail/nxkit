@@ -47,15 +47,15 @@ const createMainWindow = (): BrowserWindow => {
   // quick 'n' dirty cli handling
   const argString = process.argv.slice(2).join(' ');
   const params = new URLSearchParams();
-  const addMatch = (name: string, re: RegExp) => {
+  const addMatch = (name: string, re: RegExp, map?: (val: string) => string) => {
     const match = re.exec(argString);
     if (match) {
-      params.set(name, match[1]);
+      params.set(name, map ? map(match[1]) : match[1]);
     }
   };
 
   addMatch('tab', /--tab[= ](\S+)/);
-  addMatch('rawnand', /--rawnand[= ](\S+)/);
+  addMatch('rawnand', /--rawnand[= ](\S+)/, path.resolve);
   loadWindow(win, 'window_main', params);
 
   if (!app.isPackaged) {

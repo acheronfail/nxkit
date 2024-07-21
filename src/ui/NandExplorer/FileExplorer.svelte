@@ -36,7 +36,7 @@
   import { handleNandResult } from '../errors';
   import FileTree from '../utility/FileTree/FileTree.svelte';
   import InputTextInline from '../utility/InputTextInline.svelte';
-  import type { Progress } from '../../node/nand/explorer.worker';
+  import type { Progress } from '../../node/nand/explorer/worker';
   import { onMount } from 'svelte';
 
   let { readonly, class: propClass = '' }: Props = $props();

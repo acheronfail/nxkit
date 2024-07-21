@@ -4,7 +4,7 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { NXKitBridgeKey, NXKitBridge, NXKitBridgeKeyType } from './channels';
 import type { MainIpcDefinition } from './main';
-import type { Progress } from './node/nand/explorer.worker';
+import type { Progress } from './node/nand/explorer/worker';
 
 type RendererBridge = <C extends keyof MainIpcDefinition>(
   channel: C,

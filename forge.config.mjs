@@ -47,7 +47,7 @@ const config = {
           config: 'vite.preload.config.ts',
         },
         {
-          entry: 'src/node/nand/explorer.worker.ts',
+          entry: 'src/node/nand/explorer/worker.ts',
           config: 'vite.main.config.ts',
         },
       ],

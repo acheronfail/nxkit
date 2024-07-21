@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import { basename, join } from 'node:path';
-import { FSEntry, Fat32FileSystem } from './fatfs/fs';
+import { FSEntry, Fat32FileSystem } from '../fatfs/fs';
 
 export interface WalkParams {
   pathInNand: string;
