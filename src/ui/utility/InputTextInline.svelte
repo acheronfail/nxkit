@@ -42,7 +42,7 @@
 
   const shapeClass = 'rounded px-1 shadow-inset-border';
   const focusClass = 'focus:outline-none focus:ring-blue-500 focus:ring-1';
-  const styleClass = 'bg-slate-900 border-slate-600 shadow-slate-600';
+  const styleClass = 'bg-slate-300 dark:bg-slate-900 border-slate-400 dark:border-slate-600 shadow-slate-600';
 </script>
 
 <input class="{shapeClass} {styleClass} {focusClass} {propClass}" type="text" bind:this={node} {onkeydown} {onclick} />

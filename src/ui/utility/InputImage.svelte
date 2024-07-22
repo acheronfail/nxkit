@@ -88,7 +88,7 @@
     onCropComplete?.(null);
   }
 
-  const imageBoxClass = 'border dark:border-slate-600 dark:bg-slate-900';
+  const imageBoxClass = 'border border-slate-400 bg-slate-100 dark:border-slate-600 dark:bg-slate-900';
 </script>
 
 <Container>

@@ -52,7 +52,7 @@
     bind:this={inputNode}
     bind:files
     type="file"
-    class="grow rounded border border-slate-700 p-2 bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 caret-blue-500"
+    class="grow rounded p-2 border border-slate-400 dark:border-slate-700 bg-slate-200 dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500 caret-blue-500"
     {...rest}
   />
   {#if selected}

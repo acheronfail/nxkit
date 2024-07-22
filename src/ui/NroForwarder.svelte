@@ -87,7 +87,7 @@
       <Tab>RetroArch ROM</Tab>
     </TabList>
 
-    <TabContent class="justify-around">
+    <TabContent class="justify-around gap-2">
       <InputImage onCropComplete={(img) => (image = img)} />
       <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
         {#snippet infoTooltip()}
@@ -110,7 +110,7 @@
         {/snippet}
       </InputText>
     </TabContent>
-    <TabContent class="justify-around">
+    <TabContent class="justify-around gap-2">
       <InputImage onCropComplete={(img) => (image = img)} />
       <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
         {#snippet infoTooltip()}

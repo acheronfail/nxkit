@@ -29,18 +29,18 @@
 
   const innerClass = 'w-full h-full';
   const buttonClass = `select-none text-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded`;
-  const disabledClass = `bg-slate-600 text-slate-400 hover:text-slate-400`;
+  const disabledClass = `bg-slate-200 dark:bg-slate-600 text-slate-400 hover:text-slate-400`;
   const loadingClass = 'cursor-default';
 
   const appearanceClass: Record<Appearance, string> = {
     primary: `text-white bg-blue-500`,
-    default: `text-white bg-slate-700`,
+    default: `text-white bg-slate-500 dark:bg-slate-700`,
     warning: `text-white bg-orange-600`,
     danger: `text-white bg-red-700`,
   };
   const appearanceClassInteraction: Record<Appearance, string> = {
     primary: `hover:bg-blue-700 active:bg-blue-500`,
-    default: `hover:bg-slate-500 active:bg-slate-700`,
+    default: `hover:bg-slate-600 hover:dark:bg-slate-500 active:bg-slate-700`,
     warning: `hover:bg-orange-700 active:bg-orange-800`,
     danger: `hover:bg-red-900 active:bg-red-500`,
   };

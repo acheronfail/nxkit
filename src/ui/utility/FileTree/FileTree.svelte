@@ -204,7 +204,8 @@
     dragTargetId = undefined;
   };
 
-  const ulClass = 'select-none font-mono m-2 border border-slate-900 bg-slate-900';
+  const ulClass =
+    'select-none font-mono m-2 border border-slate-400 dark:border-slate-900 bg-slate-400 dark:bg-slate-900';
   const iconClass = 'inline-block h-4';
   const spanClass = 'grow flex items-center justify-start gap-2';
 </script>
@@ -217,14 +218,17 @@
   <li
     data-id={node.id}
     draggable={!!onDragDrop}
-    class="dark:bg-slate-800 odd:dark:bg-slate-700"
+    class="bg-slate-100 odd:bg-slate-200 dark:bg-slate-800 odd:dark:bg-slate-700"
     style="padding-left: {depth}ex;"
   >
     <div
       class="pr-2 flex justify-between items-center focus:outline-none"
       class:text-slate-500={isDisabled}
-      class:focus:bg-blue-600={!isDisabled && !dragging}
-      class:focus:hover:bg-blue-500={!isDisabled && !dragging}
+      class:focus:bg-blue-300={!isDisabled && !dragging}
+      class:focus:dark:bg-blue-600={!isDisabled && !dragging}
+      class:focus:hover:bg-blue-400={!isDisabled && !dragging}
+      class:focus:hover:dark:bg-blue-500={!isDisabled && !dragging}
+      class:hover:bg-slate-300={!isDisabled && !dragging}
       class:hover:dark:bg-slate-600={!isDisabled && !dragging}
       class:bg-blue-600={dragging}
       role={isDisabled ? '' : 'button'}
@@ -238,9 +242,9 @@
           {#if icon}
             {@render icon(node, handlers.reloadDir)}
           {:else if expanded}
-            <FolderOpenIcon class="text-blue-300 {iconClass}" />
+            <FolderOpenIcon class="text-blue-700 dark:text-blue-300 {iconClass}" />
           {:else}
-            <FolderIcon class="text-blue-300 {iconClass}" />
+            <FolderIcon class="text-blue-700 dark:text-blue-300 {iconClass}" />
           {/if}
           {#if name}
             {@render name(node, handlers.reloadDir)}

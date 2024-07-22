@@ -53,7 +53,7 @@
 
 {#snippet renderListItems({ listItems })}
   {#each listItems as item}
-    <li>
+    <li class="m-1">
       {#each item.tokens as t}
         {@render renderText({ token: t })}
       {/each}

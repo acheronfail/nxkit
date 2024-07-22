@@ -87,11 +87,11 @@
   });
 
   const c = {
-    bg: 'bg-slate-900',
-    fill: 'fill-slate-900',
-    border: 'border-slate-600',
-    stroke: 'stroke-slate-600',
-    strokeBg: 'stroke-slate-900',
+    bg: 'bg-slate-100 dark:bg-slate-900',
+    fill: 'fill-slate-100 dark:fill-slate-900',
+    border: 'border-slate-300 dark:border-slate-600',
+    stroke: 'stroke-slate-300 dark:stroke-slate-600',
+    strokeBg: 'stroke-slate-100 dark:stroke-slate-900',
   };
 </script>
 

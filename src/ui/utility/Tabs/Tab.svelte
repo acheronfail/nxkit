@@ -14,7 +14,12 @@
 </script>
 
 <li data-testid="tab" class={liClass}>
-  <button class:dark:bg-gray-800={$selectedTab === tab} class={buttonClass} on:click={() => selectTab(tab)}>
+  <button
+    class:bg-gray-300={$selectedTab === tab}
+    class:dark:bg-gray-800={$selectedTab === tab}
+    class={buttonClass}
+    on:click={() => selectTab(tab)}
+  >
     <slot />
   </button>
 </li>

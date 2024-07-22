@@ -82,7 +82,7 @@
   onFileClick={disabled ? undefined : onPartitionChoose}
 >
   {#snippet icon()}
-    <CircleStackIcon class="inline-block h-4 text-red-300" />
+    <CircleStackIcon class="inline-block h-4 text-red-600 dark:text-red-300" />
   {/snippet}
   {#snippet fileExtra(node)}
     <ActionButtons>

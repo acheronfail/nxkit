@@ -32,9 +32,9 @@
   const iconClass = 'absolute inline-block align-baseline h-[1.5rem]';
   const toggleClass = 'h-[1.5rem] w-[3rem]';
 
-  const checkedIconClass = appearance == 'pronounced' ? 'fill-green-500' : 'fill-green-300';
+  const checkedIconClass = appearance == 'pronounced' ? 'fill-green-500' : 'fill-green-700 dark:fill-green-300';
   const checkedBorderClass = appearance == 'pronounced' ? 'shadow-green-500' : 'shadow-slate-400';
-  const uncheckedIconClass = appearance == 'pronounced' ? 'fill-red-500' : 'fill-red-300';
+  const uncheckedIconClass = appearance == 'pronounced' ? 'fill-red-500' : 'fill-red-700 dark:fill-red-300';
   const uncheckedBorderClass = appearance == 'pronounced' ? 'shadow-red-500' : 'shadow-slate-400';
 
   const enabledClass = 'cursor-pointer';
@@ -53,7 +53,7 @@
         {@render label()}
       {/if}
       <div
-        class="relative rounded-full bg-slate-900 shadow-inset-border {toggleClass} {disabled
+        class="relative rounded-full bg-slate-300 dark:bg-slate-900 shadow-inset-border {toggleClass} {disabled
           ? 'shadow-slate-500'
           : checked
             ? checkedBorderClass
