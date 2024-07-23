@@ -18,6 +18,57 @@ using v8::Object;
 using v8::Persistent;
 using v8::String;
 using v8::Value;
+using v8::WeakCallbackInfo;
+using v8::WeakCallbackType;
+
+class Ciphers {
+public:
+  /**
+   * 0: tweak
+   * 1: crypto encrypt
+   * 2: crypto decrypt
+   */
+  EVP_CIPHER_CTX *ctx_list[3];
+
+  /**
+   * Required to be able to run code after the JS object is GC'd
+   */
+  Persistent<Object> persistent;
+
+  Ciphers(Isolate *isolate, Local<Object> jsObj, unsigned char *tweakKeyData, unsigned char *cryptoKeyData)
+      : persistent(isolate, jsObj) {
+    ctx_list[0] = EVP_CIPHER_CTX_new();
+    ctx_list[1] = EVP_CIPHER_CTX_new();
+    ctx_list[2] = EVP_CIPHER_CTX_new();
+
+    assert(EVP_EncryptInit(ctx_list[0], EVP_aes_128_ecb(), tweakKeyData, nullptr));
+    assert(EVP_EncryptInit(ctx_list[1], EVP_aes_128_ecb(), cryptoKeyData, nullptr));
+    assert(EVP_DecryptInit(ctx_list[2], EVP_aes_128_ecb(), cryptoKeyData, nullptr));
+
+    assert(EVP_CIPHER_CTX_set_padding(ctx_list[0], 0));
+    assert(EVP_CIPHER_CTX_set_padding(ctx_list[1], 0));
+    assert(EVP_CIPHER_CTX_set_padding(ctx_list[2], 0));
+
+    // setup callback to run after the js object is GC'd
+    this->persistent.SetWeak(this, Ciphers::FreeXtsnCipherInstance, WeakCallbackType::kParameter);
+  }
+
+  ~Ciphers() {
+    EVP_CIPHER_CTX_free(ctx_list[0]);
+    EVP_CIPHER_CTX_free(ctx_list[1]);
+    EVP_CIPHER_CTX_free(ctx_list[2]);
+  }
+
+  static void FreeXtsnCipherInstance(const WeakCallbackInfo<Ciphers> &info) {
+    Ciphers *ciphers = reinterpret_cast<Ciphers *>(info.GetParameter());
+
+    // V8 requires that we reset this when the weak callback is run
+    ciphers->persistent.Reset();
+
+    // this calls the destructor and cleans up
+    delete ciphers;
+  }
+};
 
 void CreateXtsnCipherInstance(const FunctionCallbackInfo<Value> &args) {
   Isolate *isolate = args.GetIsolate();
@@ -33,36 +84,27 @@ void CreateXtsnCipherInstance(const FunctionCallbackInfo<Value> &args) {
     return;
   }
 
-  const unsigned char *cryptoKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
+  unsigned char *cryptoKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[0]));
   if (node::Buffer::Length(args[0]) != 16) {
     isolate->ThrowException(String::NewFromUtf8(isolate, "crypto key must be 16 bytes exactly").ToLocalChecked());
     return;
   }
 
-  const unsigned char *tweakKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[1]));
+  unsigned char *tweakKeyData = reinterpret_cast<unsigned char *>(node::Buffer::Data(args[1]));
   if (node::Buffer::Length(args[1]) != 16) {
     isolate->ThrowException(String::NewFromUtf8(isolate, "tweak key must be 16 bytes exactly").ToLocalChecked());
     return;
   }
 
-  EVP_CIPHER_CTX *ctx_tweak = EVP_CIPHER_CTX_new();
-  EVP_CIPHER_CTX *ctx_crypto_encrypt = EVP_CIPHER_CTX_new();
-  EVP_CIPHER_CTX *ctx_crypto_decrypt = EVP_CIPHER_CTX_new();
+  Local<Object> jsObject = args.This();
+  // create our ciphers class and attach it to the JS object we're creating now
+  Ciphers *ciphers = new Ciphers(isolate, jsObject, tweakKeyData, cryptoKeyData);
+  // store ciphers on js object
+  jsObject->SetAlignedPointerInInternalField(0, ciphers);
+  // store sector size on js object
+  jsObject->SetInternalField(1, args[2]);
 
-  assert(EVP_EncryptInit(ctx_tweak, EVP_aes_128_ecb(), tweakKeyData, nullptr));
-  assert(EVP_EncryptInit(ctx_crypto_encrypt, EVP_aes_128_ecb(), cryptoKeyData, nullptr));
-  assert(EVP_DecryptInit(ctx_crypto_decrypt, EVP_aes_128_ecb(), cryptoKeyData, nullptr));
-
-  assert(EVP_CIPHER_CTX_set_padding(ctx_tweak, 0));
-  assert(EVP_CIPHER_CTX_set_padding(ctx_crypto_encrypt, 0));
-  assert(EVP_CIPHER_CTX_set_padding(ctx_crypto_decrypt, 0));
-
-  args.This()->SetAlignedPointerInInternalField(0, ctx_tweak);
-  args.This()->SetAlignedPointerInInternalField(1, ctx_crypto_encrypt);
-  args.This()->SetAlignedPointerInInternalField(2, ctx_crypto_decrypt);
-  args.This()->SetInternalField(3, args[2]);
-
-  args.GetReturnValue().Set(args.This());
+  args.GetReturnValue().Set(jsObject);
 }
 
 void InitTweak(EVP_CIPHER_CTX *ctx_tweak, unsigned char *tweak, uint64_t sectorOffset) {
@@ -132,10 +174,11 @@ void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
   bool encrypt = args[3]->BooleanValue(isolate);
 
   // extract saved fields
-  int sectorSize = args.This()->GetInternalField(3).As<Number>()->NumberValue(isolate->GetCurrentContext()).FromJust();
-  EVP_CIPHER_CTX *ctx_tweak = reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(0));
-  EVP_CIPHER_CTX *ctx_crypto =
-      reinterpret_cast<EVP_CIPHER_CTX *>(args.Holder()->GetAlignedPointerFromInternalField(encrypt ? 1 : 2));
+  int sectorSize = args.This()->GetInternalField(1).As<Number>()->NumberValue(isolate->GetCurrentContext()).FromJust();
+
+  Ciphers *ciphers = reinterpret_cast<Ciphers *>(args.Holder()->GetAlignedPointerFromInternalField(0));
+  EVP_CIPHER_CTX *ctx_tweak = ciphers->ctx_list[0];
+  EVP_CIPHER_CTX *ctx_crypto = ciphers->ctx_list[encrypt ? 1 : 2];
 
   // we measure our current offset through the input in 64bit chunks
   uint64_t chunkOffset = 0;
@@ -179,7 +222,7 @@ void Initialize(Local<Object> exports, Local<Object> module) {
   // setup storage for the XtsnCipher class
   Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, CreateXtsnCipherInstance);
   tpl->SetClassName(String::NewFromUtf8(isolate, "XtsnCipher").ToLocalChecked());
-  tpl->InstanceTemplate()->SetInternalFieldCount(4);
+  tpl->InstanceTemplate()->SetInternalFieldCount(2);
 
   // setup methods for XtsnCipher instances
   NODE_SET_PROTOTYPE_METHOD(tpl, "run", RunCipherMethod);

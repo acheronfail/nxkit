@@ -13,7 +13,7 @@
     "emmc"
   ],
   "scripts": {
-    "test": "vitest",
+    "test": "node --expose-gc `which vitest`",
     "build": "npm run clean && npm rebuild && npm run build:cjs && npm run build:esm",
     "build:cjs": "esbuild --outfile=dist/index.cjs --format=cjs index.ts",
     "build:esm": "esbuild --outfile=dist/index.esm.js --format=esm index.ts",
