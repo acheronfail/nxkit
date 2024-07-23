@@ -80,6 +80,15 @@ const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(ap
 let explorerController: ExplorerController;
 let mainWindow: BrowserWindow;
 
+// TODO: discover connected hekate partitions
+// drivelist.list()
+// look for:
+//  description "hekate eMMC GPP Media"
+//  partitionTableType "gpt"
+//  size 31268536320
+//  use `raw` or `device`?
+//  what about mounted emummc partitions?
+
 const mainChannelImpl = {
   preloadBridge: async () => {
     const plat = platform();
