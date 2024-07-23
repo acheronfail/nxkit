@@ -36,9 +36,10 @@ export async function split(
     const limit = inPlace ? 0 : -1;
     while (offset > limit) {
       const splitPath = getSplitPath();
-      // TODO: rather than using `console`, use some sort of logger so it's easy for users to see
-      // the logs (either a log window, or at least a log file that can be inspected)
-      console.log(`Creating ${splitPath}...`);
+      if (process.env.DEBUG) {
+        console.log(`Creating ${splitPath}...`);
+      }
+
       if (asArchive) {
         await fsp.mkdir(path.dirname(splitPath), { recursive: true });
       }
@@ -69,7 +70,9 @@ export async function split(
     // move remaining part into destination
     if (inPlace) {
       const splitPath = getSplitPath();
-      console.log(`Creating ${splitPath}...`);
+      if (process.env.DEBUG) {
+        console.log(`Creating ${splitPath}...`);
+      }
       await fsp.rename(filePath, splitPath);
     }
 
@@ -121,7 +124,10 @@ export async function merge(filePath: string, inPlace: boolean): Promise<SplitMe
     const dst = mergedHandle.createWriteStream({ autoClose: false });
     dst.setMaxListeners(splitFiles.length + 1);
     for (const splitFile of splitFiles) {
-      console.log(`Merging ${splitFile}...`);
+      if (process.env.DEBUG) {
+        console.log(`Merging ${splitFile}...`);
+      }
+
       const splitHandle = await fsp.open(splitFile, 'r');
       const src = splitHandle.createReadStream();
       await new Promise((resolve, reject) => {

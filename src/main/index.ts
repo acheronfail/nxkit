@@ -20,6 +20,10 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+// global variables set here so they can be re-used
+process.env.IS_DEV = app.isPackaged ? '1' : '0';
+process.env.DEBUG = process.env.IS_DEV ?? process.env.DEBUG ? '1' : '0';
+
 automaticContextMenus({});
 
 function loadWindow(window: BrowserWindow, name: string, params?: URLSearchParams) {
