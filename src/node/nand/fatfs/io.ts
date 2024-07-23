@@ -98,7 +98,9 @@ class FdWrapper {
       }
 
       // otherwise we'll need to close it and re-open it for writing
-      console.log(`Upgrading file descriptor (${this.fd}) for writing: (${this.filePath})`);
+      if (process.env.DEBUG) {
+        console.log(`Upgrading file descriptor (${this.fd}) for writing: (${this.filePath})`);
+      }
       this.close();
     }
 

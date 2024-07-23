@@ -62,17 +62,13 @@ test-all: rebuild-node
 test *ARGS: rebuild-node
   npm run test:vitest -- {{ARGS}}
 
-# runs vitest in bench mode
-bench *ARGS: rebuild-node
-  npm exec vitest -- bench --run -- {{ARGS}}
-
-# runs a benchmark copying a 100M file into an Xtsn-enxrypted FAT32 disk image, outputs a cpuprofile
-bench100m: rebuild-node
+# runs benchmarks; outputs a .cpuprofile file and creates bench.json if title was passed
+bench TITLE='': rebuild-node
   @mkdir -p scripts/build/Release
   @cp src/node/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
   @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
   npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
-  node --cpu-prof scripts/bench100m.js
+  node --cpu-prof scripts/bench100m.js {{TITLE}}
 
 # formats all code
 format:

@@ -1,6 +1,9 @@
 import fsp from 'node:fs/promises';
 import fs from 'node:fs';
+import chalk from 'chalk';
+import { randomBytes } from 'node:crypto';
 import * as FatFs from 'js-fatfs';
+import { Bench, Task, TaskResult } from 'tinybench';
 import { Crypto, NxCrypto } from '../src/node/nand/fatfs/crypto';
 import { createIo } from '../src/node/nand/fatfs/io';
 import { NandIoLayer } from '../src/node/nand/fatfs/layer';
@@ -8,7 +11,7 @@ import { Xtsn } from '../src/node/nand/xtsn';
 import { NxDiskIo } from '../src/node/nand/fatfs/diskio';
 import { Fat32FileSystem, FatError } from '../src/node/nand/fatfs/fs';
 import { BiosParameterBlock } from '../src/node/nand/fatfs/bpb';
-import timers from '../src/timers';
+import { getLayer, XorOffsetCrypto } from '../src/node/nand/fatfs/layer.test.util';
 
 //
 // create files
@@ -64,9 +67,7 @@ const createFs = async (size: number, crypto?: Crypto) => {
 // benchmark code
 //
 
-const benchmark = async (name: string, crypto?: Crypto) => {
-  const fat32 = await createFs(disk.size, crypto);
-  const stop = timers.start(name);
+const benchmark = async (name: string, fat32: Fat32FileSystem) => {
   let offset = 0;
 
   const handle = await fsp.open(file.path);
@@ -81,16 +82,120 @@ const benchmark = async (name: string, crypto?: Crypto) => {
     true,
   );
   await handle.close();
-  stop();
 };
 
 //
 // run benchmarks
 //
 
-for (let i = 0; i < 5; i++) {
-  await benchmark('clear', undefined);
-  await benchmark('xtsn', new NxCrypto(new Xtsn(Buffer.alloc(16), Buffer.alloc(16))));
+let layer: NandIoLayer;
+let fat32: Fat32FileSystem;
+
+const xtsn = new NxCrypto(new Xtsn(Buffer.alloc(16), Buffer.alloc(16)));
+const diskSize = 524288;
+const dataToWrite = randomBytes(diskSize);
+
+const simpleBench = new Bench({ time: 100 })
+  .add(
+    'clear',
+    () => {
+      layer.write(0, dataToWrite);
+    },
+    {
+      beforeAll: () => {
+        layer = getLayer(Buffer.alloc(diskSize));
+      },
+    },
+  )
+  .add(
+    'xor',
+    () => {
+      layer.write(0, dataToWrite);
+    },
+    {
+      beforeAll: () => {
+        layer = getLayer(Buffer.alloc(diskSize), new XorOffsetCrypto());
+      },
+    },
+  )
+  .add(
+    'encrypted',
+    () => {
+      layer.write(0, dataToWrite);
+    },
+    {
+      beforeAll: () => {
+        layer = getLayer(Buffer.alloc(diskSize), xtsn);
+      },
+    },
+  );
+
+const integrationBench = new Bench({ time: 10000 })
+  .add(
+    '100mb file, clear',
+    async () => {
+      await benchmark('clear', fat32);
+    },
+    {
+      async beforeAll() {
+        fat32 = await createFs(disk.size);
+      },
+    },
+  )
+  .add(
+    '100mb file, encrypted',
+    async () => {
+      await benchmark('xtsn', fat32);
+    },
+    {
+      async beforeAll() {
+        fat32 = await createFs(disk.size, xtsn);
+      },
+    },
+  );
+
+const results: { bench: string; name: string; result: TaskResult }[][] = [];
+async function doBenchmark(benchmark: Bench, name: string) {
+  process.stdout.write(`Running benchmark: ${name}...`);
+  await benchmark.run();
+
+  const f = (n: number) =>
+    `${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`.padStart(14);
+
+  const m = (task: Task) => ({
+    name: task.name,
+    'ops/sec': task.result ? parseInt(task.result.hz.toString(), 10).toLocaleString() : NaN,
+    'mean:ms': task.result ? f(task.result.mean) : NaN,
+    'mean:us': task.result ? f(task.result.mean * 1_000) : NaN,
+    'mean:ns': task.result ? f(task.result.mean * 1_000_000) : NaN,
+  });
+
+  process.stdout.write('\r');
+  console.table(benchmark.table(m));
+
+  type TaskWithResult = Task & { result: TaskResult };
+
+  const tasksSorted = (benchmark.tasks as TaskWithResult[]).slice().sort((a, b) => a.result.mean - b.result.mean);
+  const fastest = tasksSorted[0];
+
+  console.log(`> ${fastest.name} ${chalk.gray('is the fastest')}`);
+  for (const task of tasksSorted.slice(1)) {
+    const factor = f(task.result.mean / fastest.result.mean).trim();
+    console.log(`> ${task.name} ${chalk.cyan(`${factor}x`)} ${chalk.gray('slower than')} ${fastest.name}`);
+  }
+
+  results.push(tasksSorted.map((task) => ({ bench: name, name: task.name, result: task.result })));
 }
 
-timers.completeAll();
+// run benchmarks
+await doBenchmark(simpleBench, 'simple');
+await doBenchmark(integrationBench, 'integration');
+
+// write out results to a file if a title was provided
+const title = process.argv[2];
+if (title) {
+  const outputFile = 'bench.json';
+  const output = JSON.parse(await fsp.readFile(outputFile, 'utf-8').catch(() => '[]'));
+  output.push({ title, results });
+  await fsp.writeFile(outputFile, JSON.stringify(output));
+}
