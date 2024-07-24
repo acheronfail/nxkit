@@ -97,7 +97,7 @@ const dataToWrite = randomBytes(diskSize);
 
 const simpleBench = new Bench({ time: 100 })
   .add(
-    'clear',
+    'plaintext',
     () => {
       layer.write(0, dataToWrite);
     },
@@ -119,7 +119,7 @@ const simpleBench = new Bench({ time: 100 })
     },
   )
   .add(
-    'encrypted',
+    'encryption',
     () => {
       layer.write(0, dataToWrite);
     },
@@ -132,7 +132,7 @@ const simpleBench = new Bench({ time: 100 })
 
 const integrationBench = new Bench({ time: 10000 })
   .add(
-    '100mb file, clear',
+    '100mb file, plaintext',
     async () => {
       await benchmark('clear', fat32);
     },
@@ -154,7 +154,12 @@ const integrationBench = new Bench({ time: 10000 })
     },
   );
 
-const results: { bench: string; name: string; result: TaskResult }[][] = [];
+type BenchmarkResults = {
+  title: string;
+  results: { name: string; tasks: { name: string; result: TaskResult }[] }[];
+}[];
+
+const results: BenchmarkResults[number]['results'] = [];
 async function doBenchmark(benchmark: Bench, name: string) {
   process.stdout.write(`Running benchmark: ${name}...`);
   await benchmark.run();
@@ -184,7 +189,10 @@ async function doBenchmark(benchmark: Bench, name: string) {
     console.log(`> ${task.name} ${chalk.cyan(`${factor}x`)} ${chalk.gray('slower than')} ${fastest.name}`);
   }
 
-  results.push(tasksSorted.map((task) => ({ bench: name, name: task.name, result: task.result })));
+  results.push({
+    name,
+    tasks: tasksSorted.map((task) => ({ name: task.name, result: task.result })),
+  });
 }
 
 // run benchmarks
@@ -195,7 +203,45 @@ await doBenchmark(integrationBench, 'integration');
 const title = process.argv[2];
 if (title) {
   const outputFile = 'bench.json';
-  const output = JSON.parse(await fsp.readFile(outputFile, 'utf-8').catch(() => '[]'));
+  const output: BenchmarkResults = JSON.parse(await fsp.readFile(outputFile, 'utf-8').catch(() => '[]'));
   output.push({ title, results });
   await fsp.writeFile(outputFile, JSON.stringify(output));
+
+  type Chart = {
+    title: string;
+    // the name of each different test run
+    xValues: string[];
+    // a benchmark name and plot for each value in the run
+    yValues: [string, number[]][];
+    timeUnit: string;
+  };
+
+  const formattedFile = 'bench.formatted.json';
+  await fsp.writeFile(
+    formattedFile,
+    JSON.stringify([
+      {
+        title: 'XTSN - Copy 50k buffer of random bytes',
+        timeUnit: 'us',
+        xValues: output.map((run) => run.title),
+        yValues: simpleBench.tasks.map((_, i) => [
+          output[0].results[0].tasks[i].name,
+          output.map((run) => {
+            return run.results[0].tasks[i].result.mean;
+          }),
+        ]),
+      },
+      {
+        title: 'XTSN - Copy 100MB File into Encrypted Fat32 Partition',
+        timeUnit: 'ms',
+        xValues: output.map((run) => run.title),
+        yValues: integrationBench.tasks.map((_, i) => [
+          output[0].results[1].tasks[i].name,
+          output.map((run) => {
+            return run.results[1].tasks[i].result.mean;
+          }),
+        ]),
+      },
+    ] satisfies Chart[]),
+  );
 }

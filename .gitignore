@@ -98,6 +98,7 @@ precommit.diff
 *.o
 *.cpuprofile
 bench.json
+bench.formatted.json
 scripts/*.wasm
 scripts/build/
 scripts/bench100m.js
