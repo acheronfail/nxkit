@@ -7,6 +7,7 @@ import { exec } from '@vscode/sudo-prompt';
 import { ExplorerIpcDefinition, ExplorerIpcKey, IncomingMessage, OutgoingMessage } from '../node/nand/explorer/worker';
 import { ProdKeys } from '../channels';
 import { sendSocketMessage, setupSocket } from '../node/nand/explorer/socket';
+import { getUniquePath } from '../node/paths';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const WORKER_PATH = path.join(__dirname, 'src_node_nand_explorer_worker.js');
@@ -64,46 +65,47 @@ class SudoProcessWorker implements WorkerProcess {
   }
 
   static create(): Promise<SudoProcessWorker> {
-    return new Promise((resolve, reject) => {
-      // TODO: if the pipe already exists, create a new one at a different location? (which would allow multi-instance apps, etc)
-      const pipePath = `${process.platform === 'win32' ? '//./pipe' : ''}/tmp/nxkit.explorer.worker`;
-      const server = net.createServer();
-      const exePath = app.getPath('exe');
+    return getUniquePath(`${process.platform === 'win32' ? '//./pipe' : ''}/tmp/nxkit.explorer.worker`).then(
+      (pipePath) =>
+        new Promise((resolve, reject) => {
+          const server = net.createServer();
+          const exePath = app.getPath('exe');
 
-      const cmd: string[] = [`"${exePath}"`, '--no-sandbox', `"${WORKER_PATH}"`];
+          const cmd: string[] = [`"${exePath}"`, '--no-sandbox', `"${WORKER_PATH}"`];
 
-      // NOTE: `sudo-prompt` doesn't pass `env` correctly on linux
-      const env: Record<string, string> = { NXKIT_DISK_PIPE: pipePath };
-      if (process.platform === 'linux') {
-        const add = (key: string) => {
-          const value = process.env[key];
-          if (value) env[key] = value;
-        };
+          // NOTE: `sudo-prompt` doesn't pass `env` correctly on linux
+          const env: Record<string, string> = { NXKIT_DISK_PIPE: pipePath };
+          if (process.platform === 'linux') {
+            const add = (key: string) => {
+              const value = process.env[key];
+              if (value) env[key] = value;
+            };
 
-        add('DISPLAY');
-        add('XAUTHORITY');
+            add('DISPLAY');
+            add('XAUTHORITY');
 
-        for (const [key, value] of Object.entries(env)) {
-          cmd.unshift(`${key}="${value.replace(/"/g, '\\"')}"`);
-        }
+            for (const [key, value] of Object.entries(env)) {
+              cmd.unshift(`${key}="${value.replace(/"/g, '\\"')}"`);
+            }
 
-        // NOTE: `sudo-prompt` also doesn't maintain the CWD properly, either
-        cmd.unshift(`cd "${process.cwd()}";`);
-      }
-
-      server.listen(pipePath, () => {
-        server.once('connection', (client) => resolve(new SudoProcessWorker(server, client)));
-        exec(cmd.join(' '), { name: app.getName(), env }, (err, stdout, stderr) => {
-          if (err) {
-            console.error('sudo-prompt:err', err);
-            reject(err);
+            // NOTE: `sudo-prompt` also doesn't maintain the CWD properly, either
+            cmd.unshift(`cd "${process.cwd()}";`);
           }
 
-          if (stdout?.length) console.log('sudo-prompt:stdout:', stdout);
-          if (stderr?.length) console.log('sudo-prompt:stderr:', stderr);
-        });
-      });
-    });
+          server.listen(pipePath, () => {
+            server.once('connection', (client) => resolve(new SudoProcessWorker(server, client)));
+            exec(cmd.join(' '), { name: app.getName(), env }, (err, stdout, stderr) => {
+              if (err) {
+                console.error('sudo-prompt:err', err);
+                reject(err);
+              }
+
+              if (stdout?.length) console.log('sudo-prompt:stdout:', stdout);
+              if (stderr?.length) console.log('sudo-prompt:stderr:', stderr);
+            });
+          });
+        }),
+    );
   }
 
   close(): void {

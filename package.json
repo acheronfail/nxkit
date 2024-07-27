@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "node scripts/npm-run.js test:vitest:run test:types:tsc test:types:svelte format:check lint",
-    "test:vitest": "vitest --config vite.test.config.ts",
+    "test:vitest": "node --expose-gc `which vitest` --config vite.test.config.ts",
     "test:vitest:run": "node --expose-gc `which vitest` --config vite.test.config.ts run",
     "test:types:tsc": "tsc -p tsconfig.json",
     "test:types:svelte": "svelte-check --tsconfig tsconfig.json"
