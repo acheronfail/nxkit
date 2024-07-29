@@ -1,5 +1,5 @@
 import fs from 'node:fs/promises';
-import { getResources } from '../resources';
+import { getPaths } from '../resources';
 import { ProdKeys } from '../channels';
 import { Keys } from './keys.types';
 
@@ -15,7 +15,7 @@ export async function resolveKeys(isPackaged: boolean, keysFromUser?: ProdKeys):
 }
 
 export async function findProdKeys(isPackaged: boolean): Promise<Keys | null> {
-  for (const filePath of getResources(isPackaged).prodKeysSearchPaths) {
+  for (const filePath of getPaths(isPackaged).prodKeysSearchPaths) {
     try {
       const text = await fs.readFile(filePath, 'utf-8');
       return Keys.parseKeys(filePath, text);

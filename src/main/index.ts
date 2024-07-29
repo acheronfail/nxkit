@@ -8,7 +8,7 @@ import { ProdKeys } from '../channels';
 import { findProdKeys } from '../node/keys';
 import * as payloads from './payloads';
 import automaticContextMenus from 'electron-context-menu';
-import { getResources } from '../resources';
+import { getPaths, getResources } from '../resources';
 import { ExplorerController } from './explorer';
 import { merge, split } from '../node/split';
 
@@ -80,7 +80,8 @@ const createMainWindow = (): BrowserWindow => {
   return win;
 };
 
-const { tegraRcmSmash, payloadDirectory, prodKeysSearchPaths } = getResources(app.isPackaged);
+const { tegraRcmSmash } = getResources(app.isPackaged);
+const { payloadDirectory, prodKeysSearchPaths } = getPaths(app.isPackaged);
 let explorerController: ExplorerController;
 let mainWindow: BrowserWindow;
 

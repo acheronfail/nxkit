@@ -2,11 +2,11 @@ import fs from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import { app } from 'electron';
 import prettyBytes from 'pretty-bytes';
-import { getResources } from '../resources';
+import { getPaths } from '../resources';
 import { FSFile } from '../node/nand/fatfs/fs';
 
 export async function readPayload(payloadPath: string): Promise<Uint8Array> {
-  const { payloadDirectory } = getResources(app.isPackaged);
+  const { payloadDirectory } = getPaths(app.isPackaged);
   const resolvedPath = resolve(payloadPath);
   if (!resolvedPath.startsWith(payloadDirectory)) {
     throw new Error(`Expected ${resolvedPath} to be within ${payloadDirectory}!`);
@@ -25,7 +25,7 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 export async function copyInFiles(filePaths: string[]): Promise<void> {
-  const { payloadDirectory } = getResources(app.isPackaged);
+  const { payloadDirectory } = getPaths(app.isPackaged);
   await Promise.all(
     filePaths.map(async (filePath) => {
       const stats = await fs.stat(filePath);
@@ -50,7 +50,7 @@ export async function copyInFiles(filePaths: string[]): Promise<void> {
 }
 
 export async function findPayloads(): Promise<FSFile[]> {
-  const { payloadDirectory } = getResources(app.isPackaged);
+  const { payloadDirectory } = getPaths(app.isPackaged);
   await fs.mkdir(payloadDirectory, { recursive: true });
 
   const payloads = await fs.readdir(payloadDirectory);

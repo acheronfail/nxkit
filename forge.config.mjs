@@ -12,6 +12,8 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 import cp from 'node:child_process';
+import { createRequire } from 'node:module';
+const pkgJson = createRequire(import.meta.url)('./package.json');
 
 // *sigh*, the things we do for cjs<->esm incompatibilities...
 const extraResource = JSON.parse(
@@ -27,12 +29,27 @@ const extraResource = JSON.parse(
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 const config = {
   packagerConfig: {
+    name: pkgJson.productName,
+    executableName: pkgJson.name,
     asar: true,
     extraResource,
     appCategoryType: 'public.app-category.utilities',
   },
   rebuildConfig: {},
-  makers: [new MakerSquirrel({}), new MakerZIP({}, ['darwin', 'linux']), new MakerRpm({}), new MakerDeb({})],
+  makers: [
+    new MakerSquirrel({}),
+    new MakerZIP({}, ['darwin', 'linux']),
+    new MakerRpm({
+      options: {
+        bin: pkgJson.name,
+      },
+    }),
+    new MakerDeb({
+      options: {
+        bin: pkgJson.name,
+      },
+    }),
+  ],
   plugins: [
     new VitePlugin({
       // `build` can specify multiple entry builds, which can be Main process, Preload scripts, Worker process, etc.
