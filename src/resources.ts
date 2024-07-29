@@ -3,6 +3,9 @@ import path from 'node:path';
 
 export type Resources = ReturnType<typeof getResources>;
 
+// FIXME: `getResources` should only return RESOURCES since it's used by the forge config for building
+// currently we also have `prodKeysSearchPaths` in here which is breaking things
+
 export function getResources(isPackaged: boolean) {
   const dotSwitch = path.join(os.homedir(), '.switch');
   const resources = {
