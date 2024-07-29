@@ -11,9 +11,17 @@
   import DownloadPayloads from './PayloadInjector/DownloadPayloads.svelte';
   import LogOutput from './utility/LogOutput.svelte';
   import Markdown from './utility/Markdown.svelte';
-  import rcmHelpMd from './markdown/rcm-help.md?raw';
+  import rcmHelpLinuxMd from './markdown/rcm-help.linux.md?raw';
+  import rcmHelpWindowsMd from './markdown/rcm-help.windows.md?raw';
+  import rcmHelpGenericMd from './markdown/rcm-help.generic.md?raw';
 
-  let showHelp = $state(true);
+  const helpText = (() => {
+    if (window.nxkit.isWindows) return rcmHelpWindowsMd;
+    if (window.nxkit.isLinux) return rcmHelpLinuxMd;
+    return rcmHelpGenericMd;
+  })();
+
+  let showHelp = $state(false);
   let output = $state('');
   let payloads = $state<FSFile[]>([]);
   let fileTree = $state<FileTree<FSFile, FSDirectory> | undefined>();
@@ -124,7 +132,7 @@
 
     {#if showHelp}
       <div class="grow">
-        <Markdown content={rcmHelpMd} />
+        <Markdown content={helpText} />
       </div>
     {/if}
 

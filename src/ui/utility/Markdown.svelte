@@ -13,6 +13,8 @@
 
   // TODO: support images (ensure vite bundles them in, etc)
   const tokens = $derived(lexer(content));
+
+  const codeClass = `font-mono break-words align-text-bottom text-sm border rounded p-1 border-slate-400 dark:border-slate-900 bg-slate-200 dark:bg-slate-700`;
 </script>
 
 {#snippet renderText({ token })}
@@ -61,6 +63,10 @@
   {/each}
 {/snippet}
 
+{#snippet code({ token })}
+  <pre class={codeClass}>{token.text}</pre>
+{/snippet}
+
 <div class={propClass}>
   {#each tokens as token}
     {#if token.type === 'heading'}
@@ -87,6 +93,10 @@
           {@render renderText({ token: t })}
         {/each}
       </p>
+    {:else if token.type === 'code'}
+      {@render code({ token })}
+    {:else}
+      <span class="bg-red-400 text-black font-bold">UNSUPPORTED MARKDOWN: {token.type}</span>
     {/if}
   {/each}
 </div>
