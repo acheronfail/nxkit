@@ -47,37 +47,39 @@
       {/if}
     </div>
 
-    <Tooltip>
-      {#if keys.userKeysSelected}
-        <Button appearance="warning" onclick={resetKeys}>Clear selected keys</Button>
-      {:else}
-        <Button appearance="primary" for="prod-keys">Manually select keys</Button>
-      {/if}
+    <div>
+      <Tooltip placement="right">
+        {#if keys.userKeysSelected}
+          <Button appearance="warning" onclick={resetKeys}>Clear selected keys</Button>
+        {:else}
+          <Button appearance="primary" for="prod-keys">Manually select keys</Button>
+        {/if}
 
-      {#snippet tooltip()}
-        <div class="w-96">
-          <p>
-            Prod keys are required for creating NSPs with the NRO Forwarder, and also for reading the Switch's NAND
-            partition in the explorer.
-          </p>
-          <p>
-            By default, NXKit searches the following places for <Code>prod.keys</Code> files:
-          </p>
+        {#snippet tooltip()}
+          <div class="w-96">
+            <p>
+              Prod keys are required for creating NSPs with the NRO Forwarder, and also for reading the Switch's NAND
+              partition in the explorer.
+            </p>
+            <p>
+              By default, NXKit searches the following places for <Code>prod.keys</Code> files:
+            </p>
 
-          <ul class="list-disc ml-4">
-            {#each searchPaths as path}
-              <li class="m-1"><Code>{path}</Code></li>
-            {/each}
-          </ul>
+            <ul class="list-disc ml-4">
+              {#each searchPaths as path}
+                <li class="m-1"><Code>{path}</Code></li>
+              {/each}
+            </ul>
 
-          <h4 class="font-bold">Where do I get <Code>prod.keys</Code>?</h4>
-          <p>
-            You must extract the keys from your Switch, if you have an unpatched Switch you can use
-            <Code>Lockpick_RCM</Code> to get them.
-          </p>
-        </div>
-      {/snippet}
-    </Tooltip>
+            <h4 class="font-bold">Where do I get <Code>prod.keys</Code>?</h4>
+            <p>
+              You must extract the keys from your Switch, if you have an unpatched Switch you can use
+              <Code>Lockpick_RCM</Code> to get them.
+            </p>
+          </div>
+        {/snippet}
+      </Tooltip>
+    </div>
 
     <input hidden type="file" id="prod-keys" name="prod-keys" bind:this={input} bind:files />
   </div>
@@ -85,7 +87,7 @@
   <h4 class="text-lg font-bold">Other toggles</h4>
 
   <div>
-    <Tooltip>
+    <Tooltip placement="right">
       <InputCheckbox
         id="showAdvanced"
         label="Show Advanced Settings"
