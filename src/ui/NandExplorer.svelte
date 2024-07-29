@@ -104,8 +104,9 @@
         selectedPartition = partition;
       }
     },
-    closePartition: () => {
+    closePartition: async () => {
       selectedPartition = null;
+      await handlers.openNand();
     },
     reset: () => {
       loading = true;

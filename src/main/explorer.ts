@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import net, { Server, Socket } from 'node:net';
 import { app, BrowserWindow, UtilityProcess, utilityProcess, dialog } from 'electron';
 import { exec } from '@vscode/sudo-prompt';
+import chalk from 'chalk';
 import { ExplorerIpcDefinition, ExplorerIpcKey, IncomingMessage, OutgoingMessage } from '../node/nand/explorer/worker';
 import { ProdKeys } from '../channels';
 import { sendSocketMessage, setupSocket } from '../node/nand/explorer/socket';
@@ -28,7 +29,9 @@ class UtilityProcessWorker implements WorkerProcess {
 
   static create(): Promise<UtilityProcessWorker> {
     return new Promise((resolve) => {
-      const proc = utilityProcess.fork(WORKER_PATH, [], { stdio: 'inherit' });
+      const proc = utilityProcess.fork(WORKER_PATH, [], { stdio: 'pipe' });
+      proc.stdout?.on('data', (chunk) => process.stdout.write(chalk.yellow(chunk.toString())));
+      proc.stderr?.on('data', (chunk) => process.stderr.write(chalk.red(chunk.toString())));
       proc.once('spawn', () => {
         resolve(new UtilityProcessWorker(proc));
       });
@@ -152,7 +155,6 @@ export class ExplorerController {
     this.proc = options.asSudo ? await SudoProcessWorker.create() : await UtilityProcessWorker.create();
 
     this.proc.sendMessage({ id: 'bootstrap', isPackaged: app.isPackaged } satisfies IncomingMessage<ExplorerIpcKey>);
-    this.proc.addExitListener(() => (this.proc = null));
     this.proc.addMessageListener((msg) => {
       if (msg.id === 'progress') {
         // TODO: types around this api
@@ -164,10 +166,26 @@ export class ExplorerController {
   }
 
   public async close() {
-    const ret = await this.call('close');
-    this.proc?.close();
-    this.proc = null;
+    const proc = this.proc;
+    if (!proc) {
+      return;
+    }
 
+    // tell filesystem to close
+    const ret = await this.call('close');
+
+    // tell process to close
+    proc.close();
+
+    // wait for process to have closed
+    await new Promise<void>((resolve) => {
+      proc.addExitListener(() => {
+        this.proc = null;
+        resolve();
+      });
+    });
+
+    // return now we're sure it's all closed
     return ret;
   }
 
