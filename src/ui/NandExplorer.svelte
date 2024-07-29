@@ -20,6 +20,7 @@
   import InputCheckbox from './utility/InputCheckbox.svelte';
   import Markdown from './utility/Markdown.svelte';
   import readonlyMd from './markdown/nand-readonly.md?raw';
+  import { settings } from './stores/settings.svelte';
 
   // TODO: support working directly with a connected switch, not just with dumps
   // can we auto-detect the device? then use "nandOpenDisk" to open it with sudo
@@ -175,19 +176,22 @@
       <p class="text-center">Choose a partition to explore</p>
       <div class="flex justify-center items-center gap-2 mt-2">
         <Button size="inline" onclick={handlers.verifyPartitionTable}>verify partition table</Button>
-        <Tooltip>
-          <Button size="inline" onclick={handlers.repairBackupPartitionTable} appearance="danger" disabled={readonly}>
-            repair backup gpt table
-          </Button>
-          {#snippet tooltip()}
-            <div class="w-96">
-              <p class="text-center">
-                Attempt to repair the Backup GPT partition table by re-creating it from the Primary GPT partition table.
-              </p>
-              <p class="text-center">Only do this if you know what you're doing!</p>
-            </div>
-          {/snippet}
-        </Tooltip>
+        {#if settings.showAdvanced}
+          <Tooltip>
+            <Button size="inline" onclick={handlers.repairBackupPartitionTable} appearance="danger" disabled={readonly}>
+              repair backup gpt table
+            </Button>
+            {#snippet tooltip()}
+              <div class="w-96">
+                <p class="text-center">
+                  Attempt to repair the Backup GPT partition table by re-creating it from the Primary GPT partition
+                  table.
+                </p>
+                <p class="text-center">Only do this if you know what you're doing!</p>
+              </div>
+            {/snippet}
+          </Tooltip>
+        {/if}
       </div>
       <PartitionExplorer
         class="overflow-auto grow h-0"
@@ -212,6 +216,7 @@
   <div class="flex justify-center">
     <InputCheckbox
       id="readonly"
+      label="Read-Only"
       appearance="pronounced"
       disabled={readonlyDisabled}
       bind:checked={readonly}
@@ -227,9 +232,6 @@
             </p>
           {/if}
         </div>
-      {/snippet}
-      {#snippet label()}
-        Read-Only:
       {/snippet}
     </InputCheckbox>
   </div>

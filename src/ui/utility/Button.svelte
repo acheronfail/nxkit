@@ -85,7 +85,7 @@
     onkeydown={(e) => e.code === 'Space' && onPress(e, true)}
     tabindex="0"
     role="button"
-    class="{disabled ? disabledClass : appearanceClass[appearance]} {loading
+    class="inline-block {disabled ? disabledClass : appearanceClass[appearance]} {loading
       ? loadingClass
       : disabled
         ? ''
