@@ -2,13 +2,15 @@
   import type { Snippet } from 'svelte';
 
   export const TabContextKey = {};
+
+  export type TabType = {};
   export interface TabContext {
-    registerTab: (tab: {}) => void;
-    registerPanel: (panel: {}) => void;
-    selectTab: (tab: {}) => void;
+    registerTab: (tab: TabType) => void;
+    registerPanel: (panel: TabType) => void;
+    selectTab: (tab: TabType) => void;
     selectTabByIndex: (index: number) => void;
-    selectedTab: Writable<{} | null>;
-    selectedPanel: Writable<{} | null>;
+    selectedTab: Writable<TabType | null>;
+    selectedPanel: Writable<TabType | null>;
   }
 
   export interface Props {
@@ -23,35 +25,37 @@
 
   let { children, selected = $bindable(0) }: Props = $props();
 
-  const tabs: {}[] = [];
-  const panels: {}[] = [];
-  const selectedTab = writable<{} | null>(null);
-  const selectedPanel = writable<{} | null>(null);
+  const tabs: TabType[] = [];
+  const panels: TabType[] = [];
+  const selectedTab = writable<TabType | null>(null);
+  const selectedPanel = writable<TabType | null>(null);
 
   const context = setContext<TabContext>(TabContextKey, {
-    registerTab: (tab: {}) => {
+    registerTab: (tab: TabType) => {
       tabs.push(tab);
-      selectedTab.update((current) => current || tab);
+      selectedTab.update((current: TabType | null) => current || tab);
 
       onDestroy(() => {
         const i = tabs.indexOf(tab);
         tabs.splice(i, 1);
-        selectedTab.update((current) => (current === tab ? tabs[i] || tabs[tabs.length - 1] : current));
+        selectedTab.update((current: TabType | null) => (current === tab ? tabs[i] || tabs[tabs.length - 1] : current));
       });
     },
 
-    registerPanel: (panel: {}) => {
+    registerPanel: (panel: TabType) => {
       panels.push(panel);
-      selectedPanel.update((current) => current || panel);
+      selectedPanel.update((current: TabType | null) => current || panel);
 
       onDestroy(() => {
         const i = panels.indexOf(panel);
         panels.splice(i, 1);
-        selectedPanel.update((current) => (current === panel ? panels[i] || panels[panels.length - 1] : current));
+        selectedPanel.update((current: TabType | null) =>
+          current === panel ? panels[i] || panels[panels.length - 1] : current,
+        );
       });
     },
 
-    selectTab: (tab: {}) => {
+    selectTab: (tab: TabType) => {
       const i = tabs.indexOf(tab);
       selectedTab.set(tab);
       selectedPanel.set(panels[i]);

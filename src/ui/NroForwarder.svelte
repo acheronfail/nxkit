@@ -1,7 +1,8 @@
 <script lang="ts">
+  import { ArrowPathIcon } from 'heroicons-svelte/24/solid';
   import { downloadFile } from '../browser/file';
   import { buildNsp } from '../browser/hacbrewpack/nsp';
-  import { generateTitleId } from '../browser/hacbrewpack/id';
+  import { generateTitleId, titleIdsPromise } from '../browser/hacbrewpack/id';
   import { keys } from './stores/keys.svelte';
   import Button from './utility/Button.svelte';
   import Container from './utility/Container.svelte';
@@ -10,6 +11,7 @@
   import LogOutput from './utility/LogOutput.svelte';
   import { Tabs, TabList, TabContent, Tab } from './utility/Tabs';
   import Tooltip from './utility/Tooltip.svelte';
+  import { onMount } from 'svelte';
 
   const nroPathDesc = (name: string) => `File path to the ${name} NRO file on the Nintendo Switch SD card.`;
   const descriptions = {
@@ -23,12 +25,18 @@
     romPath: "File path to the game's ROM file on the Nintendo Switch SD card",
   };
 
-  let id = $state(generateTitleId());
+  let id = $state('');
   let title = $state('');
   let author = $state('');
   let nroPath = $state('');
   let romPath = $state('');
   let image = $state<Image | null>(null);
+
+  const regenerateId = () => generateTitleId().then((randomId) => (id = randomId));
+
+  onMount(() => {
+    regenerateId();
+  });
 
   let disabled = $derived(!keys.value || !image);
   let tooltipText = $derived(
@@ -39,7 +47,15 @@
   let stderr = $state('');
 
   async function generate() {
+    const titleIds = await titleIdsPromise;
+
     try {
+      if (titleIds.has(id)) {
+        throw new Error(
+          `The provided id: '${id}' conflicts with a known system or game id! Please choose another one.`,
+        );
+      }
+
       if (!image) {
         throw new Error('Cannot generate an NSP without an image!');
       }
@@ -80,6 +96,30 @@
   const tooltipClass = 'w-60 text-center';
 </script>
 
+{#snippet renderId()}
+  <InputText id="appId" placeholder="01..........0000" bind:value={id}>
+    {#snippet label()}
+      <div class="flex justify-between items-center pr-2">
+        App ID:
+        <Tooltip placement="top">
+          <Button size="small" onclick={regenerateId}>
+            <ArrowPathIcon class="w-6" />
+          </Button>
+          {#snippet tooltip()}
+            <p class="w-96 text-center">
+              Regenerate id. The IDs generated here should be safe: they're checked against a list of known system ids,
+              as well as a list of known game ids.
+            </p>
+          {/snippet}
+        </Tooltip>
+      </div>
+    {/snippet}
+    {#snippet infoTooltip()}
+      <div class={tooltipClass}>{descriptions.id}</div>
+    {/snippet}
+  </InputText>
+{/snippet}
+
 <Container data-testid="nro-forwarder">
   <Tabs>
     <TabList>
@@ -89,22 +129,18 @@
 
     <TabContent class="justify-around gap-2">
       <InputImage onCropComplete={(img) => (image = img)} />
-      <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
-        {#snippet infoTooltip()}
-          <div class={tooltipClass}>{descriptions.id}</div>
-        {/snippet}
-      </InputText>
-      <InputText label="App Title" placeholder="NX Shell" bind:value={title}>
+      {@render renderId()}
+      <InputText id="appTitle" label="App Title" placeholder="NX Shell" bind:value={title}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.title}</div>
         {/snippet}
       </InputText>
-      <InputText label="App Publisher" placeholder="joel16" bind:value={author}>
+      <InputText id="appPublisher" label="App Publisher" placeholder="joel16" bind:value={author}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.author}</div>
         {/snippet}
       </InputText>
-      <InputText label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
+      <InputText id="nroPath" label="NRO Path" placeholder="/switch/NX-Shell.nro" bind:value={nroPath}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.nroPath.app}</div>
         {/snippet}
@@ -112,27 +148,28 @@
     </TabContent>
     <TabContent class="justify-around gap-2">
       <InputImage onCropComplete={(img) => (image = img)} />
-      <InputText label="App ID" placeholder="01..........0000" bind:value={id}>
-        {#snippet infoTooltip()}
-          <div class={tooltipClass}>{descriptions.id}</div>
-        {/snippet}
-      </InputText>
-      <InputText label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
+      {@render renderId()}
+      <InputText id="gameTitle" label="Game Title" placeholder="Kirby's Adventure" bind:value={title}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.title}</div>
         {/snippet}
       </InputText>
-      <InputText label="Game Publisher" placeholder="Nintendo" bind:value={author}>
+      <InputText id="gamePublisher" label="Game Publisher" placeholder="Nintendo" bind:value={author}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.author}</div>
         {/snippet}
       </InputText>
-      <InputText label="Core Path" placeholder="/retroarch/cores/nestopia_libretro_libnx.nro" bind:value={nroPath}>
+      <InputText
+        id="corePath"
+        label="Core Path"
+        placeholder="/retroarch/cores/nestopia_libretro_libnx.nro"
+        bind:value={nroPath}
+      >
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.nroPath.rom}</div>
         {/snippet}
       </InputText>
-      <InputText label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
+      <InputText id="romPath" label="ROM Path" placeholder="/roms/nes/Kirby's Adventure.zip" bind:value={romPath}>
         {#snippet infoTooltip()}
           <div class={tooltipClass}>{descriptions.romPath}</div>
         {/snippet}

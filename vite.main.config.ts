@@ -2,6 +2,7 @@ import type { ConfigEnv, PluginOption, UserConfig } from 'vite';
 import { defineConfig, mergeConfig } from 'vite';
 import { join, basename, dirname, relative } from 'node:path';
 import fs from 'node:fs';
+import { SourceMapGenerator } from 'source-map';
 import { getBuildConfig, getBuildDefine, external, pluginHotRestart } from './vite.base.config';
 
 // https://vitejs.dev/config
@@ -55,17 +56,37 @@ function copyNativeNodesModules(outDir: string): PluginOption {
     transform: (code, id) => {
       const requireRe = /require\(['"](.*?)['"]\)/g;
 
-      const match = requireRe.exec(code);
-      if (!match || !match[1] || !match[1].endsWith('.node')) return;
+      const map = new SourceMapGenerator({ file: id, sourceRoot: '' });
+      map.setSourceContent(id, code);
 
-      const requirePath = match[1];
-      const dotNodePath = join(dirname(id), requirePath);
+      let match: RegExpExecArray | null;
+      while ((match = requireRe.exec(code))) {
+        const requirePath = match[1];
+        if (!requirePath || !requirePath.endsWith('.node')) continue;
 
-      const bundledPath = join(nodeDir, `${basename(dotNodePath, '.node')}.${unique++}.node`);
-      const newRequirePath = relative(outDir, bundledPath);
-      fs.copyFileSync(dotNodePath, bundledPath);
+        const line = code.substring(0, match.index).split('\n').length;
+        map.addMapping({
+          generated: { line, column: 0 },
+          original: { line, column: 0 },
+          source: id,
+        });
 
-      return { code: code.replace(requireRe, `require("./${newRequirePath}")`) };
+        const dotNodePath = join(dirname(id), requirePath);
+        const bundledPath = join(nodeDir, `${basename(dotNodePath, '.node')}.${unique++}.node`);
+        const newRequirePath = relative(outDir, bundledPath);
+        fs.copyFileSync(dotNodePath, bundledPath);
+
+        code = [
+          code.slice(0, match.index),
+          `require("./${newRequirePath}")`,
+          code.slice(match.index + match[0].length),
+        ].join('');
+      }
+
+      return {
+        code,
+        map: map.toString(),
+      };
     },
   };
 }

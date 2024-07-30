@@ -1,5 +1,3 @@
-import GameTitles from '../../../vendor/tinfoil/titles.json';
-
 const systemTitleIds = {
   systemModules: [
     // https://switchbrew.org/wiki/Title_list#System_Modules
@@ -399,20 +397,22 @@ const systemTitleIds = {
   ],
 };
 
-function getAllTitleIds(): Set<string> {
+export const titleIdsPromise = (async function getAllTitleIds(): Promise<Set<string>> {
+  const GameTitles = (await import('../../../vendor/tinfoil/titles.json')) as unknown as TinfoilResponse;
+
   const values = new Set(
     Object.values(systemTitleIds)
       .flat()
-      .concat((GameTitles as TinfoilResponse).data.map(({ id }) => id))
+      .concat(GameTitles.data.map(({ id }) => id))
       .map((id) => id.toLowerCase()),
   );
 
   return values;
-}
+})();
 
-export const titleIds = getAllTitleIds();
+export async function generateTitleId(): Promise<string> {
+  const titleIds = await titleIdsPromise;
 
-export function generateTitleId(): string {
   const randomId = () =>
     ['01', ...new Array(10).fill(0).map(() => Math.floor(Math.random() * 16).toString(16)), '0000'].join('');
 
