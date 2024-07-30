@@ -1,7 +1,7 @@
 {
   "type": "module",
   "name": "nxkit",
-  "productName": "NKXit",
+  "productName": "NXKit",
   "version": "1.0.0",
   "description": "Utilities for Nintendo Switch (NX) Homebrew",
   "main": ".vite/build/src_main_index.js",
