@@ -46,6 +46,12 @@ setup:
 dev *args: rebuild-electron
   npm start -- -- {{args}}
 
+# package the app and start it
+dev-packaged *args:
+  rm -rf out
+  npm run package
+  ./out/NXKit-{{os()}}-{{ if arch() == "x86_64" { "x64" } else { arch() } }}/nxkit {{args}}
+
 # rebuild native modules to work with electron
 rebuild-electron:
   cd src/node/nand/xtsn && npm run clean
