@@ -26,12 +26,14 @@ const extraResource = JSON.parse(
   ),
 );
 
+const asar = true;
+
 /** @type {import('@electron-forge/shared-types').ForgeConfig} */
 const config = {
   packagerConfig: {
     name: pkgJson.productName,
     executableName: pkgJson.name,
-    asar: true,
+    asar,
     extraResource,
     appCategoryType: 'public.app-category.utilities',
   },
@@ -86,7 +88,7 @@ const config = {
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
       // Disabled because it currently breaks windows applications
       [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: false,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
+      [FuseV1Options.OnlyLoadAppFromAsar]: asar,
     }),
   ],
 };

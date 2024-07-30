@@ -101,6 +101,9 @@ fetch-titles:
 publish-xtsn:
   cd src/node/nand/xtsn && npm run prepublish && npm publish
 
+package:
+  npm run make
+
 #
 # Hooks
 #

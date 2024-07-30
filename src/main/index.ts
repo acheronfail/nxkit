@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { platform } from 'node:os';
 import cp from 'node:child_process';
 import { createRequire } from 'node:module';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { ProdKeys } from '../channels';
 import { findProdKeys } from '../node/keys';
@@ -21,16 +21,20 @@ if (require('electron-squirrel-startup')) {
 }
 
 // global variables set here so they can be re-used
-process.env.IS_DEV = app.isPackaged ? '1' : '0';
-process.env.DEBUG = process.env.IS_DEV ?? process.env.DEBUG ? '1' : '0';
+setEnv('IS_DEV', app.isPackaged);
+setEnv('DEBUG', process.env.IS_DEV ?? process.env.DEBUG);
 
 automaticContextMenus({});
 
 function loadWindow(window: BrowserWindow, name: string, params?: URLSearchParams) {
+  const query = '?' + params;
+  const htmlPath = `/src/${name}/index.html`;
   if (RENDERER_VITE_DEV_SERVER_URL) {
-    window.loadURL(`${RENDERER_VITE_DEV_SERVER_URL}/src/${name}/index.html?${params}`);
+    window.loadURL([RENDERER_VITE_DEV_SERVER_URL, htmlPath, query].join(''));
   } else {
-    window.loadFile(path.join(__dirname, `../${RENDERER_VITE_NAME}/src/${name}/index.html?${params}`));
+    const relPath = path.join(__dirname, '..', RENDERER_VITE_NAME, htmlPath);
+    const absPath = path.resolve(relPath);
+    window.loadURL([pathToFileURL(absPath), query].join(''));
   }
 }
 
@@ -49,7 +53,7 @@ const createMainWindow = (): BrowserWindow => {
   win.once('ready-to-show', () => win.show());
 
   // quick 'n' dirty cli handling
-  const argString = process.argv.slice(2).join(' ');
+  const argString = process.argv.slice(1 + Number(!app.isPackaged)).join(' ');
   const params = new URLSearchParams();
   const addMatch = (name: string, re: RegExp, map?: (val: string) => string) => {
     const match = re.exec(argString);
@@ -201,3 +205,11 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+function setEnv(key: string, value?: string | boolean) {
+  if (value) {
+    process.env[key] = typeof value === 'boolean' ? '1' : value;
+  } else {
+    delete process.env[key];
+  }
+}
