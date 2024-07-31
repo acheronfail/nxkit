@@ -12,6 +12,8 @@ import { getPaths, getResources } from '../resources';
 import { ExplorerController } from './explorer';
 import { merge, split } from '../node/split';
 
+// FIXME: need a way to easily view main proc logs on windows - explorer doesn't work there
+
 const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
