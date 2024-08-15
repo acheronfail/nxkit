@@ -29,7 +29,7 @@ setEnv('DEBUG', process.env.IS_DEV ?? process.env.DEBUG);
 automaticContextMenus({});
 
 function loadWindow(window: BrowserWindow, name: string, params?: URLSearchParams) {
-  const query = '?' + params;
+  const query = params ? '?' + params : '';
   const htmlPath = `/src/${name}/index.html`;
   if (RENDERER_VITE_DEV_SERVER_URL) {
     window.loadURL([RENDERER_VITE_DEV_SERVER_URL, htmlPath, query].join(''));
