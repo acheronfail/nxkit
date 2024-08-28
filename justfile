@@ -1,4 +1,6 @@
-bin := './.bin'
+bin := invocation_directory() / './.bin'
+
+node_bin := bin / 'node/bin'
 node_arch := if arch() == "x86_64" { "x64" } else { "arm64" }
 node_platform := if os() == "windows" { "win" } else if os() == "macos" { "darwin" } else { os() }
 node_version := '20.17.0'
@@ -17,16 +19,25 @@ _default:
 # set up the local repository for development
 setup:
   @mkdir -p {{bin}} {{bin / 'node'}}
-  @if [ ! -d {{bin / 'node'}} ]; then curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}}; fi
-  npm install --force
+  @if [ ! -d {{node_bin}} ]; then curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}}; fi
+  {{node_bin}}/npm install --force
 
   @echo "Setting up git hooks..."
   @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
   @echo "just pre-commit" >> .git/hooks/pre-commit
   @chmod +x .git/hooks/pre-commit
 
-  @echo -n "Do you want to create a fake nand dump? (y/N): "
+  @env echo -n "Do you want to create a fake nand dump? (y/N): "
   @read ans; if [[ $ans = *y* ]]; then just create-nand; fi
+
+# clean up installed toolchains and installed dependencies
+clean:
+  rm -rf {{bin}}
+  rm -rf node_modules
+
+# revert to the state after cloning the repository
+clean_all: clean
+  git clean -fdx
 
 #
 # Dev Scripts
@@ -34,45 +45,45 @@ setup:
 
 # start the app in dev mode
 dev *args: rebuild-electron
-  npm start -- -- {{args}}
+  {{node_bin}}/npm start -- -- {{args}}
 
 # package the app and start it
 dev-packaged *args:
   rm -rf out
-  npm run package
+  {{node_bin}}/npm run package
   ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
 
 # rebuild native modules to work with electron
 rebuild-electron:
-  cd src/node/nand/xtsn && npm run clean
-  npm exec electron-rebuild -- --module-dir src/node/nand/xtsn
+  cd src/node/nand/xtsn && {{node_bin}}/npm run clean
+  {{node_bin}}/npm exec electron-rebuild -- --module-dir src/node/nand/xtsn
 # rebuild native modules to work with node
 rebuild-node:
-  cd src/node/nand/xtsn && npm rebuild
+  cd src/node/nand/xtsn && {{node_bin}}/npm rebuild
 
 # runs all tests and checks
 test-all: rebuild-node
-  npm run test
+  {{node_bin}}/npm run test
 
 # runs vitest in watch mode
 test *ARGS: rebuild-node
-  npm run test:vitest -- {{ARGS}}
+  {{node_bin}}/npm run test:vitest -- {{ARGS}}
 
 # runs benchmarks; outputs a .cpuprofile file and creates bench.json if title was passed
 bench TITLE='': rebuild-node
   @mkdir -p scripts/build/Release
   @cp src/node/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
   @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
-  npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
-  node --cpu-prof scripts/bench100m.js {{TITLE}}
+  {{node_bin}}/npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
+  {{node_bin}}/node --cpu-prof scripts/bench100m.js {{TITLE}}
 
 # formats all code
 format:
-  npm run format
+  {{node_bin}}/npm run format
 
 # creates a fake NAND dump for testing
 create-nand *ARGS: rebuild-node
-  npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
+  {{node_bin}}/npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
 
 #
 # Vendor
@@ -91,17 +102,17 @@ vendor-hacbrewpack: _nxkit_image
   docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{nxkit_image}} bash -c '(cd /src; make clean_full; make)'
 
 fetch-titles:
-  npm exec tsx vendor/tinfoil/update.ts
+  {{node_bin}}/npm exec tsx vendor/tinfoil/update.ts
 
 #
 # Release
 #
 
 publish-xtsn:
-  cd src/node/nand/xtsn && npm run prepublish && npm publish
+  cd src/node/nand/xtsn && {{node_bin}}/npm run prepublish && {{node_bin}}/npm publish
 
 package:
-  npm run make
+  {{node_bin}}/npm run make
 
 #
 # Hooks
