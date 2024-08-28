@@ -1,6 +1,12 @@
-cyan := '\033[0;36m'
-red := '\033[0;31m'
-reset := '\033[0m'
+bin := './.bin'
+node_arch := if arch() == "x86_64" { "x64" } else { "arm64" }
+node_platform := if os() == "windows" { "win" } else if os() == "macos" { "darwin" } else { os() }
+node_version := '20.17.0'
+node_url := 'https://nodejs.org/dist/v' + node_version + '/node-v' + node_version + '-' + node_platform + '-' + node_arch + '.tar.gz'
+
+nxkit_image := 'nxkit'
+
+export PATH := bin + ':' + bin / 'node/bin:' + env_var('PATH')
 
 _default:
   just -l
@@ -8,34 +14,18 @@ _default:
 @_check CMD MSG="":
     if ! command -v {{CMD}} >/dev/null 2>&1 /dev/null; then echo "{{CMD}} is required! {{MSG}}"; exit 1; fi
 
-@_setup_pacman pac:
-  @just _check "{{pac}}" "See https://devkitpro.org/wiki/Getting_Started for installation instructions"
-  @echo "{{cyan}}Checking for devkitpro switch packages...{{reset}}"
-  @if ! {{pac}} -Qg switch-dev | cut -d' ' -f2 | xargs -n1 sh -c '{{pac}} -Qi $0 >/dev/null || exit 255'; then \
-    echo "{{red}}Failed to find devkitpro switch-dev package, installing now...{{reset}}" \
-    sudo {{pac}} -Sy switch-dev; \
-  fi
-
 # set up the local repository for development
 setup:
-  @echo "{{cyan}}Installing node_modules...{{reset}}"
+  @mkdir -p {{bin}} {{bin / 'node'}}
+  @if [ ! -d {{bin / 'node'}} ]; then curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}}; fi
   npm install --force
 
-  @echo "{{cyan}}Setting up git hooks...{{reset}}"
+  @echo "Setting up git hooks..."
   @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
   @echo "just pre-commit" >> .git/hooks/pre-commit
   @chmod +x .git/hooks/pre-commit
 
-  @echo "{{cyan}}Checking for required tools...{{reset}}"
-  @just _check "gcc"
-  @just _check "make"
-  @just _check "emcc" "See https://emscripten.org/docs/getting_started/downloads.html for installation instructions"
-  @if command -v pacman &> /dev/null; then just _setup_pacman pacman; else just _setup_pacman dkp-pacman; fi
-
-  @echo "{{cyan}}Building vendor dependencies...{{reset}}"
-  just vendor
-
-  @echo -n "{{cyan}}Do you want to create a fake nand dump?{{reset}} (y/N): "
+  @echo -n "Do you want to create a fake nand dump? (y/N): "
   @read ans; if [[ $ans = *y* ]]; then just create-nand; fi
 
 #
@@ -50,7 +40,7 @@ dev *args: rebuild-electron
 dev-packaged *args:
   rm -rf out
   npm run package
-  ./out/NXKit-{{os()}}-{{ if arch() == "x86_64" { "x64" } else { arch() } }}/nxkit {{args}}
+  ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
 
 # rebuild native modules to work with electron
 rebuild-electron:
@@ -88,14 +78,17 @@ create-nand *ARGS: rebuild-node
 # Vendor
 #
 
+_nxkit_image:
+  docker build -t {{nxkit_image}} vendor/docker
+
 # builds all vendor dependencies
-vendor:
+vendor: _nxkit_image
   for c in $(just --summary | xargs -n1 | grep vendor-); do just $c; done
 
-vendor-nro:
-  cd vendor/Forwarder-Mod && (make clean; make all)
-vendor-hacbrewpack:
-  cd vendor/hacbrewpack && (make clean_full; make)
+vendor-nro: _nxkit_image
+  docker run -ti --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{nxkit_image}} bash -c '(cd /src; make clean; make all)'
+vendor-hacbrewpack: _nxkit_image
+  docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{nxkit_image}} bash -c '(cd /src; make clean_full; make)'
 
 fetch-titles:
   npm exec tsx vendor/tinfoil/update.ts
