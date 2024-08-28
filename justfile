@@ -5,6 +5,7 @@ node_arch := if arch() == "x86_64" { "x64" } else { "arm64" }
 node_platform := if os() == "windows" { "win" } else if os() == "macos" { "darwin" } else { os() }
 node_version := '20.17.0'
 node_url := 'https://nodejs.org/dist/v' + node_version + '/node-v' + node_version + '-' + node_platform + '-' + node_arch + '.tar.gz'
+npm := node_bin / 'npm'
 
 nxkit_image := 'nxkit'
 
@@ -20,7 +21,7 @@ _default:
 setup:
   @mkdir -p {{bin}} {{bin / 'node'}}
   @if [ ! -d {{node_bin}} ]; then curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}}; fi
-  {{node_bin}}/npm install --force
+  {{npm}} install --force
 
   @echo "Setting up git hooks..."
   @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
@@ -43,31 +44,35 @@ clean_all: clean
 # Dev Scripts
 #
 
+# run npm
+npm *args:
+  {{npm}} {{args}}
+
 # start the app in dev mode
 dev *args: rebuild-electron
-  {{node_bin}}/npm start -- -- {{args}}
+  {{npm}} start -- -- {{args}}
 
 # package the app and start it
 dev-packaged *args:
   rm -rf out
-  {{node_bin}}/npm run package
+  {{npm}} run package
   ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
 
 # rebuild native modules to work with electron
 rebuild-electron:
-  cd src/node/nand/xtsn && {{node_bin}}/npm run clean
-  {{node_bin}}/npm exec electron-rebuild -- --module-dir src/node/nand/xtsn
+  cd src/node/nand/xtsn && {{npm}} run clean
+  {{npm}} exec electron-rebuild -- --module-dir src/node/nand/xtsn
 # rebuild native modules to work with node
 rebuild-node:
-  cd src/node/nand/xtsn && {{node_bin}}/npm rebuild
+  cd src/node/nand/xtsn && {{npm}} rebuild
 
 # runs all tests and checks
 test-all: rebuild-node
-  {{node_bin}}/npm run test
+  {{npm}} run test
 
 # runs vitest in watch mode
 test *ARGS: rebuild-node
-  {{node_bin}}/npm run test:vitest -- {{ARGS}}
+  {{npm}} run test:vitest -- {{ARGS}}
 
 # runs benchmarks; outputs a .cpuprofile file and creates bench.json if title was passed
 bench TITLE='': rebuild-node
@@ -79,11 +84,11 @@ bench TITLE='': rebuild-node
 
 # formats all code
 format:
-  {{node_bin}}/npm run format
+  {{npm}} run format
 
 # creates a fake NAND dump for testing
 create-nand *ARGS: rebuild-node
-  {{node_bin}}/npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
+  {{npm}} exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
 
 #
 # Vendor
@@ -102,17 +107,17 @@ vendor-hacbrewpack: _nxkit_image
   docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{nxkit_image}} bash -c '(cd /src; make clean_full; make)'
 
 fetch-titles:
-  {{node_bin}}/npm exec tsx vendor/tinfoil/update.ts
+  {{npm}} exec tsx vendor/tinfoil/update.ts
 
 #
 # Release
 #
 
 publish-xtsn:
-  cd src/node/nand/xtsn && {{node_bin}}/npm run prepublish && {{node_bin}}/npm publish
+  cd src/node/nand/xtsn && {{npm}} run prepublish && {{npm}} publish
 
 package:
-  {{node_bin}}/npm run make
+  {{npm}} run make
 
 #
 # Hooks
