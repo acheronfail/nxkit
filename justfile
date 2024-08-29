@@ -1,11 +1,15 @@
-bin := invocation_directory() / './.bin'
+bin := invocation_directory() / '.bin'
+tmp := invocation_directory() / '.tmp'
 
-node_bin := bin / 'node/bin'
-node_arch := if arch() == "x86_64" { "x64" } else { "arm64" }
-node_platform := if os() == "windows" { "win" } else if os() == "macos" { "darwin" } else { os() }
-node_version := '20.17.0'
-node_url := 'https://nodejs.org/dist/v' + node_version + '/node-v' + node_version + '-' + node_platform + '-' + node_arch + '.tar.gz'
+node_bin := bin / if os() == 'windows' { 'node' } else { 'node/bin' }
+node_arch := if arch() == 'x86_64' { 'x64' } else { 'arm64' }
+node_plat := if os() == 'windows' { 'win' } else if os() == 'macos' { 'darwin' } else { os() }
+node_ver := '20.17.0'
+node_url := 'https://nodejs.org/dist/v' + node_ver + '/node-v' + node_ver + '-' + node_plat + '-' + node_arch + if os() == 'windows' { '.zip' } else { '.tar.gz' }
+node_tar := if os() == 'windows' { 'unzip - -d' } else { 'tar -xzvf - --strip-components=1 -C' }
 npm := node_bin / 'npm'
+npx := node_bin / 'npx'
+node := node_bin / 'node'
 
 nxkit_image := 'nxkit'
 
@@ -19,17 +23,34 @@ _default:
 
 # set up the local repository for development
 setup:
-  @mkdir -p {{bin}} {{bin / 'node'}}
-  @if [ ! -d {{node_bin}} ]; then curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}}; fi
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  echo "preparing directories..."
+  rm -rf {{tmp}}
+  mkdir -p {{bin}} {{tmp}} {{bin / 'node'}}
+
+  echo "checking node..."
+  if [ ! -x {{npm}} ]; then
+    if [ "{{os()}}" = "windows" ]; then
+      curl -L {{node_url}} > {{tmp}}/node.zip
+      unzip {{tmp}}/node.zip -d {{bin / 'node'}}
+      mv {{bin / 'node'}}/*/* {{bin / 'node'}}/
+    else
+      curl -L {{node_url}} | tar -xzvf - --strip-components=1 -C {{bin / 'node'}};
+    fi
+  fi
   {{npm}} install --force
 
-  @echo "Setting up git hooks..."
-  @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
-  @echo "just pre-commit" >> .git/hooks/pre-commit
-  @chmod +x .git/hooks/pre-commit
+  if [ -z "${CI:-}" ]; then
+    echo "setting up git hooks..."
+    echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
+    echo "just pre-commit" >> .git/hooks/pre-commit
+    chmod +x .git/hooks/pre-commit
 
-  @env echo -n "Do you want to create a fake nand dump? (y/N): "
-  @read ans; if [[ $ans = *y* ]]; then just create-nand; fi
+    env echo -n "Do you want to create a fake nand dump? (y/N): "
+    read ans; if [[ $ans = *y* ]]; then just create-nand; fi
+  fi
 
 # clean up installed toolchains and installed dependencies
 clean:
@@ -79,8 +100,8 @@ bench TITLE='': rebuild-node
   @mkdir -p scripts/build/Release
   @cp src/node/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
   @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
-  {{node_bin}}/npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
-  {{node_bin}}/node --cpu-prof scripts/bench100m.js {{TITLE}}
+  {{npx}} esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
+  {{node}} --cpu-prof scripts/bench100m.js {{TITLE}}
 
 # formats all code
 format:
@@ -95,9 +116,9 @@ create-nand *ARGS: rebuild-node
 #
 
 _nxkit_image:
-  docker build -t {{nxkit_image}} vendor/docker
+  docker build --platform linux/amd64 --tag {{nxkit_image}} vendor/docker
 
-# builds all vendor dependencies
+# rebuilds all vendor dependencies
 vendor: _nxkit_image
   for c in $(just --summary | xargs -n1 | grep vendor-); do just $c; done
 
@@ -118,6 +139,9 @@ publish-xtsn:
 
 package:
   {{npm}} run make
+
+publish:
+  {{npm}} run publish
 
 #
 # Hooks

@@ -102,6 +102,5 @@ bench.formatted.json
 scripts/*.wasm
 scripts/build/
 scripts/bench100m.js
-vendor/hacbrewpack/hacbrewpack
-vendor/hacbrewpack/hacbrewpack.wasm
 .bin/
+.tmp/

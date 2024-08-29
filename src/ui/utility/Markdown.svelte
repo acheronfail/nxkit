@@ -12,12 +12,13 @@
   let { content, class: propClass = '' }: Props = $props();
 
   // TODO: support images (ensure vite bundles them in, etc)
+  // TODO: fix 'any' types here
   const tokens = $derived(lexer(content));
 
   const codeClass = `font-mono break-words align-text-bottom text-sm border rounded p-1 border-slate-400 dark:border-slate-900 bg-slate-200 dark:bg-slate-700`;
 </script>
 
-{#snippet renderText({ token })}
+{#snippet renderText({ token }: any)}
   {#if token.type === 'text'}
     {#if token.tokens}
       {#each token.tokens as t}
@@ -41,7 +42,7 @@
   {/if}
 {/snippet}
 
-{#snippet renderList({ token })}
+{#snippet renderList({ token }: any)}
   {#if token.ordered}
     <ol class="text-left list-decimal pl-4">
       {@render renderListItems({ listItems: token.items })}
@@ -53,7 +54,7 @@
   {/if}
 {/snippet}
 
-{#snippet renderListItems({ listItems })}
+{#snippet renderListItems({ listItems }: any)}
   {#each listItems as item}
     <li class="m-1">
       {#each item.tokens as t}
@@ -63,7 +64,7 @@
   {/each}
 {/snippet}
 
-{#snippet code({ token })}
+{#snippet code({ token }: any)}
   <pre class={codeClass}>{token.text}</pre>
 {/snippet}
 

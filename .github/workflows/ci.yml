@@ -1,0 +1,77 @@
+name: ci
+on:
+  push:
+    # Enable when testing release infrastructure on a branch.
+    branches:
+      - ci/setup
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+  build-release:
+    name: build-release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        build: [linux-gnu, macos, win-msvc]
+        include:
+          - build: linux-gnu
+            os: ubuntu-latest
+          - build: macos
+            os: macos-latest
+          - build: win-msvc
+            os: windows-2022
+
+    steps:
+      # checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      # cache
+      - uses: actions/cache@v4
+        with:
+          path: |
+            node_modules/
+          key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
+
+      # install just
+      - uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # node-gyp@<10 has issues with python3.12
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # install openssl in windows
+      - if: matrix.os == 'windows-2022'
+        run: |
+          choco install openssl
+          choco install pkgconfiglite
+          echo OPENSSL_DIR="C:\Program Files\OpenSSL-Win64" >> $env:GITHUB_ENV
+          echo OPENSSL_LIB_DIR="C:\Program Files\OpenSSL-Win64\lib\VC\x64\MD" >> $env:GITHUB_ENV
+      - if: matrix.os == 'windows-2022'
+        shell: bash
+        run: |
+          echo OPENSSL_DIR=$OPENSSL_DIR
+          echo OPENSSL_LIB_DIR=$OPENSSL_LIB_DIR
+          pkg-config --libs openssl
+
+      # dependencies
+      - name: Setup Dependencies
+        run: |
+          just setup
+
+      # test
+      # FIXME: windows can't npm rebuild (openssl not available)
+      - name: Test
+        run: |
+          just test-all
+
+      # publish
+      - name: Publish
+        run: |
+          echo TODO just publish

@@ -2,7 +2,7 @@
   "type": "module",
   "name": "nxkit",
   "productName": "NXKit",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Utilities for Nintendo Switch (NX) Homebrew",
   "main": ".vite/build/src_main_index.js",
   "scripts": {
@@ -28,6 +28,7 @@
     "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
     "@electron-forge/plugin-fuses": "^7.4.0",
     "@electron-forge/plugin-vite": "^7.4.0",
+    "@electron-forge/publisher-github": "^7.4.0",
     "@electron/fuses": "^1.8.0",
     "@sveltejs/vite-plugin-svelte": "^4.0.0-next.6",
     "@testing-library/jest-dom": "^6.4.6",
