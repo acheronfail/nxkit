@@ -11,7 +11,7 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "eslint --ext .ts,.tsx .",
-    "format": "prettier --write .",
+    "format": "prettier --write --list-different .",
     "format:check": "prettier --check .",
     "test": "node scripts/npm-run.js test:vitest:run test:types:tsc test:types:svelte format:check lint",
     "test:vitest": "node --expose-gc `which vitest` --config vite.test.config.ts",
