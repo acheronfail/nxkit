@@ -76,6 +76,7 @@ jobs:
       - name: Test
         if: matrix.os == 'windows-2022'
         run: |
+          cd src/node/nand/xtsn && npm rebuild
           npm run test
 
       - name: Test
