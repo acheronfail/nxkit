@@ -16,6 +16,11 @@ export default defineConfig(() => {
       alias: {
         '@testing-library/svelte': '@testing-library/svelte/svelte5',
       },
+      poolOptions: {
+        forks: {
+          execArgv: ['--expose-gc'],
+        },
+      },
     },
     resolve: {
       preserveSymlinks: true,

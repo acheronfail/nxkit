@@ -7,6 +7,6 @@ window[NXKitBridgeKey] = {
   isLinux: false,
   isOsx: false,
 
-  call: vi.fn<[]>().mockResolvedValue(undefined),
+  call: vi.fn().mockResolvedValue(undefined),
   progressSubscribe: vi.fn(),
 };

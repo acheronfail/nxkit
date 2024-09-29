@@ -41,7 +41,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # node-gyp@<10 has issues with python3.12
+      # install node
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: 'package.json'
+
+      # install python (node-gyp@<10 has issues with python3.12)
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
