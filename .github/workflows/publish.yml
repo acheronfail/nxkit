@@ -54,17 +54,10 @@ jobs:
       # install openssl in windows
       - if: matrix.os == 'windows-2022'
         run: |
-          choco install openssl
-          choco install pkgconfiglite
-          echo OPENSSL_DIR="C:\Program Files\OpenSSL-Win64" >> $env:GITHUB_ENV
-          echo OPENSSL_LIB_DIR="C:\Program Files\OpenSSL-Win64\lib\VC\x64\MD" >> $env:GITHUB_ENV
-      - if: matrix.os == 'windows-2022'
-        shell: bash
-        continue-on-error: true
-        run: |
-          echo OPENSSL_DIR=$OPENSSL_DIR
-          echo OPENSSL_LIB_DIR=$OPENSSL_LIB_DIR
-          pkg-config --libs openssl
+          git clone https://github.com/microsoft/vcpkg
+          ./vcpkg/bootstrap-vcpkg.bat
+          ./vcpkg/vcpkg install openssl:x64-windows
+          ./vcpkg/vcpkg integrate install
 
       # dependencies
       - name: Setup Dependencies
@@ -72,15 +65,15 @@ jobs:
           just setup
 
       # test
-      # FIXME: windows can't npm rebuild (openssl not available)
       - name: Test
         if: matrix.os == 'windows-2022'
         run: |
           cd src/node/nand/xtsn && npm rebuild
           npm run test
 
+      # FIXME: windows can't npm rebuild (openssl not available)
       - name: Test
-        if: matrix.os != 'windows-2022'
+        continue-on-error: true
         run: |
           just test-all
 
