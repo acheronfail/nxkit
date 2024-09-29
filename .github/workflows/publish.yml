@@ -74,6 +74,12 @@ jobs:
       # test
       # FIXME: windows can't npm rebuild (openssl not available)
       - name: Test
+        if: matrix.os == 'windows-2022'
+        run: |
+          npm run test
+
+      - name: Test
+        if: matrix.os != 'windows-2022'
         run: |
           just test-all
 
