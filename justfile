@@ -9,7 +9,7 @@ _default:
 
 # set up the local repository for development
 setup:
-  npm install --force
+  npm install
   if [ -z "${CI:-}" ]; then just setup_hooks; fi
 
 # set up git hooks

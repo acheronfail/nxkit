@@ -3,6 +3,7 @@ import * as FatFs from 'js-fatfs';
 import { FSFile, Fat32FileSystem, FatType } from './fs';
 import { BiosParameterBlock } from './bpb';
 
+// eslint-disable-next-line import/namespace
 class MockDisk implements FatFs.DiskIO {
   readonly sectorSize = 512;
 

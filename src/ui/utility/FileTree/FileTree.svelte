@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   import { onMount, type Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
 
@@ -218,11 +218,11 @@
   <li
     data-id={node.id}
     draggable={!!onDragDrop}
-    class="bg-slate-100 odd:bg-slate-200 dark:bg-slate-800 odd:dark:bg-slate-700"
+    class="bg-slate-100 odd:bg-slate-200 dark:bg-slate-800 dark:odd:bg-slate-700"
     style="padding-left: {depth}ex;"
   >
     <div
-      class="pr-2 flex justify-between items-center focus:outline-none"
+      class="pr-2 flex justify-between items-center focus:outline-hidden"
       class:text-slate-500={isDisabled}
       class:focus:bg-blue-300={!isDisabled && !dragging}
       class:focus:dark:bg-blue-600={!isDisabled && !dragging}

@@ -74,7 +74,7 @@ export async function findRCMDevices(): Promise<USBDevice[]> {
   try {
     await navigator.usb.requestDevice({ filters: [] });
     return await navigator.usb.getDevices();
-  } catch (err) {
+  } catch {
     return [];
   }
 }

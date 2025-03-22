@@ -1,4 +1,4 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   import type { Snippet } from 'svelte';
   import type { EventHandler, HTMLAttributes } from 'svelte/elements';
 
@@ -28,7 +28,7 @@
   }: Props = $props();
 
   const innerClass = 'w-full h-full';
-  const buttonClass = `select-none text-center focus:outline-none focus:ring-2 focus:ring-blue-500 rounded`;
+  const buttonClass = `select-none text-center focus:outline-hidden focus:ring-2 focus:ring-blue-500 rounded-sm`;
   const disabledClass = `bg-slate-200 dark:bg-slate-600 text-slate-400 hover:text-slate-400`;
   const loadingClass = 'cursor-default';
 
@@ -40,7 +40,7 @@
   };
   const appearanceClassInteraction: Record<Appearance, string> = {
     primary: `hover:bg-blue-700 active:bg-blue-500`,
-    default: `hover:bg-slate-600 hover:dark:bg-slate-500 active:bg-slate-700`,
+    default: `hover:bg-slate-600 dark:hover:bg-slate-500 active:bg-slate-700`,
     warning: `hover:bg-orange-700 active:bg-orange-800`,
     danger: `hover:bg-red-900 active:bg-red-500`,
   };

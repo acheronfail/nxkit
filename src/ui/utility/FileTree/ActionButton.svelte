@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { Snippet } from 'svelte';
   import type { HTMLAttributes } from 'svelte/elements';
 
@@ -28,7 +28,7 @@
     tabindex="0"
     onkeypress={(e) => e.key === ' ' && handler(e)}
     onclick={(e) => handler(e)}
-    class="inline-block rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+    class="inline-block rounded-sm focus:outline-hidden focus:ring-2 focus:ring-blue-500"
     {...rest}
   >
     {@render children()}

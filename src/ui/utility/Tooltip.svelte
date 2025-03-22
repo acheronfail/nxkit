@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import { type Placement } from '@floating-ui/dom';
   import { type Snippet } from 'svelte';
 
@@ -108,7 +108,7 @@
 </span>
 
 {#if !disabled}
-  <div bind:this={tooltipEl} class="z-50 hidden absolute w-max text-sm py-1 px-2 rounded border {c.bg} {c.border}">
+  <div bind:this={tooltipEl} class="z-50 hidden absolute w-max text-sm py-1 px-2 rounded-sm border {c.bg} {c.border}">
     {#if tooltip}
       {@render tooltip()}
     {/if}

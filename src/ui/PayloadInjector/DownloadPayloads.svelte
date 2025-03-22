@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import downloadHekateMd from '../markdown/download-hekate.md?raw';
   import downloadFuseeMd from '../markdown/download-fusee.md?raw';
 

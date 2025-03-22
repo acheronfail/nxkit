@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { FSDirectory, FSEntry, FSFile } from '../../node/nand/fatfs/fs';
   import type { Node, ReloadFn } from '../utility/FileTree/FileTree.svelte';
 

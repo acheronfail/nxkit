@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { Partition } from 'src/channels';
   import type { Node } from '../utility/FileTree/FileTree.svelte';
 

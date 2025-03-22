@@ -1,4 +1,4 @@
-// eslint-disable-next-line import/no-unresolved, import/default
+// eslint-disable-next-line import/default
 import NSPWorker from './nsp.worker?worker';
 
 import { NACP, VideoCapture } from '@tootallnate/nacp';

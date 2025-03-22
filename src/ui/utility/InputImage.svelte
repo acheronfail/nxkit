@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   export interface Image {
     toBlob: () => Promise<Blob>;
   }
@@ -99,14 +99,14 @@
           image={imageDataUrl}
           aspect={1}
           showGrid={false}
-          on:cropcomplete={(event) =>
-            onCropComplete?.(imageDataUrl ? { toBlob: () => extractCroppedImage(event.detail.pixels) } : null)}
+          oncropcomplete={(event) =>
+            onCropComplete?.(imageDataUrl ? { toBlob: () => extractCroppedImage(event.pixels) } : null)}
         />
       </div>
     {:else}
       <label
         for="image-input"
-        class="nro256 {imageBoxClass} border-dashed h-full flex flex-col p-6 text-center justify-center items-center cursor-pointer hover:dark:bg-slate-700"
+        class="nro256 {imageBoxClass} border-dashed h-full flex flex-col p-6 text-center justify-center items-center cursor-pointer dark:hover:bg-slate-700"
       >
         Please select an NRO file or an image
       </label>

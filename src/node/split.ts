@@ -49,7 +49,7 @@ export async function split(
       const splitHandle = await fsp.open(splitPath, 'w');
       const src = fileHandle.createReadStream({ start, end, autoClose: false });
       const dst = splitHandle.createWriteStream();
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         dst.on('finish', resolve);
         dst.on('error', reject);
         src.on('error', reject);
@@ -130,7 +130,7 @@ export async function merge(filePath: string, inPlace: boolean): Promise<SplitMe
 
       const splitHandle = await fsp.open(splitFile, 'r');
       const src = splitHandle.createReadStream();
-      await new Promise((resolve, reject) => {
+      await new Promise<void>((resolve, reject) => {
         dst.on('error', reject);
         src.on('error', reject);
         src.on('end', resolve);

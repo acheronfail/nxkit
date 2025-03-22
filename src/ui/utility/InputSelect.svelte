@@ -1,4 +1,4 @@
-<script lang="ts" context="module">
+<script lang="ts" module>
   import type { HTMLSelectAttributes } from 'svelte/elements';
 
   export interface Option {
@@ -29,7 +29,7 @@
     />
   </svg>
   <select
-    class="{dispClass} border rounded appearance-none {sizeClass} focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-900"
+    class="{dispClass} border rounded-sm appearance-none {sizeClass} focus:outline-hidden focus:ring-2 focus:ring-blue-500 dark:bg-slate-700 dark:border-slate-900"
     class:text-slate-400={value === ''}
     onchange={(e) => (value = e.currentTarget.value)}
     bind:value
