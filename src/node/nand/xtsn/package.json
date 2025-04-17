@@ -3,7 +3,7 @@
   "version": "4.0.2",
   "type": "module",
   "license": "AGPL-3.0-only",
-  "main": "dist/index.esm.js",
+  "main": "build/js/index.esm.js",
   "gypfile": true,
   "keywords": [
     "switch",
@@ -14,11 +14,12 @@
   ],
   "scripts": {
     "test": "vitest --config vitest.config.ts",
-    "build": "npm run clean && npm rebuild && npm run build:cjs && npm run build:esm",
-    "build:cjs": "esbuild --outfile=dist/index.cjs --format=cjs index.ts",
-    "build:esm": "esbuild --outfile=dist/index.esm.js --format=esm index.ts",
+    "build": "npm run clean && npm run build:cpp && npm run build:cjs && npm run build:esm",
+    "build:cpp": "node-gyp configure && node-gyp build",
+    "build:cjs": "esbuild --outfile=build/js/index.cjs --format=cjs index.ts",
+    "build:esm": "esbuild --outfile=build/js/index.esm.js --format=esm index.ts",
     "prepublish": "vitest run && npm run build",
-    "clean": "rm -rf dist"
+    "clean": "rm -rf build"
   },
   "files": [
     "README.md",

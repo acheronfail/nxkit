@@ -53,11 +53,17 @@ jobs:
 
       # install openssl in windows
       - if: matrix.os == 'windows-2022'
+        id: vcpkg
+        uses: lukka/run-vcpkg@v11
+        with:
+          runVcpkgInstall: true
+          vcpkgGitCommitId: b02e341c927f16d991edbd915d8ea43eac52096c
+      - if: matrix.os == 'windows-2022'
         run: |
-          git clone https://github.com/microsoft/vcpkg
-          ./vcpkg/bootstrap-vcpkg.bat
-          ./vcpkg/vcpkg install openssl:x64-windows
-          ./vcpkg/vcpkg integrate install
+          $libssl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
+          $opensslLibDir = Split-Path -Path $libssl.FullName -Parent
+          echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
+          Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"
 
       # dependencies
       - name: Setup Dependencies
@@ -65,14 +71,13 @@ jobs:
           just setup
 
       # test
-      - name: Test
+      - name: Test XTSN
         if: matrix.os == 'windows-2022'
         run: |
-          cd src/node/nand/xtsn && npm rebuild
+          cd src/node/nand/xtsn && npm run build
           npm run test
 
-      # FIXME: windows can't npm rebuild (openssl not available)
-      - name: Test
+      - name: Test NXKit
         continue-on-error: true
         run: |
           just test-all

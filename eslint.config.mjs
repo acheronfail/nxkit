@@ -43,7 +43,7 @@ export default defineConfig([
       },
     },
 
-    ignores: ['.vite/**', 'src/browser/hacbrewpack/hacbrewpack.js'],
+    ignores: ['src/browser/hacbrewpack/hacbrewpack.js'],
 
     rules: {
       '@typescript-eslint/no-unused-vars': [
