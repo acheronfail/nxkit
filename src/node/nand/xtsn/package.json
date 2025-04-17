@@ -1,6 +1,6 @@
 {
   "name": "haccrypto",
-  "version": "4.0.2",
+  "version": "5.0.0",
   "type": "module",
   "license": "AGPL-3.0-only",
   "main": "build/js/index.esm.js",
@@ -12,6 +12,9 @@
     "nand",
     "emmc"
   ],
+  "engines": {
+    "node": ">=20 <21"
+  },
   "scripts": {
     "test": "vitest --config vitest.config.ts",
     "build": "npm run clean && npm run build:cpp && npm run build:cjs && npm run build:esm",
@@ -24,8 +27,14 @@
   "files": [
     "README.md",
     "binding.gyp",
-    "dist/*",
+    "build/js/*",
     "index.ts",
-    "native.cc"
-  ]
+    "xtsn.cpp"
+  ],
+  "devDependencies": {
+    "@types/node": "^22.14.1",
+    "esbuild": "^0.25.2",
+    "node-gyp": "^11.2.0",
+    "vitest": "^3.1.1"
+  }
 }
