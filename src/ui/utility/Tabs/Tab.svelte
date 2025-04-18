@@ -8,7 +8,7 @@
   registerTab(tab);
 
   const liClass =
-    'w-full overflow-hidden focus-within:z-10 focus-within:ring-2 focus-within:ring-blue-500 border first:border-l border-l-0 first:rounded-l-lg last:rounded-r-lg border-slate-200 dark:border-slate-900';
+    'w-full overflow-hidden focus-within:z-10 focus-within:ring-2 focus-within:ring-blue-500 border first:border-l border-l-0 first:rounded-l-lg last:rounded-r-lg border-slate-200 dark:border-slate-900 truncate';
   const buttonClass =
     'focus:outline-hidden inline-flex w-full p-4 text-gray-900 bg-gray-100 dark:bg-gray-700 dark:text-white flex flex-row justify-center items-center';
 </script>

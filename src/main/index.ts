@@ -1,7 +1,6 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { platform } from 'node:os';
 import cp from 'node:child_process';
-import { createRequire } from 'node:module';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { ProdKeys } from '../channels';
@@ -11,14 +10,14 @@ import automaticContextMenus from 'electron-context-menu';
 import { getPaths, getResources } from '../resources';
 import { ExplorerController } from './explorer';
 import { merge, split } from '../node/split';
+import { electronSquirrelStartup } from './_squirrel';
 
 // FIXME: need a way to easily view main proc logs on windows - explorer doesn't work there
 
-const require = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
+if (electronSquirrelStartup()) {
   app.quit();
 }
 
