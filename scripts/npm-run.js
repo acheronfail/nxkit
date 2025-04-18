@@ -19,6 +19,11 @@ for (const arg of process.argv.slice(2)) {
     cp.execSync(`npm run ${arg}`, { stdio: 'inherit' });
   } catch (err) {
     console.error(chalk.red.bold(err));
-    process.exit(windowsAllowFail ? 0 : 1);
+    if (windowsAllowFail) {
+      console.log(chalk.yellow('Ignoring error due to --windows-allow-fail flag.'));
+      continue;
+    }
+
+    process.exit(1);
   }
 }

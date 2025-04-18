@@ -32,8 +32,7 @@ jobs:
       # cache
       - uses: actions/cache@v4
         with:
-          path: |
-            node_modules/
+          path: node_modules/
           key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
 
       # install just
@@ -67,8 +66,7 @@ jobs:
 
       # dependencies
       - name: Setup Dependencies
-        run: |
-          just setup
+        run: just setup
 
       # test
       - name: Test XTSN
@@ -78,11 +76,8 @@ jobs:
           npm run test
 
       - name: Test NXKit
-        continue-on-error: true
-        run: |
-          just test-all
+        run: just test-all
 
       # publish
       - name: Publish
-        run: |
-          echo TODO just publish
+        run: just publish
