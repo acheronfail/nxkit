@@ -21,18 +21,23 @@ export default defineConfig((env) => {
   }
 
   const { entry } = forgeConfigSelf;
+  const fileName = `${(entry as string).replace(/\//g, '_').replace(/\.ts$/, '')}`;
   const config: UserConfig = {
     build: {
       lib: {
         entry,
-        fileName: `${(entry as string).replace(/\//g, '_').replace(/\.ts$/, '')}`,
+        fileName,
         formats: ['es'],
       },
       rollupOptions: {
         external,
       },
     },
-    plugins: [copyNativeNodesModules(buildConfig.build?.outDir), pluginHotRestart('restart')],
+    plugins: [
+      copyNativeNodesModules(buildConfig.build!.outDir),
+      copyWasmFiles(buildConfig.build!.outDir),
+      pluginHotRestart('restart'),
+    ],
     define,
     resolve: {
       // Load the Node.js entry.
@@ -43,15 +48,54 @@ export default defineConfig((env) => {
   return mergeConfig(buildConfig, config);
 });
 
-function copyNativeNodesModules(outDir: string): PluginOption {
-  let unique = 0;
-  const nodeDir = join(outDir, '.node');
+interface CopyContext {
+  uniqueId: number;
+  copyDir: string;
+  rootDir: string;
+  extension: string;
+}
+
+// Needed to properly import `js-fatfs`'s wasm file (which is built by emscripten).
+// If we don't do this manual copy then vite inlines the file as a base64 string which breaks things.
+// Since this file is dynamically imported I can't find a way to stop vite from doing this.
+function copyWasmFiles(rootDir: string): PluginOption {
+  const ctx: CopyContext = {
+    uniqueId: 0,
+    copyDir: join(rootDir, '.wasm'),
+    rootDir,
+    extension: '.wasm',
+  };
+
+  const re = /new\s+URL\(\s*"(?<name>[a-zA-Z0-9_-]+)\.wasm",\s*import\.meta\.url\s*\).href/;
+  return {
+    enforce: 'pre',
+    name: 'copy-wasm-files',
+    buildStart: (_options) => {
+      fs.mkdirSync(ctx.copyDir, { recursive: true });
+    },
+    transform: (code, id) => {
+      const match = re.exec(code);
+      if (match) {
+        const newPath = copyFile(ctx, id, `${match[1]}${ctx.extension}`);
+        return code.replace(match[0], `import.meta.url.replace(/\\/[^/]*$/, "/${newPath}")`);
+      }
+    },
+  };
+}
+
+function copyNativeNodesModules(rootDir: string): PluginOption {
+  const ctx: CopyContext = {
+    uniqueId: 0,
+    copyDir: join(rootDir, '.node'),
+    rootDir,
+    extension: '.node',
+  };
 
   return {
     enforce: 'pre',
     name: 'copy-native-nodes-modules',
     buildStart: (_options) => {
-      fs.mkdirSync(nodeDir, { recursive: true });
+      fs.mkdirSync(ctx.copyDir, { recursive: true });
     },
     transform: (code, id) => {
       const requireRe = /require\(['"](.*?)['"]\)/g;
@@ -71,10 +115,7 @@ function copyNativeNodesModules(outDir: string): PluginOption {
           source: id,
         });
 
-        const dotNodePath = join(dirname(id), requirePath);
-        const bundledPath = join(nodeDir, `${basename(dotNodePath, '.node')}.${unique++}.node`);
-        const newRequirePath = relative(outDir, bundledPath);
-        fs.copyFileSync(dotNodePath, bundledPath);
+        const newRequirePath = copyFile(ctx, id, requirePath);
 
         code = [
           code.slice(0, match.index),
@@ -89,4 +130,12 @@ function copyNativeNodesModules(outDir: string): PluginOption {
       };
     },
   };
+}
+
+function copyFile(ctx: CopyContext, id: string, requirePath: string) {
+  const idPath = join(dirname(id), requirePath);
+  const bundledPath = join(ctx.copyDir, `${basename(idPath, ctx.extension)}.${ctx.uniqueId++}${ctx.extension}`);
+  const newRequirePath = relative(ctx.rootDir, bundledPath);
+  fs.copyFileSync(idPath, bundledPath);
+  return newRequirePath;
 }
