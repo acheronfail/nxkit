@@ -110,7 +110,15 @@ package:
   npm run make
 
 publish:
-  npm run publish
+  #!/usr/bin/env bash
+  set -uo pipefail
+
+  if [[ "{{os()}}" == "macos" ]]; then
+    npm run publish --arch=arm64;
+    npm run publish --arch=x64;
+  else
+    npm run publish;
+  fi
 
 #
 # Hooks
