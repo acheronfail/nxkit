@@ -2,6 +2,7 @@ import { describe, beforeEach, test, expect } from 'vitest';
 import * as FatFs from 'js-fatfs';
 import { FSFile, Fat32FileSystem, FatType } from './fs';
 import { BiosParameterBlock } from './bpb';
+import { normalisePathSeparator } from '../explorer/utils';
 
 // eslint-disable-next-line import/namespace
 class MockDisk implements FatFs.DiskIO {
@@ -81,13 +82,19 @@ describe(Fat32FileSystem.name, () => {
     expect(fs.readdir('/')).toEqual([]);
     fs.writeFile('/empty');
     fs.writeFile('/stuff', Buffer.from('foobar'));
-    expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/empty', '/stuff']);
+    expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/empty', '/stuff']);
   });
 
   describe('mkdir', () => {
     test('normal', () => {
       fs.mkdir('/dir');
-      expect(fs.readdir('/')).toEqual([
+      expect(
+        fs.readdir('/').map(({ name, path, type }) => ({
+          type,
+          name,
+          path: normalisePathSeparator(path),
+        })),
+      ).toEqual([
         {
           type: 'd',
           name: 'dir',
@@ -154,7 +161,7 @@ describe(Fat32FileSystem.name, () => {
 
   test('rmdir', () => {
     fs.mkdir('/dir');
-    expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/dir']);
+    expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/dir']);
     fs.rmdir('/dir');
     expect(fs.readdir('/')).toEqual([]);
   });
@@ -162,22 +169,22 @@ describe(Fat32FileSystem.name, () => {
   describe('rename', () => {
     test('file', () => {
       fs.writeFile('/file');
-      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/file']);
+      expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/file']);
       fs.rename('/file', '/new');
-      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/new']);
+      expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/new']);
     });
 
     test('dir', () => {
       fs.mkdir('/dir');
-      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/dir']);
+      expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/dir']);
       fs.rename('/dir', '/new');
-      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/new']);
+      expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/new']);
     });
 
     test('across directories', () => {
       fs.mkdir('/dir');
       fs.writeFile('/file');
-      expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/dir', '/file']);
+      expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/dir', '/file']);
       fs.rename('/file', '/dir/new');
       expect(fs.readdir('/').map(({ name }) => name)).toEqual(['dir']);
       expect(fs.readdir('/dir').map(({ name }) => name)).toEqual(['new']);
@@ -191,7 +198,7 @@ describe(Fat32FileSystem.name, () => {
     fs.writeFile('/first/stuff', Buffer.from('asdf'));
     fs.writeFile('/first/second/stuff', Buffer.from('asdf'));
 
-    expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/first']);
+    expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/first']);
     expect(fs.readdir('/first').map(({ name }) => name)).toEqual(['second', 'empty', 'stuff']);
     expect(fs.readdir('/first/second').map(({ name }) => name)).toEqual(['stuff']);
 
@@ -264,7 +271,7 @@ describe(Fat32FileSystem.name, () => {
     fs.writeFile('/foo', Buffer.from('1'));
     fs.mkdir('/dir');
     fs.writeFile('/dir/foo', Buffer.from('2'));
-    expect(fs.readdir('/').map(({ path }) => path)).toEqual(['/foo', '/dir']);
+    expect(fs.readdir('/').map(({ path }) => normalisePathSeparator(path))).toEqual(['/foo', '/dir']);
     fs.format(FatType.Fat);
     expect(fs.readdir('/')).toEqual([]);
   });
