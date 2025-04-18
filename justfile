@@ -52,6 +52,7 @@ dev-packaged *args:
 # rebuild native modules to work with electron
 rebuild-electron:
   cd "{{xtsn_dir}}" && npm run clean
+  cd "{{xtsn_dir}}" && sh -c 'echo -L$(pkg-config --variable=libdir openssl) -lssl -lcrypto'
   cd "{{xtsn_dir}}" && npm exec electron-rebuild
 
 # rebuild native modules to work with node
