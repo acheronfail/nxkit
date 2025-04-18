@@ -29,16 +29,22 @@ const config = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      name: pkgJson.name,
+      setupExe: `${pkgJson.name}-win-setup-\${version}.exe`,
+      setupMsi: `${pkgJson.name}-win-\${version}.msi`,
+    }),
     new MakerZIP({}, ['darwin', 'linux']),
     new MakerRpm({
       options: {
         bin: pkgJson.name,
+        name: 'nxkit-linux-${arch}',
       },
     }),
     new MakerDeb({
       options: {
         bin: pkgJson.name,
+        name: 'nxkit-linux-${arch}',
       },
     }),
   ],
