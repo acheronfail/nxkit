@@ -9,6 +9,8 @@
     "node": ">=20 <21"
   },
   "scripts": {
+    "prestart": "tsx scripts/resources.ts",
+    "postinstall": "tsx scripts/resources.ts",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",

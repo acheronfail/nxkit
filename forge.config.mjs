@@ -11,20 +11,9 @@ import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import cp from 'node:child_process';
+import fsp from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const pkgJson = createRequire(import.meta.url)('./package.json');
-
-// *sigh*, the things we do for cjs<->esm incompatibilities...
-const extraResource = JSON.parse(
-  cp.execSync(
-    `npm exec tsx -- --eval "import('./src/resources').then(m => {
-      const extraResource = Object.values(m.getResources(false));
-      console.log(JSON.stringify(extraResource));
-    })"`,
-    { encoding: 'utf-8' },
-  ),
-);
 
 const asar = true;
 
@@ -34,7 +23,8 @@ const config = {
     name: pkgJson.productName,
     executableName: pkgJson.name,
     asar,
-    extraResource,
+    // *sigh*, the things we do for cjs<->esm incompatibilities...
+    extraResource: JSON.parse(await fsp.readFile('./resources.json')),
     appCategoryType: 'public.app-category.utilities',
   },
   rebuildConfig: {},
