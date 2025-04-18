@@ -31,6 +31,7 @@ const config = {
   makers: [
     new MakerSquirrel({
       name: `${pkgJson.name}-windows`,
+      setupExe: `${pkgJson.name}-windows-installer.exe`,
     }),
     new MakerZIP({}, ['darwin', 'linux']),
     new MakerRpm({
