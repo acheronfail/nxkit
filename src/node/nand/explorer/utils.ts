@@ -3,6 +3,9 @@ import fsp from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { FSEntry, Fat32FileSystem } from '../fatfs/fs';
 
+export const normalisePathSeparator = (input: string): string => input.replace(/\\/g, '/');
+export const normalisePathSeparators = (input: string[]): string[] => input.map(normalisePathSeparator);
+
 export interface WalkParams {
   pathInNand: string;
   pathInNandEntry: FSEntry | null;
