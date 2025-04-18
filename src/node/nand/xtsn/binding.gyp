@@ -6,12 +6,7 @@
       "include_dirs": [],
       "conditions": [
         [ "OS=='mac'", {
-          "include_dirs": [
-            "<!(pkg-config --variable=includedir openssl)"
-          ],
-          "libraries": [
-            "<!(sh -c 'echo -L$(pkg-config --variable=libdir openssl) -lssl -lcrypto')"
-          ]
+          "libraries": [ "-lssl", "-lcrypto" ]
         }],
         [ "OS=='linux'", {
           "libraries": [ "-lssl", "-lcrypto" ]
