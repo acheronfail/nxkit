@@ -110,9 +110,6 @@ publish-xtsn:
 package:
   npm run make
 
-# FIXME: bundle in openssl so consumers don't need it to be installed
-# try in gyp: "<(node_root_dir)/deps/openssl/openssl/include" ?
-# ^^ can we use node & electron's openssl?
 publish:
   #!/usr/bin/env bash
   set -euo pipefail
