@@ -160,31 +160,27 @@ describe(walkHostPaths.name, () => {
         return WalkAction.Continue;
       });
 
-      expect(hostPaths).toEqual(
-        normalisePathSeparators([
-          '/dir1',
-          '/dir2',
-          '/dir2/dir3',
-          '/dir2/dir3/file5',
-          '/dir2/file3',
-          '/dir2/file4',
-          '/file1',
-          '/file2',
-        ]),
-      );
+      expect(normalisePathSeparators(hostPaths)).toEqual([
+        '/dir1',
+        '/dir2',
+        '/dir2/dir3',
+        '/dir2/dir3/file5',
+        '/dir2/file3',
+        '/dir2/file4',
+        '/file1',
+        '/file2',
+      ]);
 
-      expect(nandPaths).toEqual(
-        normalisePathSeparators([
-          '/nand/path/dir1',
-          '/nand/path/dir2',
-          '/nand/path/dir2/dir3',
-          '/nand/path/dir2/dir3/file5',
-          '/nand/path/dir2/file3',
-          '/nand/path/dir2/file4',
-          '/nand/path/file1',
-          '/nand/path/file2',
-        ]),
-      );
+      expect(normalisePathSeparators(nandPaths)).toEqual([
+        '/nand/path/dir1',
+        '/nand/path/dir2',
+        '/nand/path/dir2/dir3',
+        '/nand/path/dir2/dir3/file5',
+        '/nand/path/dir2/file3',
+        '/nand/path/dir2/file4',
+        '/nand/path/file1',
+        '/nand/path/file2',
+      ]);
     });
   });
 
@@ -201,9 +197,12 @@ describe(walkHostPaths.name, () => {
         return pathInNand.endsWith('/dir2') ? WalkAction.Skip : WalkAction.Stop;
       });
 
-      expect(nandPaths).toEqual(
-        normalisePathSeparators(['/nand/path/dir1', '/nand/path/dir2', '/nand/path/file1', '/nand/path/file2']),
-      );
+      expect(normalisePathSeparators(nandPaths)).toEqual([
+        '/nand/path/dir1',
+        '/nand/path/dir2',
+        '/nand/path/file1',
+        '/nand/path/file2',
+      ]);
     });
   });
 });
