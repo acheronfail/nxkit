@@ -6,10 +6,16 @@
       "include_dirs": [],
       "conditions": [
         [ "OS=='mac'", {
-          "libraries": [ "-lssl", "-lcrypto" ]
+          "include_dirs": [
+            "<!(pkg-config --variable=includedir openssl)"
+          ],
+          "libraries": [
+            "<!(sh -c 'echo $(pkg-config --variable=libdir openssl)/libssl.a')",
+            "<!(sh -c 'echo $(pkg-config --variable=libdir openssl)/libcrypto.a')"
+          ]
         }],
         [ "OS=='linux'", {
-          "libraries": [ "-lssl", "-lcrypto" ]
+          "libraries": [ "-l:libssl.a", "-l:libcrypto.a" ]
         }],
         [ "OS=='win'", {
           "libraries": [
