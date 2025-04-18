@@ -49,9 +49,12 @@ dev-packaged *args:
   ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
 
 # rebuild native modules to work with electron
-rebuild-electron:
+rebuild-electron-arch arch:
   cd "{{xtsn_dir}}" && npm run clean
-  npm exec electron-rebuild -- --module-dir "{{xtsn_dir}}"
+  npm exec electron-rebuild -- --module-dir "{{xtsn_dir}}" --arch {{arch}}
+rebuild-electron:
+  just rebuild-electron-arch {{node_arch}}
+
 # rebuild native modules to work with node
 rebuild-node:
   cd "{{xtsn_dir}}" && npm rebuild
@@ -114,8 +117,11 @@ publish:
   set -uo pipefail
 
   if [[ "{{os()}}" == "macos" ]]; then
-    npm run publish -- --arch=arm64;
-    npm run publish -- --arch=x64;
+    just rebuild-electron-arch arm64
+    npm run package -- --arch=arm64;
+
+    just rebuild-electron-arch x64
+    npm run package -- --arch=x64;
   else
     npm run publish;
   fi
