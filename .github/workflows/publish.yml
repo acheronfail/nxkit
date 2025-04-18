@@ -50,9 +50,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - if: matrix.os == 'macos-latest'
-        run: brew install openssl
-
       - if: matrix.os == 'windows-2022'
         id: vcpkg
         uses: lukka/run-vcpkg@v11
@@ -83,3 +80,5 @@ jobs:
       # publish
       - name: Publish
         run: just publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
