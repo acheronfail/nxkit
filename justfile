@@ -123,6 +123,7 @@ publish:
     just rebuild-electron-arch x64
     npm run publish -- --arch=x64;
   else
+    just rebuild-electron
     npm run publish;
   fi
 
