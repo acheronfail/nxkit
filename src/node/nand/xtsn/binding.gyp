@@ -7,7 +7,7 @@
       "conditions": [
         [ "OS=='mac'", {
           "libraries": [
-            "<!(sh -c 'echo -L$(pkg-config --variable=libdir openssl)/lib -lssl -lcrypto')"
+            "<!(sh -c 'echo -L$(pkg-config --variable=libdir openssl) -lssl -lcrypto')"
           ]
         }],
         [ "OS=='linux'", {
