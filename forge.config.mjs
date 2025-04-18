@@ -36,12 +36,14 @@ const config = {
     new MakerZIP({}, ['darwin', 'linux']),
     new MakerRpm({
       options: {
-        bin: `${pkgJson.name}-linux`,
+        bin: pkgJson.name,
+        name: `${pkgJson.name}-linux`,
       },
     }),
     new MakerDeb({
       options: {
-        bin: `${pkgJson.name}-linux`,
+        bin: pkgJson.name,
+        name: `${pkgJson.name}-linux`,
       },
     }),
   ],
