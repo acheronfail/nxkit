@@ -118,10 +118,10 @@ publish:
 
   if [[ "{{os()}}" == "macos" ]]; then
     just rebuild-electron-arch arm64
-    npm run package -- --arch=arm64;
+    npm run publish -- --arch=arm64;
 
     just rebuild-electron-arch x64
-    npm run package -- --arch=x64;
+    npm run publish -- --arch=x64;
   else
     npm run publish;
   fi
