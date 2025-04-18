@@ -2,16 +2,17 @@
   "targets": [
     {
       "target_name": "xtsn",
-      "sources": [
-        "xtsn.cpp"
-      ],
-      "include_dirs": [
-        "<!(pkg-config --cflags-only-I openssl | sed 's/-I//g')"
-      ],
-      "libraries": [
-        "<!(pkg-config --libs openssl)"
-      ],
+      "sources": [ "xtsn.cpp" ],
+      "include_dirs": [],
       "conditions": [
+        [ "OS=='mac'", {
+          "libraries": [
+            "<!(sh -c 'echo -L$(pkg-config --variable=libdir openssl)/lib -lssl -lcrypto')"
+          ]
+        }],
+        [ "OS=='linux'", {
+          "libraries": [ "-lssl", "-lcrypto" ]
+        }],
         [ "OS=='win'", {
           "libraries": [
             "<!(echo %OPENSSL_LIB_DIR%\\libssl.lib)",
@@ -33,12 +34,7 @@
               ]
             }
           }
-        }],
-        ["OS=='mac'", {
-          "libraries": [
-            "<!(sh -c 'echo -L$(pkg-config --variable=libdir openssl)/lib -lssl -lcrypto')"
-          ]
-        }],
+        }]
       ]
     }
   ]
