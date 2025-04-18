@@ -30,8 +30,7 @@ const config = {
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
-      setupExe: `${pkgJson.name}-windows-installer.exe`,
-      setupMsi: `${pkgJson.name}-windows-installer.msi`,
+      name: `${pkgJson.name}-windows`,
     }),
     new MakerZIP({}, ['darwin', 'linux']),
     new MakerRpm({
