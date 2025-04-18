@@ -11,7 +11,7 @@ _default:
 # set up the local repository for development
 setup:
   npm install
-  cd "{{xtsn_dir}}" && npm run clean
+  cd "{{xtsn_dir}}" && npm install
 
   if [ -z "${CI:-}" ]; then just setup_hooks; fi
 
@@ -50,11 +50,9 @@ dev-packaged *args:
   ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
 
 # rebuild native modules to work with electron
-rebuild-electron-arch arch:
-  cd "{{xtsn_dir}}" && npm run clean
-  npm exec electron-rebuild -- --module-dir "{{xtsn_dir}}" --arch {{arch}}
 rebuild-electron:
-  just rebuild-electron-arch {{node_arch}}
+  cd "{{xtsn_dir}}" && npm run clean
+  npm exec electron-rebuild -- --module-dir "{{xtsn_dir}}"
 
 # rebuild native modules to work with node
 rebuild-node:
@@ -117,16 +115,8 @@ publish:
   #!/usr/bin/env bash
   set -euo pipefail
 
-  if [[ "{{os()}}" == "macos" ]]; then
-    just rebuild-electron-arch arm64
-    npm run publish -- --arch=arm64;
-
-    just rebuild-electron-arch x64
-    npm run publish -- --arch=x64;
-  else
-    just rebuild-electron
-    npm run publish;
-  fi
+  just rebuild-electron
+  npm run publish;
 
 #
 # Hooks

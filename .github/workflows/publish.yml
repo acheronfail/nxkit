@@ -20,8 +20,10 @@ jobs:
         include:
           - build: linux-gnu
             os: ubuntu-latest
-          - build: macos
+          - build: macos-arm
             os: macos-latest
+          - build: macos-intel
+            os: macos-13
           - build: win-msvc
             os: windows-2022
 
@@ -73,7 +75,8 @@ jobs:
       # test
       - name: Test XTSN
         run: |
-          cd src/node/nand/xtsn && npm run build
+          cd src/node/nand/xtsn
+          npm run build
           npm run test
 
       - name: Test NXKit
