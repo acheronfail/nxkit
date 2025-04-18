@@ -72,7 +72,6 @@ jobs:
 
       # test
       - name: Test XTSN
-        if: matrix.os == 'windows-2022'
         run: |
           cd src/node/nand/xtsn && npm run build
           npm run test
