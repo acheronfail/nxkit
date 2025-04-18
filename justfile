@@ -11,6 +11,7 @@ _default:
 # set up the local repository for development
 setup:
   npm install
+  cd "{{xtsn_dir}}" && npm run clean
 
   if [ -z "${CI:-}" ]; then just setup_hooks; fi
 
@@ -114,7 +115,7 @@ package:
 
 publish:
   #!/usr/bin/env bash
-  set -uo pipefail
+  set -euo pipefail
 
   if [[ "{{os()}}" == "macos" ]]; then
     just rebuild-electron-arch arm64
