@@ -52,7 +52,7 @@ dev-packaged *args:
 # rebuild native modules to work with electron
 rebuild-electron:
   cd "{{xtsn_dir}}" && npm run clean
-  npm exec electron-rebuild -- --module-dir "{{xtsn_dir}}"
+  cd "{{xtsn_dir}}" && npm exec electron-rebuild
 
 # rebuild native modules to work with node
 rebuild-node:

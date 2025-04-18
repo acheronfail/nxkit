@@ -55,9 +55,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - if: runner.os == 'macOS'
-        run: brew install openssl pkg-config
-
       - if: matrix.os == 'windows-2022'
         id: vcpkg
         uses: lukka/run-vcpkg@v11
