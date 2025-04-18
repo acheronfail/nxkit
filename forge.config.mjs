@@ -29,16 +29,19 @@ const config = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
+    new MakerSquirrel({
+      setupExe: `${pkgJson.name}-windows-installer.exe`,
+      setupMsi: `${pkgJson.name}-windows-installer.msi`,
+    }),
     new MakerZIP({}, ['darwin', 'linux']),
     new MakerRpm({
       options: {
-        bin: pkgJson.name,
+        bin: `${pkgJson.name}-linux`,
       },
     }),
     new MakerDeb({
       options: {
-        bin: pkgJson.name,
+        bin: `${pkgJson.name}-linux`,
       },
     }),
   ],
