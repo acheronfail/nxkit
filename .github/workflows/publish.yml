@@ -61,6 +61,8 @@ jobs:
         with:
           runVcpkgInstall: true
           vcpkgGitCommitId: b02e341c927f16d991edbd915d8ea43eac52096c
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
       - if: matrix.os == 'windows-2022'
         run: |
           $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }

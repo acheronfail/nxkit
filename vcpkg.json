@@ -1,7 +1,5 @@
 {
   "name": "main",
   "version-string": "latest",
-  "dependencies": [
-    "openssl:x64-windows-static"
-  ]
+  "dependencies": ["openssl"]
 }
