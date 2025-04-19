@@ -65,7 +65,7 @@ jobs:
       - if: matrix.os == 'windows-2022'
         name: Set OpenSSL variables
         run: |
-          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl_static.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
+          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
           $opensslLibDir = Split-Path -Path $libSsl.FullName -Parent
           echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"

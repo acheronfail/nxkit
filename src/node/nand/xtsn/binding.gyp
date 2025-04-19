@@ -22,8 +22,8 @@
             "<!(echo %OPENSSL_INC_DIR%)"
           ],
           "libraries": [
-            "<!(echo %OPENSSL_LIB_DIR%\\libssl_static.lib)",
-            "<!(echo %OPENSSL_LIB_DIR%\\libcrypto_static.lib)",
+            "<!(echo %OPENSSL_LIB_DIR%\\libssl.lib)",
+            "<!(echo %OPENSSL_LIB_DIR%\\libcrypto.lib)",
             "crypt32.lib",
             "ws2_32.lib",
             "user32.lib"
@@ -31,8 +31,8 @@
           "msvs_settings": {
             "VCLinkerTool": {
               "AdditionalDependencies": [
-                "libssl_static.lib",
-                "libcrypto_static.lib",
+                "libssl.lib",
+                "libcrypto.lib",
                 "crypt32.lib",
                 "ws2_32.lib",
                 "user32.lib"
