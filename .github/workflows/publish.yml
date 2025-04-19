@@ -63,10 +63,14 @@ jobs:
           vcpkgGitCommitId: b02e341c927f16d991edbd915d8ea43eac52096c
       - if: matrix.os == 'windows-2022'
         run: |
-          $libssl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
-          $opensslLibDir = Split-Path -Path $libssl.FullName -Parent
+          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
+          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h
+          $opensslLibDir = Split-Path -Path $libSsl.FullName -Parent
+          $opensslIncDir = Split-Path -Path (Split-Path -Path $incSsl.FullName -Parent) -Parent
           echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
+          echo "OPENSSL_INC_DIR=$opensslIncDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"
+          Write-Host "OPENSSL_INC_DIR: $opensslIncDir"
 
       # dependencies
       - name: Setup Dependencies

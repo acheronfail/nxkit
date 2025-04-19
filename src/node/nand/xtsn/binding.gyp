@@ -18,6 +18,9 @@
           "libraries": [ "-l:libssl.a", "-l:libcrypto.a" ]
         }],
         [ "OS=='win'", {
+          "include_dirs": [
+            "<!(echo %OPENSSL_INC_DIR%)"
+          ],
           "libraries": [
             "<!(echo %OPENSSL_LIB_DIR%\\libssl_static.lib)",
             "<!(echo %OPENSSL_LIB_DIR%\\libcrypto_static.lib)",
@@ -41,7 +44,8 @@
             "VCCLCompilerTool": {
               "RuntimeLibrary": 0,
               "AdditionalIncludeDirectories": [
-                "<!(echo %OPENSSL_LIB_DIR%)"
+                "<!(echo %OPENSSL_LIB_DIR%)",
+                "<!(echo %OPENSSL_INC_DIR%)"
               ]
             }
           },
