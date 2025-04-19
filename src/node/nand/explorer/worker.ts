@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import fsp from 'node:fs/promises';
 import * as FatFs from 'js-fatfs';
 import GPT, { PartitionEntry } from 'gpt';
+import prettyBytes from 'pretty-bytes';
 import { NxDiskIo, ReadonlyError } from '../fatfs/diskio';
 import { FSEntry, Fat32FileSystem, FatError, FatType } from '../fatfs/fs';
 import { BLOCK_SIZE, getPartitionTable, readBackupGpt, repairBackupGptTable } from '../gpt';
@@ -11,7 +12,6 @@ import { NX_PARTITIONS, NxPartition, PartitionFormat, isFat } from '../constants
 import { NandIoLayer } from '../fatfs/layer';
 import { Io, createIo } from '../fatfs/io';
 import { NandResult, Partition, ProdKeys } from '../../../channels';
-import prettyBytes from 'pretty-bytes';
 import { BiosParameterBlock } from '../fatfs/bpb';
 import { Crypto, NxCrypto } from '../fatfs/crypto';
 import { Xtsn } from '../xtsn';
