@@ -115,7 +115,7 @@ publish:
   set -euo pipefail
 
   just rebuild-electron
-  npm run publish;
+  npm run publish
 
 #
 # Hooks

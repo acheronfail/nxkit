@@ -33,7 +33,7 @@ const config = {
       name: `${pkgJson.name}-windows`,
       setupExe: `${pkgJson.name}-windows-installer.exe`,
     }),
-    new MakerZIP({}, ['darwin', 'linux']),
+    new MakerZIP({}, ['darwin', 'linux', 'win32']),
     new MakerRpm({
       options: {
         bin: pkgJson.name,
