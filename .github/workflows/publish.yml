@@ -56,7 +56,6 @@ jobs:
           python-version: '3.11'
 
       - if: matrix.os == 'windows-2022'
-        id: vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           runVcpkgInstall: true
@@ -64,14 +63,16 @@ jobs:
         env:
           VCPKG_DEFAULT_TRIPLET: x64-windows-static
       - if: matrix.os == 'windows-2022'
+        name: Set OpenSSL variables
         run: |
-          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
-          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h
+          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl_static.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
           $opensslLibDir = Split-Path -Path $libSsl.FullName -Parent
-          $opensslIncDir = Split-Path -Path (Split-Path -Path $incSsl.FullName -Parent) -Parent
           echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
-          echo "OPENSSL_INC_DIR=$opensslIncDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"
+
+          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h
+          $opensslIncDir = Split-Path -Path (Split-Path -Path $incSsl.FullName -Parent) -Parent
+          echo "OPENSSL_INC_DIR=$opensslIncDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_INC_DIR: $opensslIncDir"
 
       # dependencies
