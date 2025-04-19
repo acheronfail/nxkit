@@ -70,7 +70,7 @@ jobs:
           echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"
 
-          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h
+          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h | Select-Object -First 1
           $opensslIncDir = Split-Path -Path (Split-Path -Path $incSsl.FullName -Parent) -Parent
           echo "OPENSSL_INC_DIR=$opensslIncDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_INC_DIR: $opensslIncDir"
