@@ -21,7 +21,7 @@
     "build:cpp": "node-gyp configure && node-gyp build",
     "build:cjs": "esbuild --outfile=build/js/index.cjs --format=cjs index.ts",
     "build:esm": "esbuild --outfile=build/js/index.esm.js --format=esm index.ts",
-    "prepublish": "vitest run && npm run build",
+    "prepare": "npm run build && vitest run --config vitest.config.ts",
     "clean": "rm -rf build"
   },
   "files": [

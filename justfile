@@ -35,13 +35,9 @@ clean_all: clean
 # Dev Scripts
 #
 
-# run npm
-npm *args:
-  npm {{args}}
-
 # start the app in dev mode
-dev *args: rebuild-electron
-  npm start -- -- {{args}}
+dev *args: rebuild-node
+  npm start -- -- -- {{args}}
 
 # package the app and start it
 dev-packaged *args:
@@ -105,7 +101,7 @@ fetch-titles:
 #
 
 publish-xtsn:
-  cd "{{xtsn_dir}}" && npm run prepublish && npm publish
+  cd "{{xtsn_dir}}" && npm run prepare && npm publish
 
 package:
   npm run make
@@ -116,6 +112,7 @@ publish:
 
   just rebuild-electron
   npm run publish
+  npx electron scripts/abi-check.js "${PWD}/.vite/build/.node/*"
 
 #
 # Hooks
