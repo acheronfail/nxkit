@@ -36,7 +36,7 @@ clean_all: clean
 #
 
 # start the app in dev mode
-dev *args: rebuild-node
+dev *args: rebuild-electron
   npm start -- -- -- {{args}}
 
 # package the app and start it
