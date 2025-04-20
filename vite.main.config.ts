@@ -1,6 +1,6 @@
 import type { ConfigEnv, PluginOption, UserConfig } from 'vite';
 import { defineConfig, mergeConfig } from 'vite';
-import { join, basename, dirname, relative } from 'node:path';
+import { join, basename, dirname, relative } from 'node:path/posix';
 import fs from 'node:fs';
 import { SourceMapGenerator } from 'source-map';
 import { getBuildConfig, getBuildDefine, external, pluginHotRestart } from './vite.base.config';
@@ -34,7 +34,7 @@ export default defineConfig((env) => {
       },
     },
     plugins: [
-      copyNativeNodesModules(buildConfig.build!.outDir),
+      copyNativeNodeModules(buildConfig.build!.outDir),
       copyWasmFiles(buildConfig.build!.outDir),
       pluginHotRestart('restart'),
     ],
@@ -83,7 +83,7 @@ function copyWasmFiles(rootDir: string): PluginOption {
   };
 }
 
-function copyNativeNodesModules(rootDir: string): PluginOption {
+function copyNativeNodeModules(rootDir: string): PluginOption {
   const ctx: CopyContext = {
     uniqueId: 0,
     copyDir: join(rootDir, '.node'),
@@ -93,7 +93,7 @@ function copyNativeNodesModules(rootDir: string): PluginOption {
 
   return {
     enforce: 'pre',
-    name: 'copy-native-nodes-modules',
+    name: 'copy-native-node-modules',
     buildStart: (_options) => {
       fs.mkdirSync(ctx.copyDir, { recursive: true });
     },
