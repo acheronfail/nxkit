@@ -4,7 +4,6 @@
  * - https://github.com/gulpjs/interpret/blob/c09bf70bc73d020b9d387223e7b74708687fdb47/index.js#L70
  */
 
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
@@ -29,10 +28,6 @@ const config = {
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({
-      name: `${pkgJson.name}-win32`,
-      setupExe: `${pkgJson.name}-win32-installer.exe`,
-    }),
     new MakerZIP({}, ['darwin', 'linux', 'win32']),
     new MakerRpm({
       options: {

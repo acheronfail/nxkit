@@ -10,16 +10,10 @@ import automaticContextMenus from 'electron-context-menu';
 import { getPaths, getResources } from '../resources';
 import { ExplorerController } from './explorer';
 import { merge, split } from '../node/split';
-import { electronSquirrelStartup } from './_squirrel';
 
 // FIXME: need a way to easily view main proc logs on windows - explorer doesn't work there
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-// Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (electronSquirrelStartup()) {
-  app.quit();
-}
 
 // global variables set here so they can be re-used
 setEnv('IS_DEV', app.isPackaged);
