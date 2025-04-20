@@ -112,7 +112,6 @@ publish:
 
   just rebuild-electron
   npm run publish
-  npx electron scripts/abi-check.js "${PWD}/.vite/build/.node/*"
 
 #
 # Hooks
