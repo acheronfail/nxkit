@@ -1,5 +1,6 @@
 // Used for checking ABI compatibility post build.
 import { createRequire } from 'node:module';
+import { app } from 'electron';
 import glob from 'glob';
 const require = createRequire(import.meta.url);
 
@@ -8,6 +9,7 @@ const die = (msg) => {
   process.exit(1);
 };
 
+app.commandLine.appendSwitch('--no-sandbox');
 const input = process.argv[2];
 if (!input) {
   die('Usage: electron abi-check.js <node addon path>');
