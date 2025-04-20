@@ -1,17 +1,14 @@
 # NXKit
 
-Things left to do:
+An application intended to bring some commonly needed tools for Nintendo Switch Homebrew to a more user-friendly place. Currently supports:
 
-- [x] ensure windows builds statically link to openssl
-- [x] document `xattr -d com.apple.quarantine` requirement
-- [ ] fix vite windows builds failing to compile worker process
-- [ ] test all CI built artifacts
+- 🐧️ Linux, 🍎️ macOS and 🪟️ Windows!
+- 💉️ injecting payloads
+- 🚀️ creating custom launchers
+- 🔎️ exploring NAND dumps
+- 🔪️ splitting/merging NSPs
 
-Future ideas:
-
-- support for compressing/decompressing .nsz, etc
-
----
+Hopefully it's helpful to you!
 
 ## Installation
 
@@ -23,3 +20,7 @@ If you're using macOS, be aware that this application isn't notarised (since tha
 xattr -d com.apple.quarantine /path/to/NXKit.app
 ```
 This command removes the quarantine attribute from the app, allowing it to run without being blocked by macOS's Gatekeeper.
+
+## Future ideas
+
+- support for compressing/decompressing .nsz files and the like
