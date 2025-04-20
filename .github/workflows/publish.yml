@@ -29,10 +29,13 @@ jobs:
 
     steps:
       # checkout
+      - name: Enable symlink support
+        run: git config --global core.symlinks true
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
+          symlinks: true
 
       # cache
       - uses: actions/cache@v4
