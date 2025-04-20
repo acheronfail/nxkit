@@ -23,7 +23,7 @@
   import { settings } from './stores/settings.svelte';
 
   // TODO: support working directly with a connected switch, not just with dumps
-  // can we auto-detect the device? then use "nandOpenDisk" to open it with sudo
+  // can we auto-detect the device? then use "nandOpenDisk" to open it with sudo? (doesn't work on windows at all)
 
   let { nandFilePath, partitionName, readonlyDefault = true }: Props = $props();
 
@@ -160,7 +160,7 @@
       id="rawnand-file"
       type="file"
       bind:this={input}
-      onchange={(e) => handlers.onNandChoose(e.currentTarget.files?.[0].path)}
+      onchange={(e) => handlers.onNandChoose(window.nxkit.getFilePath(e.currentTarget.files?.[0]))}
     />
   </div>
 

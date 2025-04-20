@@ -9,4 +9,5 @@ window[NXKitBridgeKey] = {
 
   call: vi.fn().mockResolvedValue(undefined),
   progressSubscribe: vi.fn(),
+  getFilePath: (file) => file?.name,
 };

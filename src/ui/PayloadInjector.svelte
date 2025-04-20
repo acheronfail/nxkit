@@ -65,8 +65,9 @@
       // only copy in paths ending in `.bin`
       const filePaths: string[] = [];
       for (const file of fileList) {
-        if (file.path.endsWith('.bin')) {
-          filePaths.push(file.path);
+        const filePath = window.nxkit.getFilePath(file);
+        if (filePath?.endsWith('.bin')) {
+          filePaths.push(filePath);
         }
       }
 
