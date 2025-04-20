@@ -83,7 +83,9 @@
         await loadDirectory(id)
           .then((childNodes) => {
             childrenState[id] = childNodes.map((node) => node.id);
-            childNodes.forEach((node) => (nodes[node.id] = node));
+            childNodes.forEach((node) => {
+              nodes[node.id] = node;
+            });
           })
           .finally(() => {
             clearTimeout(loadingTimer);

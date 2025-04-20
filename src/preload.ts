@@ -1,7 +1,7 @@
 // See the Electron documentation for details on how to use preload scripts:
 // https://www.electronjs.org/docs/latest/tutorial/process-model#preload-scripts
 
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import { NXKitBridgeKey, NXKitBridge, NXKitBridgeKeyType } from './channels';
 import type { MainIpcDefinition } from './main';
 import type { Progress } from './node/nand/explorer/worker';
@@ -18,6 +18,7 @@ declare global {
     [NXKitBridgeKey]: NXKitBridge & {
       call: RendererBridge;
       progressSubscribe: (fn: OnProgress) => void;
+      getFilePath: (file: File | undefined) => string | undefined;
     };
   }
 }
@@ -33,5 +34,6 @@ invoke('preloadBridge').then((bridge) => {
     ...bridge,
     call: invoke,
     progressSubscribe: (fn) => (onProgress = fn),
+    getFilePath: (file) => (file ? webUtils.getPathForFile(file) : undefined),
   } satisfies Window[NXKitBridgeKeyType]);
 });

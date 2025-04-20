@@ -64,10 +64,11 @@
         disabled={!splitSelected}
         loading={splitting}
         onclick={() => {
-          if (splitFileList) {
+          const splitFilePath = window.nxkit.getFilePath(splitFileList?.[0]);
+          if (splitFilePath) {
             splitting = true;
             window.nxkit
-              .call('splitFile', splitFileList[0].path, splitAsArchive, !splitCopy)
+              .call('splitFile', splitFilePath, splitAsArchive, !splitCopy)
               .then(handleSplitMergeResult)
               .finally(() => (splitting = false));
           }
@@ -123,10 +124,11 @@
         disabled={!mergeSelected}
         loading={merging}
         onclick={() => {
-          if (mergeFileList) {
+          const mergeFilePath = window.nxkit.getFilePath(mergeFileList?.[0]);
+          if (mergeFilePath) {
             merging = true;
             window.nxkit
-              .call('mergeFile', mergeFileList[0].path, !mergeCopy)
+              .call('mergeFile', mergeFilePath, !mergeCopy)
               .then(handleSplitMergeResult)
               .finally(() => (merging = false));
           }

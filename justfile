@@ -21,7 +21,7 @@ setup_hooks:
   @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
   @echo "just pre-commit" >> .git/hooks/pre-commit
   @chmod +x .git/hooks/pre-commit
-  @env echo -n "Do you want to create a fake nand dump? (y/N): "; read ans; if [[ $ans = *y* ]]; then just create-nand; fi
+  @env echo -n "Do you want to create a fake nand dump? (y/N): "; read ans; if [[ $ans = y* ]]; then just create-nand; fi
 
 # clean up installed toolchains and installed dependencies
 clean:
@@ -36,7 +36,7 @@ clean_all: clean
 #
 
 # start the app in dev mode
-dev *args: rebuild-node
+dev *args: rebuild-electron
   npm start -- -- -- {{args}}
 
 # package the app and start it

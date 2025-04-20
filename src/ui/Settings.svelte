@@ -18,7 +18,9 @@
 
   $effect(() => {
     if (keyFile) {
-      readFile(keyFile, 'string').then((data) => keys.setUserKeys({ location: keyFile.path, data }));
+      readFile(keyFile, 'string').then((data) =>
+        keys.setUserKeys({ location: window.nxkit.getFilePath(keyFile)!, data }),
+      );
     }
   });
 
