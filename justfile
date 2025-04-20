@@ -1,5 +1,6 @@
 nxkit_image := 'nxkit'
 node_arch := if arch() == 'x86_64' { 'x64' } else { 'arm64' }
+xtsn_dir := 'src/node/nand/xtsn'
 
 _default:
   just -l
@@ -10,6 +11,8 @@ _default:
 # set up the local repository for development
 setup:
   npm install
+  cd "{{xtsn_dir}}" && npm install
+
   if [ -z "${CI:-}" ]; then just setup_hooks; fi
 
 # set up git hooks
@@ -32,13 +35,9 @@ clean_all: clean
 # Dev Scripts
 #
 
-# run npm
-npm *args:
-  npm {{args}}
-
 # start the app in dev mode
-dev *args: rebuild-electron
-  npm start -- -- {{args}}
+dev *args: rebuild-node
+  npm start -- -- -- {{args}}
 
 # package the app and start it
 dev-packaged *args:
@@ -48,11 +47,11 @@ dev-packaged *args:
 
 # rebuild native modules to work with electron
 rebuild-electron:
-  cd src/node/nand/xtsn && npm run clean
-  npm exec electron-rebuild -- --module-dir src/node/nand/xtsn
+  cd "{{xtsn_dir}}" && npm exec electron-rebuild
+
 # rebuild native modules to work with node
 rebuild-node:
-  cd src/node/nand/xtsn && npm rebuild
+  cd "{{xtsn_dir}}" && npm rebuild
 
 # runs all tests and checks
 test-all: rebuild-node
@@ -65,7 +64,7 @@ test *ARGS: rebuild-node
 # runs benchmarks; outputs a .cpuprofile file and creates bench.json if title was passed
 bench TITLE='': rebuild-node
   @mkdir -p scripts/build/Release
-  @cp src/node/nand/xtsn/build/Release/xtsn.node scripts/build/Release/xtsn.node
+  @cp "{{xtsn_dir}}"/build/Release/xtsn.node scripts/build/Release/xtsn.node
   @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
   npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
   node --cpu-prof scripts/bench100m.js {{TITLE}}
@@ -102,12 +101,16 @@ fetch-titles:
 #
 
 publish-xtsn:
-  cd src/node/nand/xtsn && npm run prepublish && npm publish
+  cd "{{xtsn_dir}}" && npm run prepare && npm publish
 
 package:
   npm run make
 
 publish:
+  #!/usr/bin/env bash
+  set -euo pipefail
+
+  just rebuild-electron
   npm run publish
 
 #

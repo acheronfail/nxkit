@@ -104,3 +104,4 @@ scripts/build/
 scripts/bench100m.js
 .bin/
 .tmp/
+resources.json

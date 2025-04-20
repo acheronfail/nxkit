@@ -4,27 +4,15 @@
  * - https://github.com/gulpjs/interpret/blob/c09bf70bc73d020b9d387223e7b74708687fdb47/index.js#L70
  */
 
-import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDeb } from '@electron-forge/maker-deb';
 import { MakerRpm } from '@electron-forge/maker-rpm';
 import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
-import cp from 'node:child_process';
+import fsp from 'node:fs/promises';
 import { createRequire } from 'node:module';
 const pkgJson = createRequire(import.meta.url)('./package.json');
-
-// *sigh*, the things we do for cjs<->esm incompatibilities...
-const extraResource = JSON.parse(
-  cp.execSync(
-    `npm exec tsx -- --eval "import('./src/resources').then(m => {
-      const extraResource = Object.values(m.getResources(false));
-      console.log(JSON.stringify(extraResource));
-    })"`,
-    { encoding: 'utf-8' },
-  ),
-);
 
 const asar = true;
 
@@ -34,21 +22,23 @@ const config = {
     name: pkgJson.productName,
     executableName: pkgJson.name,
     asar,
-    extraResource,
+    // *sigh*, the things we do for cjs<->esm incompatibilities...
+    extraResource: JSON.parse(await fsp.readFile('./resources.json')),
     appCategoryType: 'public.app-category.utilities',
   },
   rebuildConfig: {},
   makers: [
-    new MakerSquirrel({}),
-    new MakerZIP({}, ['darwin', 'linux']),
+    new MakerZIP({}, ['darwin', 'linux', 'win32']),
     new MakerRpm({
       options: {
         bin: pkgJson.name,
+        name: `${pkgJson.name}-linux`,
       },
     }),
     new MakerDeb({
       options: {
         bin: pkgJson.name,
+        name: `${pkgJson.name}-linux`,
       },
     }),
   ],

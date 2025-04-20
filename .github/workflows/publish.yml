@@ -7,23 +7,30 @@ on:
     tags:
       - '[0-9]+.[0-9]+.[0-9]+'
 
+permissions:
+  contents: write
+
 jobs:
   build-release:
     name: build-release
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        build: [linux-gnu, macos, win-msvc]
+        build: [linux-gnu, macos-arm, macos-intel, win-msvc]
         include:
           - build: linux-gnu
             os: ubuntu-latest
-          - build: macos
+          - build: macos-arm
             os: macos-latest
+          - build: macos-intel
+            os: macos-13
           - build: win-msvc
             os: windows-2022
 
     steps:
       # checkout
+      - name: Enable symlink support
+        run: git config --global core.symlinks true
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
@@ -32,9 +39,8 @@ jobs:
       # cache
       - uses: actions/cache@v4
         with:
-          path: |
-            node_modules/
-          key: ${{ runner.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
+          path: node_modules/
+          key: ${{ matrix.os }}-node_modules-${{ hashFiles('**/package-lock.json') }}
 
       # install just
       - uses: extractions/setup-just@v2
@@ -51,38 +57,42 @@ jobs:
         with:
           python-version: '3.11'
 
-      # install openssl in windows
       - if: matrix.os == 'windows-2022'
-        id: vcpkg
         uses: lukka/run-vcpkg@v11
         with:
           runVcpkgInstall: true
           vcpkgGitCommitId: b02e341c927f16d991edbd915d8ea43eac52096c
+        env:
+          VCPKG_DEFAULT_TRIPLET: x64-windows-static
       - if: matrix.os == 'windows-2022'
+        name: Set OpenSSL variables
         run: |
-          $libssl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
-          $opensslLibDir = Split-Path -Path $libssl.FullName -Parent
+          $libSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter libssl.lib | Where-Object { $_.FullName -notmatch '\\debug\\' }
+          $opensslLibDir = Split-Path -Path $libSsl.FullName -Parent
           echo "OPENSSL_LIB_DIR=$opensslLibDir" >> $env:GITHUB_ENV
           Write-Host "OPENSSL_LIB_DIR: $opensslLibDir"
 
+          $incSsl = Get-ChildItem -Path $vcpkgRoot -Recurse -Filter evp.h | Select-Object -First 1
+          $opensslIncDir = Split-Path -Path (Split-Path -Path $incSsl.FullName -Parent) -Parent
+          echo "OPENSSL_INC_DIR=$opensslIncDir" >> $env:GITHUB_ENV
+          Write-Host "OPENSSL_INC_DIR: $opensslIncDir"
+
       # dependencies
       - name: Setup Dependencies
-        run: |
-          just setup
+        run: just setup
 
       # test
       - name: Test XTSN
-        if: matrix.os == 'windows-2022'
         run: |
-          cd src/node/nand/xtsn && npm run build
+          cd src/node/nand/xtsn
+          npm run build
           npm run test
 
       - name: Test NXKit
-        continue-on-error: true
-        run: |
-          just test-all
+        run: just test-all
 
       # publish
       - name: Publish
-        run: |
-          echo TODO just publish
+        run: just publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

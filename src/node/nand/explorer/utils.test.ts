@@ -2,7 +2,14 @@ import { describe, expect, test, vi } from 'vitest';
 import fsp from 'node:fs/promises';
 import { join, relative } from 'node:path';
 import { temporaryDirectoryTask } from 'tempy';
-import { WalkAction, preCopyCheck, checkExistsRecursively, walkHostPaths } from './utils';
+import {
+  WalkAction,
+  preCopyCheck,
+  checkExistsRecursively,
+  walkHostPaths,
+  normalisePathSeparator,
+  normalisePathSeparators,
+} from './utils';
 import { Fat32FileSystem } from '../fatfs/fs';
 
 const mockFat = () => {
@@ -53,7 +60,7 @@ describe(checkExistsRecursively.name, () => {
       const fat = mockFat();
 
       fat.read.mockImplementation((path) => {
-        switch (path) {
+        switch (normalisePathSeparator(path)) {
           case '/dir2':
           case '/dir2/dir3':
           case '/dir2/dir3/file5':
@@ -74,7 +81,7 @@ describe(checkExistsRecursively.name, () => {
       const fat = mockFat();
 
       fat.read.mockImplementation((path) => {
-        switch (path) {
+        switch (normalisePathSeparator(path)) {
           case '/dir2':
             return { type: 'd', name: 'dir2', path };
           case '/dir2/dir3':
@@ -97,7 +104,7 @@ describe(checkExistsRecursively.name, () => {
       const fat = mockFat();
 
       fat.read.mockImplementation((path) => {
-        switch (path) {
+        switch (normalisePathSeparator(path)) {
           case '/dir2':
           case '/dir2/dir3':
           case '/dir2/dir3/file5':
@@ -120,7 +127,7 @@ describe(checkExistsRecursively.name, () => {
       const fat = mockFat();
 
       fat.read.mockImplementation((path) => {
-        switch (path) {
+        switch (normalisePathSeparator(path)) {
           case '/dir2':
             return { type: 'f', path, name: 'dir2', size: 0, sizeHuman: '0 B' };
           case '/dir2/dir3':
@@ -153,7 +160,7 @@ describe(walkHostPaths.name, () => {
         return WalkAction.Continue;
       });
 
-      expect(hostPaths).toEqual([
+      expect(normalisePathSeparators(hostPaths)).toEqual([
         '/dir1',
         '/dir2',
         '/dir2/dir3',
@@ -164,7 +171,7 @@ describe(walkHostPaths.name, () => {
         '/file2',
       ]);
 
-      expect(nandPaths).toEqual([
+      expect(normalisePathSeparators(nandPaths)).toEqual([
         '/nand/path/dir1',
         '/nand/path/dir2',
         '/nand/path/dir2/dir3',
@@ -190,7 +197,12 @@ describe(walkHostPaths.name, () => {
         return pathInNand.endsWith('/dir2') ? WalkAction.Skip : WalkAction.Stop;
       });
 
-      expect(nandPaths).toEqual(['/nand/path/dir1', '/nand/path/dir2', '/nand/path/file1', '/nand/path/file2']);
+      expect(normalisePathSeparators(nandPaths)).toEqual([
+        '/nand/path/dir1',
+        '/nand/path/dir2',
+        '/nand/path/file1',
+        '/nand/path/file2',
+      ]);
     });
   });
 });
