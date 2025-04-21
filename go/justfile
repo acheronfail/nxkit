@@ -1,0 +1,14 @@
+_default:
+  just -l
+
+test:
+  go test github.com/acheronfail/nxkit/...
+
+bench:
+  go test -bench=. github.com/acheronfail/nxkit/...
+
+build:
+  go build -o nxkit main.go
+
+run:
+  go run main.go

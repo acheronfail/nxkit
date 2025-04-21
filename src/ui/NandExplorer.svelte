@@ -121,7 +121,7 @@
   };
 </script>
 
-<Container fillParent data-testid="nandexplorer">
+<Container fillParent data-testid="nand-explorer">
   <div class="flex flex-col">
     <Tooltip>
       {#snippet tooltip()}

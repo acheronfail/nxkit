@@ -186,7 +186,7 @@ void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
 
   // see if we can completely skip any sectors
   if (skippedBytes > 0) {
-    int fullSectorsToSkip = std::floor(skippedBytes / sectorSize);
+    uint64_t fullSectorsToSkip = skippedBytes / sectorSize;
     sectorOffset += fullSectorsToSkip;
     skippedBytes %= sectorSize;
   }
@@ -198,12 +198,12 @@ void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
     InitTweak(ctx_tweak, tweak, sectorOffset);
 
     // update the tweak for all chunks before the first chunk we need to process
-    for (int i = 0; i < std::floor(skippedBytes / 16); i++) {
+    for (int i = 0; i < skippedBytes / 16; i++) {
       UpdateTweak(tweak);
     }
 
     // finally, process the rest of the chunks in this sector
-    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, std::floor((sectorSize - skippedBytes) / 16));
+    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, (sectorSize - skippedBytes) / 16);
     sectorOffset++;
   }
 
@@ -211,7 +211,7 @@ void RunCipherMethod(const FunctionCallbackInfo<Value> &args) {
   while (chunkOffset < totalChunks) {
     unsigned char tweak[16] = {0};
     InitTweak(ctx_tweak, tweak, sectorOffset);
-    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, std::floor(sectorSize / 16));
+    ProcessChunks(ctx_crypto, input, tweak, &chunkOffset, totalChunks, sectorSize / 16);
     sectorOffset++;
   }
 }
