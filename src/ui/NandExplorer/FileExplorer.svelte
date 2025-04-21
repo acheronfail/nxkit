@@ -98,7 +98,10 @@
       disabled = true;
       const filePaths: string[] = [];
       for (const file of files) {
-        filePaths.push(file.path);
+        const filePath = window.nxkit.getFilePath(file);
+        if (filePath) {
+          filePaths.push(filePath);
+        }
       }
 
       if (!filePaths.length) {
