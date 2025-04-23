@@ -197,8 +197,8 @@ func (m *MemoryBackend) Seek(offset int64, whence int) (int64, error) {
 // Stat implements backend.Storage.
 func (m *MemoryBackend) Stat() (fs.FileInfo, error) {
 	return &NandStats{
-		isEncrypted: false,
-		size:        m.size,
+		name: "MemoryBackend",
+		size: m.size,
 	}, nil
 }
 

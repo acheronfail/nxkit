@@ -7,15 +7,9 @@ toolchain go1.24.1
 require fyne.io/fyne/v2 v2.6.0
 
 require (
-	github.com/djherbis/times v1.6.0 // indirect
 	github.com/elliotwutingfeng/asciiset v0.0.0-20230602022725-51bbb787efab // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/jpillora/sizestr v1.0.0 // indirect
-	github.com/klauspost/compress v1.17.4 // indirect
-	github.com/pierrec/lz4/v4 v4.1.17 // indirect
-	github.com/pkg/xattr v0.4.9 // indirect
-	github.com/sirupsen/logrus v1.9.4-0.20230606125235-dd1b4c2e81af // indirect
-	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/jpillora/sizestr v1.0.0
 )
 
 require (
@@ -45,7 +39,7 @@ require (
 	github.com/rymdport/portal v0.4.1 // indirect
 	github.com/srwiley/oksvg v0.0.0-20221011165216-be6e8873101c // indirect
 	github.com/srwiley/rasterx v0.0.0-20220730225603-2ab79fcdd4ef // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/testify v1.10.0
 	github.com/yuin/goldmark v1.7.8 // indirect
 	golang.org/x/image v0.24.0 // indirect
 	golang.org/x/net v0.35.0 // indirect

@@ -16,13 +16,13 @@ import (
 
 // If I am do to this, I would first need:
 // - [x] port XTSN to golang
-// - [ ] support reading split dumps
+// - [x] support reading split dumps
 // - [ ] port hacbrewpack to golang (or compile it and then spawn it?)
 // - [ ] have a way to ship assets (*.nso, etc)
 
 func openNand(path string) {
 	// open dump
-	dumpBackend, err := nand.NewCombinedDumpBackend(path)
+	dumpBackend, err := nand.NewDumpBackend(path, true)
 	if err != nil {
 		panic(err)
 	}
@@ -75,7 +75,7 @@ func openNand(path string) {
 }
 
 func main() {
-	openNand("../.data/rawnand.bin")
+	openNand("../.data/rawnand.bin.00")
 
 	myApp := app.New()
 	w := myApp.NewWindow("Two Way")

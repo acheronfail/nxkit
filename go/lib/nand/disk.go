@@ -198,8 +198,8 @@ func (l *NandBackend) Seek(offset int64, whence int) (int64, error) {
 }
 
 type NandStats struct {
-	isEncrypted bool
-	size        int64
+	name string
+	size int64
 }
 
 func (n *NandStats) IsDir() bool {
@@ -218,11 +218,7 @@ func (n *NandStats) Mode() fs.FileMode {
 
 // Name implements fs.FileInfo.
 func (n *NandStats) Name() string {
-	if n.isEncrypted {
-		return "Nand(encrypted)"
-	}
-
-	return "Nand(unencrypted)"
+	return n.name
 }
 
 // Size implements fs.FileInfo.
@@ -237,9 +233,16 @@ func (n *NandStats) Sys() any {
 
 // Stat implements backend.Storage.
 func (l *NandBackend) Stat() (fs.FileInfo, error) {
+	var name string
+	if l.crypto == nil {
+		name = "NAND(unencrypted)"
+	} else {
+		name = "NAND(encrypted)"
+	}
+
 	return &NandStats{
-		isEncrypted: l.crypto != nil,
-		size:        int64(l.fsSectorCount * l.fsSectorSize),
+		name: name,
+		size: int64(l.fsSectorCount * l.fsSectorSize),
 	}, nil
 }
 
