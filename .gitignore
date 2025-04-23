@@ -105,3 +105,4 @@ scripts/bench100m.js
 .bin/
 .tmp/
 resources.json
+*.nacp

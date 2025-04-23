@@ -13,5 +13,5 @@ bench:
 build:
   go build -o nxkit main.go
 
-run:
-  go run main.go
+run *args:
+  go run main.go {{args}}

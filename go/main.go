@@ -3,12 +3,15 @@ package main
 import (
 	"fmt"
 	"os"
+	"slices"
 
+	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/widget"
 	"github.com/acheronfail/nxkit/lib/inject"
+	"github.com/acheronfail/nxkit/lib/nacp"
 	"github.com/acheronfail/nxkit/lib/nand"
 	"github.com/acheronfail/nxkit/lib/xtsn"
 	"github.com/diskfs/go-diskfs/filesystem/fat32"
@@ -21,8 +24,23 @@ import (
 // - [x] port XTSN to golang
 // - [x] support reading split dumps
 // - [x] support injecting payloads (port web injector)
-// - [ ] port hacbrewpack to golang (or compile it and then spawn it?)
+// - [-] port hacbrewpack to golang (or compile it and then spawn it?)
+//     - [-] port nacp
+//     - [ ] port hacbrewpack
 // - [ ] have a way to ship assets (*.nso, etc)
+
+func createNsp() {
+	nacp := nacp.NewNacp(nil)
+	nacp.SetTitle("Test Title")
+
+	buffer := nacp.Buffer()
+	err := os.WriteFile("control.nacp", buffer, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	// TODO: create nsp from dir
+}
 
 // TODO: don't leave devices open? open in inject?
 func injectPayload(payloadPath string) {
@@ -117,12 +135,10 @@ func openNand(path string) {
 	}
 }
 
-func main() {
-	openNand("../.data/rawnand.bin.00")
-	injectPayload("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
-
+func gui() {
 	myApp := app.New()
 	w := myApp.NewWindow("Two Way")
+	w.Resize(fyne.NewSize(640, 480))
 
 	str := binding.NewString()
 	str.Set("Hi!")
@@ -130,7 +146,22 @@ func main() {
 	w.SetContent(container.NewVBox(
 		widget.NewLabelWithData(str),
 		widget.NewEntryWithData(str),
+		widget.NewButton("Quit", func() {
+			myApp.Quit()
+		}),
 	))
 
 	w.ShowAndRun()
+}
+
+func main() {
+	if slices.Contains(os.Args, "--nand") {
+		openNand("../.data/rawnand.bin.00")
+	} else if slices.Contains(os.Args, "--inject") {
+		injectPayload("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
+	} else if slices.Contains(os.Args, "--nsp") {
+		createNsp()
+	} else {
+		gui()
+	}
 }
