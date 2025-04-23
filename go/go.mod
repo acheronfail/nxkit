@@ -6,6 +6,8 @@ toolchain go1.24.1
 
 require fyne.io/fyne/v2 v2.6.0
 
+require github.com/google/gousb v1.1.3
+
 require (
 	github.com/elliotwutingfeng/asciiset v0.0.0-20230602022725-51bbb787efab // indirect
 	github.com/google/uuid v1.3.0 // indirect
