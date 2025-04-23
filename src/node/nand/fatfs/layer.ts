@@ -35,17 +35,17 @@ export class NandIoLayer {
     this.sectorCount = Math.floor((options.partitionEndOffset - options.partitionStartOffset) / options.sectorSize);
   }
 
-  public read(offset: number, size: number): Buffer {
-    const diskOffset = this.partitionStartOffset + offset;
+  public read(partOffset: number, size: number): Buffer {
+    const diskOffset = this.partitionStartOffset + partOffset;
 
     // can't read past the end
-    if (this.partitionStartOffset + offset > this.partitionEndOffset) {
+    if (this.partitionStartOffset + partOffset > this.partitionEndOffset) {
       return Buffer.from([]);
     }
 
     // adjust size to make sure we don't read past the end
-    if (offset + size > this.partitionEndOffset) {
-      size = this.partitionEndOffset - offset;
+    if (partOffset + size > this.partitionEndOffset) {
+      size = this.partitionEndOffset - partOffset;
     }
 
     if (!this.crypto) {
@@ -61,23 +61,23 @@ export class NandIoLayer {
     // the second chunk. We then read both chunks and decrypt them, and return the
     // desired bytes (discarding `before` and `after`)
 
-    const before = offset % this.blockSize;
-    let after = (offset + size) % this.blockSize;
+    const before = partOffset % this.blockSize;
+    let after = (partOffset + size) % this.blockSize;
     if (after) after = this.blockSize - after;
 
     const readSize = before + size + after;
     const alignedDiskOffset = diskOffset - before;
-    const partByteOffset = offset - before;
+    const partByteOffset = partOffset - before;
 
     const buf = this.io.read(alignedDiskOffset, readSize);
     return this.crypto.decrypt(buf, partByteOffset).subarray(before, before + size);
   }
 
-  public write(offset: number, data: Uint8Array): number {
-    const diskOffset = this.partitionStartOffset + offset;
+  public write(partOffset: number, data: Uint8Array): number {
+    const diskOffset = this.partitionStartOffset + partOffset;
 
     // don't write past the end
-    if (this.partitionStartOffset + offset > this.partitionEndOffset) {
+    if (this.partitionStartOffset + partOffset > this.partitionEndOffset) {
       return 0;
     }
 
@@ -102,18 +102,18 @@ export class NandIoLayer {
 
     const chunks: Uint8Array[] = [];
 
-    const before = offset % this.blockSize;
-    const partByteOffset = offset - before;
+    const before = partOffset % this.blockSize;
+    const partByteOffset = partOffset - before;
     if (before) {
       chunks.push(this.read(partByteOffset, before));
     }
 
     chunks.push(data);
 
-    let after = (offset + data.byteLength) % this.blockSize;
+    let after = (partOffset + data.byteLength) % this.blockSize;
     if (after) {
       after = this.blockSize - after;
-      chunks.push(this.read(offset + data.byteLength, after));
+      chunks.push(this.read(partOffset + data.byteLength, after));
     }
 
     const toWrite = Buffer.concat(chunks);
