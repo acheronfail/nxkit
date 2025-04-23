@@ -4,6 +4,9 @@ _default:
 test:
   go test github.com/acheronfail/nxkit/...
 
+testw:
+  reflex -r '\.go$' -- just test
+
 bench:
   go test -bench=. github.com/acheronfail/nxkit/...
 

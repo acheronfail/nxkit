@@ -8,6 +8,11 @@ import (
 	"unsafe"
 )
 
+type Crypto interface {
+	Encrypt(input []byte, byteOffset uint64) ([]byte, error)
+	Decrypt(input []byte, byteOffset uint64) ([]byte, error)
+}
+
 type XtsnCipher struct {
 	tweakCipher  cipher.Block
 	cryptoCipher cipher.Block
