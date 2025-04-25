@@ -14,4 +14,9 @@ build:
   go build -o nxkit main.go
 
 run *args:
+  rm -rf staging staging.bkp
+  mkdir staging staging.bkp
+  cp ../vendor/Forwarder-Mod/hbl.npdm staging/main.npdm
+  cp ../vendor/Forwarder-Mod/hbl.nso staging/main.nso
   go run main.go {{args}}
+  md5sum staging/main.npdm ../vendor/Forwarder-Mod/hbl.npdm

@@ -13,6 +13,7 @@ import (
 	"github.com/acheronfail/nxkit/lib/inject"
 	"github.com/acheronfail/nxkit/lib/nacp"
 	"github.com/acheronfail/nxkit/lib/nand"
+	"github.com/acheronfail/nxkit/lib/npdm"
 	"github.com/acheronfail/nxkit/lib/xtsn"
 	"github.com/diskfs/go-diskfs/filesystem/fat32"
 	"github.com/diskfs/go-diskfs/partition/gpt"
@@ -30,11 +31,24 @@ import (
 // - [ ] have a way to ship assets (*.nso, etc)
 
 func createNsp() {
-	nacp := nacp.NewNacp(nil)
-	nacp.SetTitle("Test Title")
+	launcherNacp := nacp.NewNacp(nil)
+	launcherNacp.SetTitle("Test Title")
+	launcherNacp.SetAuthor("Test Author")
 
-	buffer := nacp.Buffer()
-	err := os.WriteFile("control.nacp", buffer, 0644)
+	buffer := launcherNacp.Buffer()
+	err := os.WriteFile("staging/control.nacp", buffer, 0644)
+	if err != nil {
+		panic(err)
+	}
+
+	// TODO: make sure title id is maintained between these steps
+	// TODO: re-factor these as needed for simplicity
+	err = npdm.Process("staging", "staging.bkp", 0, false)
+	if err != nil {
+		panic(err)
+	}
+
+	err = nacp.Process("staging", int64(launcherNacp.GetID()))
 	if err != nil {
 		panic(err)
 	}

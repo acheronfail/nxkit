@@ -99,7 +99,7 @@ func (n *Nacp) SetAuthor(v string) {
 	}
 }
 
-func (n *Nacp) SetID(v interface{}) {
+func (n *Nacp) SetID(v any) {
 	val := parseU64(v)
 	// PresenceGroupId
 	binary.LittleEndian.PutUint64(n.buffer[0x3038:], val)
