@@ -26,34 +26,35 @@ import (
 // - [x] support reading split dumps
 // - [x] support injecting payloads (port web injector)
 // - [-] port hacbrewpack to golang (or compile it and then spawn it?)
-//     - [-] port nacp
-//     - [ ] port hacbrewpack
+//     - [x] nacp
+//     - [x] npdm
+//     - [ ] nca program
+//     - [ ] nca control
+//     - [ ] nca htmldoc
+//     - [ ] nca legalinfo
+//     - [ ] nca meta
+//     - [ ] nsp
 // - [ ] have a way to ship assets (*.nso, etc)
 
 func createNsp() {
+	// validate and patch npdm as needed
+	titleId, err := npdm.Process("staging", "staging.bkp", 0, false)
+	if err != nil {
+		panic(err)
+	}
+
+	// validate and patch nacp as needed
 	launcherNacp := nacp.NewNacp(nil)
 	launcherNacp.SetTitle("Test Title")
 	launcherNacp.SetAuthor("Test Author")
-
-	buffer := launcherNacp.Buffer()
-	err := os.WriteFile("staging/control.nacp", buffer, 0644)
+	err = nacp.Process(launcherNacp, int64(titleId))
 	if err != nil {
 		panic(err)
 	}
 
-	// TODO: make sure title id is maintained between these steps
-	// TODO: re-factor these as needed for simplicity
-	err = npdm.Process("staging", "staging.bkp", 0, false)
-	if err != nil {
-		panic(err)
-	}
+	// TODO: create nca files
 
-	err = nacp.Process("staging", int64(launcherNacp.GetID()))
-	if err != nil {
-		panic(err)
-	}
-
-	// TODO: create nsp from dir
+	// TODO: create nsp
 }
 
 // TODO: don't leave devices open? open in inject?

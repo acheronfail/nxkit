@@ -2,26 +2,9 @@ package nacp
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 )
 
-func Process(controlDir string, titleId int64) error {
-	nacpPath := filepath.Join(controlDir, "control.nacp")
-	nacpFile, err := os.OpenFile(nacpPath, os.O_RDWR, 0644)
-	if err != nil {
-		return err
-	}
-	defer nacpFile.Close()
-
-	// Read the NACP file
-	nacpData, err := os.ReadFile(nacpPath)
-	if err != nil {
-		return err
-	}
-
-	nacp := NewNacp(nacpData)
-
+func Process(nacp *Nacp, titleId int64) error {
 	// TODO: these are required
 	if nacp.GetTitle() == "" {
 		return fmt.Errorf("invalid title name in control.nacp")
@@ -36,12 +19,5 @@ func Process(controlDir string, titleId int64) error {
 	if titleId != 0 {
 		nacp.SetID(titleId)
 	}
-
-	// Write the modified NACP data back to the file
-	_, err = nacpFile.Write(nacp.Buffer())
-	if err != nil {
-		return err
-	}
-
 	return nil
 }

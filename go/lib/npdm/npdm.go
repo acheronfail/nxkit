@@ -67,45 +67,45 @@ type NpdmAci0 struct {
 	Padding   uint64
 }
 
-func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool) error {
+func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool) (uint64, error) {
 	npdmPath := filepath.Join(exefsDir, "main.npdm")
 	f, err := os.OpenFile(npdmPath, os.O_RDWR, 0)
 	if err != nil {
-		return fmt.Errorf("failed to open %s: %w", npdmPath, err)
+		return 0, fmt.Errorf("failed to open %s: %w", npdmPath, err)
 	}
 	defer f.Close()
 
 	var npdm Npdm
 	if err := binary.Read(f, binary.LittleEndian, &npdm); err != nil {
-		return fmt.Errorf("failed to read NPDM header: %w", err)
+		return 0, fmt.Errorf("failed to read NPDM header: %w", err)
 	}
 
 	if npdm.Magic != MAGIC_META {
-		return fmt.Errorf("invalid NPDM magic")
+		return 0, fmt.Errorf("invalid NPDM magic")
 	}
 
 	// Read ACID
 	var acid NpdmAcid
 	if _, err := f.Seek(int64(npdm.AcidOffset), 0); err != nil {
-		return fmt.Errorf("failed to seek to NPDM ACID: %w", err)
+		return 0, fmt.Errorf("failed to seek to NPDM ACID: %w", err)
 	}
 	if err := binary.Read(f, binary.LittleEndian, &acid); err != nil {
-		return fmt.Errorf("failed to read NPDM ACID: %w", err)
+		return 0, fmt.Errorf("failed to read NPDM ACID: %w", err)
 	}
 	if acid.Magic != MAGIC_ACID {
-		return fmt.Errorf("invalid ACID magic")
+		return 0, fmt.Errorf("invalid ACID magic")
 	}
 
 	// Read ACI0
 	var aci0 NpdmAci0
 	if _, err := f.Seek(int64(npdm.Aci0Offset), 0); err != nil {
-		return fmt.Errorf("failed to seek to NPDM ACI0: %w", err)
+		return 0, fmt.Errorf("failed to seek to NPDM ACI0: %w", err)
 	}
 	if err := binary.Read(f, binary.LittleEndian, &aci0); err != nil {
-		return fmt.Errorf("failed to read NPDM ACI0: %w", err)
+		return 0, fmt.Errorf("failed to read NPDM ACI0: %w", err)
 	}
 	if aci0.Magic != MAGIC_ACI0 {
-		return fmt.Errorf("invalid ACI0 magic")
+		return 0, fmt.Errorf("invalid ACI0 magic")
 	}
 
 	// Determine TitleID
@@ -116,7 +116,7 @@ func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool
 
 	fmt.Printf("Validating TitleID: 0x%016x\n", tid)
 	if tid < 0x0100000000000000 || tid > 0x0fffffffffffffff {
-		return fmt.Errorf("bad TitleID found in main.npdm: 0x%016x. Valid range: 0100000000000000 - 0fffffffffffffff", tid)
+		return 0, fmt.Errorf("bad TitleID found in main.npdm: 0x%016x. Valid range: 0100000000000000 - 0fffffffffffffff", tid)
 	}
 	if tid > 0x01ffffffffffffff {
 		fmt.Printf("Warning: TitleID %016x is greater than 01ffffffffffffff and it's not suggested\n", tid)
@@ -125,10 +125,10 @@ func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool
 	// Patch TitleID if provided
 	if tid != 0 {
 		if _, err := f.Seek(int64(npdm.Aci0Offset+0x10), 0); err != nil {
-			return fmt.Errorf("seek error while patching title ID: %w", err)
+			return 0, fmt.Errorf("seek error while patching title ID: %w", err)
 		}
 		if err := binary.Write(f, binary.LittleEndian, tid); err != nil {
-			return fmt.Errorf("write error while patching title ID: %w", err)
+			return 0, fmt.Errorf("write error while patching title ID: %w", err)
 		}
 	}
 
@@ -138,24 +138,24 @@ func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool
 		backupName := fmt.Sprintf("%d_main.npdm", timestamp)
 		backupPath := filepath.Join(backupDir, backupName)
 		if err := copyFile(npdmPath, backupPath); err != nil {
-			return fmt.Errorf("failed to backup main.npdm: %w", err)
+			return 0, fmt.Errorf("failed to backup main.npdm: %w", err)
 		}
 
 		fmt.Println("Patching ACID public key")
 		if _, err := f.Seek(int64(npdm.AcidOffset+0x100), 0); err != nil {
-			return fmt.Errorf("seek error while patching public key: %w", err)
+			return 0, fmt.Errorf("seek error while patching public key: %w", err)
 		}
 
 		pubKey, err := getPublicKeyBytes("keys/hacbrewpack.pub.pem")
 		if err != nil {
-			return fmt.Errorf("failed to get public key bytes: %w", err)
+			return 0, fmt.Errorf("failed to get public key bytes: %w", err)
 		}
 		if _, err := f.Write(pubKey); err != nil {
-			return fmt.Errorf("write error while patching public key: %w", err)
+			return 0, fmt.Errorf("write error while patching public key: %w", err)
 		}
 	}
 
-	return nil
+	return tid, nil
 }
 
 func getPublicKeyBytes(pubKeyPath string) ([]byte, error) {
