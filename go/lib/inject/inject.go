@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/google/gousb"
 )
 
-var INTERMEZZO = []byte{
+var intermezzo = []byte{
 	0x44, 0x00, 0x9f, 0xe5, 0x01, 0x11, 0xa0, 0xe3, 0x40, 0x20, 0x9f, 0xe5, 0x00, 0x20, 0x42, 0xe0, 0x08, 0x00, 0x00,
 	0xeb, 0x01, 0x01, 0xa0, 0xe3, 0x10, 0xff, 0x2f, 0xe1, 0x00, 0x00, 0xa0, 0xe1, 0x2c, 0x00, 0x9f, 0xe5, 0x2c, 0x10,
 	0x9f, 0xe5, 0x02, 0x28, 0xa0, 0xe3, 0x01, 0x00, 0x00, 0xeb, 0x20, 0x00, 0x9f, 0xe5, 0x10, 0xff, 0x2f, 0xe1, 0x04,
@@ -18,14 +19,14 @@ var INTERMEZZO = []byte{
 }
 
 const (
-	RCM_PAYLOAD_ADDRESS = 0x40010000
-	INTERMEZZO_LOCATION = 0x4001f000
+	rcmPayloadAddress  = 0x40010000
+	intermezzoLocation = 0x4001f000
 )
 
-func CreateRCMPayload(payload []byte) []byte {
+func createRCMPayload(payload []byte) []byte {
 	rcmLength := uint32(0x30298)
 
-	intermezzoAddressRepeatCount := (INTERMEZZO_LOCATION - RCM_PAYLOAD_ADDRESS) / 4
+	intermezzoAddressRepeatCount := (intermezzoLocation - rcmPayloadAddress) / 4
 
 	rcmPayloadSize := ((0x2a8 + 0x4*intermezzoAddressRepeatCount + 0x1000 + len(payload) + 0x1000 - 1) / 0x1000) * 0x1000
 
@@ -36,17 +37,17 @@ func CreateRCMPayload(payload []byte) []byte {
 
 	// Write INTERMEZZO_LOCATION repeatedly
 	for i := range intermezzoAddressRepeatCount {
-		binary.LittleEndian.PutUint32(rcmPayload[0x2a8+i*4:], INTERMEZZO_LOCATION)
+		binary.LittleEndian.PutUint32(rcmPayload[0x2a8+i*4:], intermezzoLocation)
 	}
 
 	// Copy INTERMEZZO and payload into the buffer
-	copy(rcmPayload[0x2a8+0x4*intermezzoAddressRepeatCount:], INTERMEZZO)
+	copy(rcmPayload[0x2a8+0x4*intermezzoAddressRepeatCount:], intermezzo)
 	copy(rcmPayload[0x2a8+0x4*intermezzoAddressRepeatCount+0x1000:], payload)
 
 	return rcmPayload
 }
 
-func Write(dev *gousb.OutEndpoint, data []byte) (int, error) {
+func writeToDevice(dev *gousb.OutEndpoint, data []byte) (int, error) {
 	length := len(data)
 	writeCount := 0
 	packetSize := 0x1000
@@ -68,14 +69,14 @@ func Write(dev *gousb.OutEndpoint, data []byte) (int, error) {
 	return writeCount, nil
 }
 
-func FindRCMDevices(ctx *gousb.Context) ([]*gousb.Device, error) {
+func findRCMDevices(ctx *gousb.Context) ([]*gousb.Device, error) {
 	// Nintendo Switch RCM mode VID:PID = 0x0955:0x7321
 	return ctx.OpenDevices(func(desc *gousb.DeviceDesc) bool {
 		return desc.Vendor == 0x0955 && desc.Product == 0x7321
 	})
 }
 
-func InjectPayload(dev *gousb.Device, payload []byte) error {
+func injectPayload(dev *gousb.Device, payload []byte) error {
 	// Get device info
 	manufacturer, _ := dev.Manufacturer()
 	product, _ := dev.Product()
@@ -106,9 +107,9 @@ func InjectPayload(dev *gousb.Device, payload []byte) error {
 	}
 
 	// Create and send RCM payload
-	rcmPayload := CreateRCMPayload(payload)
+	rcmPayload := createRCMPayload(payload)
 	fmt.Println("Sending payload...")
-	writeCount, err := Write(outEndpoint, rcmPayload)
+	writeCount, err := writeToDevice(outEndpoint, rcmPayload)
 	if err != nil {
 		return fmt.Errorf("failed to send payload: %v", err)
 	}
@@ -139,5 +140,45 @@ func InjectPayload(dev *gousb.Device, payload []byte) error {
 		make([]byte, vulnerabilityLength),
 	)
 
+	return nil
+}
+
+// TODO: don't leave devices open? open in inject?
+func Inject(payloadPath string) error {
+	// Read payload from file
+	payload, err := os.ReadFile(payloadPath)
+	if err != nil {
+		return err
+	}
+
+	// Initialize USB context
+	ctx := gousb.NewContext()
+	defer ctx.Close()
+
+	// Look for RCM devices
+	devices, err := findRCMDevices(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		for _, d := range devices {
+			d.Close()
+		}
+	}()
+
+	if len(devices) == 0 {
+		return fmt.Errorf("no Nintendo Switch RCM devices found")
+	}
+
+	fmt.Printf("Found %d RCM device(s)\n", len(devices))
+
+	// Send payload to the first device found
+	device := devices[0]
+	err = injectPayload(device, payload)
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("Injection completed successfully!")
 	return nil
 }

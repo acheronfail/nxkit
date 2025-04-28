@@ -1,11 +1,15 @@
 _default:
   just -l
 
+setup:
+  go mod tidy
+  go install github.com/cespare/reflex@latest
+
 test:
   go test github.com/acheronfail/nxkit/...
 
 testw:
-  reflex -r '\.go$' -- just test
+  reflex -sr '\.go$' -- just test
 
 bench:
   go test -bench=. github.com/acheronfail/nxkit/...
@@ -20,3 +24,6 @@ run *args:
   cp ../vendor/Forwarder-Mod/hbl.nso staging/main.nso
   go run main.go {{args}}
   md5sum staging/main.npdm ../vendor/Forwarder-Mod/hbl.npdm
+
+runw *args:
+  reflex -sr '\.go$' -- just run {{args}}

@@ -5,11 +5,7 @@ import (
 	"os"
 	"slices"
 
-	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/app"
-	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
-	"fyne.io/fyne/v2/widget"
+	"github.com/acheronfail/nxkit/gui"
 	"github.com/acheronfail/nxkit/lib/inject"
 	"github.com/acheronfail/nxkit/lib/nacp"
 	"github.com/acheronfail/nxkit/lib/nand"
@@ -17,7 +13,6 @@ import (
 	"github.com/acheronfail/nxkit/lib/xtsn"
 	"github.com/diskfs/go-diskfs/filesystem/fat32"
 	"github.com/diskfs/go-diskfs/partition/gpt"
-	"github.com/google/gousb"
 	"github.com/jpillora/sizestr"
 )
 
@@ -55,45 +50,6 @@ func createNsp() {
 	// TODO: create nca files
 
 	// TODO: create nsp
-}
-
-// TODO: don't leave devices open? open in inject?
-func injectPayload(payloadPath string) {
-	// Read payload from file
-	payload, err := os.ReadFile(payloadPath)
-	if err != nil {
-		panic(err)
-	}
-
-	// Initialize USB context
-	ctx := gousb.NewContext()
-	defer ctx.Close()
-
-	// Look for RCM devices
-	devices, err := inject.FindRCMDevices(ctx)
-	if err != nil {
-		panic(err)
-	}
-	defer func() {
-		for _, d := range devices {
-			d.Close()
-		}
-	}()
-
-	if len(devices) == 0 {
-		panic("No Nintendo Switch RCM devices found.")
-	}
-
-	fmt.Printf("Found %d RCM device(s)\n", len(devices))
-
-	// Send payload to the first device found
-	device := devices[0]
-	err = inject.InjectPayload(device, payload)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Injection completed successfully!")
 }
 
 func openNand(path string) {
@@ -150,33 +106,14 @@ func openNand(path string) {
 	}
 }
 
-func gui() {
-	myApp := app.New()
-	w := myApp.NewWindow("Two Way")
-	w.Resize(fyne.NewSize(640, 480))
-
-	str := binding.NewString()
-	str.Set("Hi!")
-
-	w.SetContent(container.NewVBox(
-		widget.NewLabelWithData(str),
-		widget.NewEntryWithData(str),
-		widget.NewButton("Quit", func() {
-			myApp.Quit()
-		}),
-	))
-
-	w.ShowAndRun()
-}
-
 func main() {
 	if slices.Contains(os.Args, "--nand") {
 		openNand("../.data/rawnand.bin.00")
 	} else if slices.Contains(os.Args, "--inject") {
-		injectPayload("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
+		inject.Inject("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
 	} else if slices.Contains(os.Args, "--nsp") {
 		createNsp()
 	} else {
-		gui()
+		gui.StartGuiApp()
 	}
 }
