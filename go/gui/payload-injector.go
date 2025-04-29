@@ -67,7 +67,6 @@ func PayloadInjectorTab() fyne.CanvasObject {
 				err := inject.Inject(payloadPath)
 				if err != nil {
 					dialog.ShowError(err, mainWindow)
-					// nxkitApp.SendNotification(fyne.NewNotification("Error", fmt.Sprintf("Failed to inject payload: %v", err)))
 				}
 			}
 		},

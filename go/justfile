@@ -25,5 +25,5 @@ run *args:
   go run main.go {{args}}
   md5sum staging/main.npdm ../vendor/Forwarder-Mod/hbl.npdm
 
-runw *args:
+dev *args:
   reflex -sr '\.go$' -- just run {{args}}
