@@ -159,9 +159,9 @@ type BootSectorFat32 struct {
 }
 
 type BootSector struct {
-	Common BootSectorCommon
-	Fat    *BootSectorFat
-	Fat32  *BootSectorFat32
+	BootSectorCommon
+	Fat   *BootSectorFat
+	Fat32 *BootSectorFat32
 }
 
 func NewBootSector(b []byte) (*BootSector, error) {
@@ -193,9 +193,7 @@ func NewBootSector(b []byte) (*BootSector, error) {
 		fatsZ32 = binary.LittleEndian.Uint32(b[36:40])
 	}
 
-	bs := &BootSector{
-		Common: common,
-	}
+	bs := &BootSector{BootSectorCommon: common}
 
 	if common.fatType(fatsZ32) == Fat32 {
 		bs.Fat32 = &BootSectorFat32{
@@ -290,13 +288,21 @@ func (bs *BootSector) FatType() FatType {
 		return Fat32
 	}
 
-	return bs.Common.fatType(0)
+	return bs.fatType(0)
 }
 
 func (bs *BootSector) TotalSize() int64 {
 	if bs.Fat32 != nil {
-		return bs.Common.totalSize(bs.Fat32.BPB_FATSz32)
+		return bs.totalSize(bs.Fat32.BPB_FATSz32)
 	}
 
-	return bs.Common.totalSize(0)
+	return bs.totalSize(0)
+}
+
+func (bs *BootSector) FatSectorSize() uint32 {
+	if bs.Fat32 != nil {
+		return bs.Fat32.BPB_FATSz32
+	}
+
+	return uint32(bs.BPB_FATSz16)
 }
