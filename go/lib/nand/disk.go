@@ -11,7 +11,7 @@ import (
 )
 
 // TODO: use int64/uint64 where appropriate
-type NandBackend struct {
+type NxPartBackend struct {
 	seekOffset      int64
 	rawnand         backend.Storage
 	partitionStart  uint64
@@ -23,12 +23,12 @@ type NandBackend struct {
 }
 
 // Close implements backend.Storage.
-func (l *NandBackend) Close() error {
+func (l *NxPartBackend) Close() error {
 	return l.rawnand.Close()
 }
 
 // Read implements backend.Storage.
-func (l *NandBackend) Read(p []byte) (int, error) {
+func (l *NxPartBackend) Read(p []byte) (int, error) {
 	n, err := l.ReadAt(p, l.seekOffset)
 	if err != nil {
 		return 0, err
@@ -39,7 +39,7 @@ func (l *NandBackend) Read(p []byte) (int, error) {
 }
 
 // ReadAt implements backend.Storage.
-func (l *NandBackend) ReadAt(p []byte, diskOffset int64) (n int, err error) {
+func (l *NxPartBackend) ReadAt(p []byte, diskOffset int64) (n int, err error) {
 	// can't read past the end
 	if diskOffset > int64(l.partitionEnd) {
 		return 0, nil
@@ -94,7 +94,7 @@ func (l *NandBackend) ReadAt(p []byte, diskOffset int64) (n int, err error) {
 }
 
 // WriteAt implements backend.WritableFile.
-func (l *NandBackend) WriteAt(p []byte, diskOffset int64) (n int, err error) {
+func (l *NxPartBackend) WriteAt(p []byte, diskOffset int64) (n int, err error) {
 	// can't write past the end
 	if diskOffset > int64(l.partitionEnd) {
 		return 0, nil
@@ -178,7 +178,7 @@ func (l *NandBackend) WriteAt(p []byte, diskOffset int64) (n int, err error) {
 }
 
 // Seek implements backend.Storage.
-func (l *NandBackend) Seek(offset int64, whence int) (int64, error) {
+func (l *NxPartBackend) Seek(offset int64, whence int) (int64, error) {
 	switch whence {
 	case 0:
 		l.seekOffset = offset
@@ -232,7 +232,7 @@ func (n *NandStats) Sys() any {
 }
 
 // Stat implements backend.Storage.
-func (l *NandBackend) Stat() (fs.FileInfo, error) {
+func (l *NxPartBackend) Stat() (fs.FileInfo, error) {
 	var name string
 	if l.crypto == nil {
 		name = "NAND(unencrypted)"
@@ -247,17 +247,17 @@ func (l *NandBackend) Stat() (fs.FileInfo, error) {
 }
 
 // Sys implements backend.Storage.
-func (l *NandBackend) Sys() (*os.File, error) {
+func (l *NxPartBackend) Sys() (*os.File, error) {
 	return l.rawnand.Sys()
 }
 
 // Writable implements backend.Storage.
-func (l *NandBackend) Writable() (backend.WritableFile, error) {
+func (l *NxPartBackend) Writable() (backend.WritableFile, error) {
 	return l, nil
 }
 
-func NewNandBackend(rawnand backend.Storage, partStart, partEnd, cryptoBlockSize, fsSectorSize uint64) *NandBackend {
-	return &NandBackend{
+func NewNxPartBackend(rawnand backend.Storage, partStart, partEnd, cryptoBlockSize, fsSectorSize uint64) *NxPartBackend {
+	return &NxPartBackend{
 		rawnand:         rawnand,
 		partitionStart:  partStart,
 		partitionEnd:    partEnd,
@@ -268,6 +268,6 @@ func NewNandBackend(rawnand backend.Storage, partStart, partEnd, cryptoBlockSize
 	}
 }
 
-func (l *NandBackend) SetCrypto(crypto xtsn.Crypto) {
+func (l *NxPartBackend) SetCrypto(crypto xtsn.Crypto) {
 	l.crypto = crypto
 }

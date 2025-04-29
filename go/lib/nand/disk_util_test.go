@@ -19,9 +19,9 @@ var (
  * Test helpers
  */
 
-func getLayer(size int64) (*NandBackend, *MemoryBackend) {
+func getLayer(size int64) (*NxPartBackend, *MemoryBackend) {
 	backend := NewMemoryBackend(size)
-	return NewNandBackend(backend, 0, uint64(size), 16, FS_SECTOR_SIZE), backend
+	return NewNxPartBackend(backend, 0, uint64(size), 16, FS_SECTOR_SIZE), backend
 }
 
 func readAt(backend backend.Storage, offset int64, size int) []byte {

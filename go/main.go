@@ -11,6 +11,7 @@ import (
 	"github.com/acheronfail/nxkit/lib/nand"
 	"github.com/acheronfail/nxkit/lib/npdm"
 	"github.com/acheronfail/nxkit/lib/xtsn"
+	"github.com/diskfs/go-diskfs/backend"
 	"github.com/diskfs/go-diskfs/filesystem/fat32"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/jpillora/sizestr"
@@ -20,6 +21,7 @@ import (
 // - [x] port XTSN to golang
 // - [x] support reading split dumps
 // - [x] support injecting payloads (port web injector)
+// - [ ] add FAT12/16 support (own filesystem driver?)
 // - [-] port hacbrewpack to golang (or compile it and then spawn it?)
 //     - [x] nacp
 //     - [x] npdm
@@ -67,33 +69,43 @@ func openNand(path string) {
 	}
 
 	var userPartition *gpt.Partition
+	// var prodInfoFPartition *gpt.Partition
 	for i, part := range gptTable.Partitions {
 		if part.Name == "USER" {
 			userPartition = gptTable.Partitions[i]
-			break
 		}
+		// if part.Name == "PRODINFOF" {
+		// 	prodInfoFPartition = gptTable.Partitions[i]
+		// }
 	}
 
+	// if prodInfoFPartition == nil {
+	// 	panic("PRODINFOF partition not found")
+	// }
 	if userPartition == nil {
 		panic("USER partition not found")
 	}
 
-	fmt.Printf("Found USER partition, start=%d end=%d size=%s\n", userPartition.Start, userPartition.End, sizestr.ToString(int64(userPartition.Size)))
+	listPartition(dumpBackend, userPartition, true)
+	// listPartition(dumpBackend, prodInfoFPartition, false)
+}
+
+func listPartition(dumpBackend backend.Storage, partition *gpt.Partition, isFat32 bool) {
+	fmt.Printf("Found %s partition, start=%d end=%d size=%s\n", partition.Name, partition.Start, partition.End, sizestr.ToString(int64(partition.Size)))
 
 	// setup nand backend
 	fsSectorSize := int64(512)
 	cryptoBlockSize := uint64(16)
 	cryptoSectorSize := uint64(16384)
-	nandBackend := nand.NewNandBackend(dumpBackend, userPartition.Start*uint64(fsSectorSize), (userPartition.End+1)*uint64(fsSectorSize), cryptoBlockSize, uint64(fsSectorSize))
+	partBackend := nand.NewNxPartBackend(dumpBackend, partition.Start*uint64(fsSectorSize), (partition.End+1)*uint64(fsSectorSize), cryptoBlockSize, uint64(fsSectorSize))
+
 	crypto, err := xtsn.NewXtsnCipher(make([]byte, 16), make([]byte, 16), cryptoSectorSize)
 	if err != nil {
 		panic(err)
 	}
+	partBackend.SetCrypto(crypto)
 
-	nandBackend.SetCrypto(crypto)
-
-	// read fat32 filesystem
-	fs, err := fat32.Read(nandBackend, int64(userPartition.Size), int64(userPartition.Start)*fsSectorSize, fsSectorSize)
+	fs, err := fat32.Read(partBackend, int64(partition.Size), int64(partition.Start)*fsSectorSize, fsSectorSize)
 	if err != nil {
 		panic(err)
 	}
