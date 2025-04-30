@@ -9,7 +9,7 @@ test:
   go test github.com/acheronfail/nxkit/...
 
 testw:
-  reflex -sr '\.go$' -- just test
+  reflex -d none -sr '\.go$' -- just test
 
 bench:
   go test -bench=. github.com/acheronfail/nxkit/...
@@ -26,4 +26,4 @@ run *args:
   md5sum staging/main.npdm ../vendor/Forwarder-Mod/hbl.npdm
 
 dev *args:
-  reflex -sr '\.go$' -- just run {{args}}
+  reflex -d none -sr '\.go$' -- just run {{args}}
