@@ -4,11 +4,15 @@ _default:
 setup:
   go mod tidy
   go install github.com/cespare/reflex@latest
+  just fixtures
+
+fixtures:
+  bash ./lib/fs/fixtures/create.sh
 
 test:
   go test github.com/acheronfail/nxkit/...
 
-testw:
+testw: fixtures
   reflex -d none -sr '\.go$' -- just test
 
 bench:

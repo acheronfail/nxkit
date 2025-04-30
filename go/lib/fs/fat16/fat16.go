@@ -5,6 +5,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/acheronfail/nxkit/lib/fs/boot_sector"
 )
@@ -18,9 +19,11 @@ type FileSystem struct {
 	file                     *os.File
 	bootSector               boot_sector.BootSector
 	bytesPerSector           uint32
+	bytesPerCluster          int64
 	sectorsPerCluster        uint32
-	fatSectorStart           uint32
 	fatSectorCount           uint32
+	fatsSectorStart          uint32
+	fatsSectorCount          uint32
 	rootDirectorySectorStart uint32
 	rootDirectorySectorCount uint32
 	dataSectorStart          uint32
@@ -28,7 +31,7 @@ type FileSystem struct {
 }
 
 func NewFromPath(path string) (*FileSystem, error) {
-	file, err := os.Open(path)
+	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
 	}
@@ -52,38 +55,43 @@ func NewFromPath(path string) (*FileSystem, error) {
 	}
 
 	// Calculate the start of the FAT tables
-	bytesPerSector := uint32(bootSector.BPB_BytsPerSec)
 	sectorsPerCluster := uint32(bootSector.BPB_SecPerClus)
-	fatSectorStart := uint32(bootSector.BPB_RsvdSecCnt)
-	fatSectorCount := bootSector.FatSectorSize() * uint32(bootSector.BPB_NumFATs)
+	bytesPerSector := uint32(bootSector.BPB_BytsPerSec)
+	bytesPerCluster := int64(bytesPerSector * sectorsPerCluster)
 
-	fatBytes := make([]byte, int64(fatSectorCount*bytesPerSector))
-	_, err = file.ReadAt(fatBytes, int64(fatSectorStart*bytesPerSector))
+	fatSectorCount := bootSector.FatSectorCount()
+	fatsSectorStart := uint32(bootSector.BPB_RsvdSecCnt)
+	fatsSectorCount := fatSectorCount * uint32(bootSector.BPB_NumFATs)
+
+	rootDirectorySectorStart := fatsSectorStart + fatsSectorCount
+	rootDirectorySectorCount := uint32((32*bootSector.BPB_RootEntCnt + bootSector.BPB_BytsPerSec - 1) / bootSector.BPB_BytsPerSec)
+	dataSectorStart := rootDirectorySectorStart + rootDirectorySectorCount
+
+	fs := &FileSystem{
+		file:                     file,
+		bootSector:               *bootSector,
+		bytesPerSector:           bytesPerSector,
+		bytesPerCluster:          bytesPerCluster,
+		sectorsPerCluster:        sectorsPerCluster,
+		fatSectorCount:           fatSectorCount,
+		fatsSectorStart:          fatsSectorStart,
+		fatsSectorCount:          fatsSectorCount,
+		rootDirectorySectorStart: rootDirectorySectorStart,
+		rootDirectorySectorCount: rootDirectorySectorCount,
+		dataSectorStart:          dataSectorStart,
+	}
+
+	// TODONICE: support more than 2 fats
+	fat1Bytes, err := fs.getFatSectorBytes(1)
 	if err != nil {
 		file.Close()
 		return nil, err
 	}
 
-	table := parseFat16Table(fatBytes)
-	rootDirectorySectorStart := fatSectorStart + fatSectorCount
-	rootDirectorySectorCount := uint32((32*bootSector.BPB_RootEntCnt + bootSector.BPB_BytsPerSec - 1) / bootSector.BPB_BytsPerSec)
-	dataSectorStart := rootDirectorySectorStart + rootDirectorySectorCount
-
 	// TODONICE: validate both fats are identical
+	fs.table = parseFat16Table(fat1Bytes)
 
-	return &FileSystem{
-		file:                     file,
-		bootSector:               *bootSector,
-		bytesPerSector:           bytesPerSector,
-		sectorsPerCluster:        sectorsPerCluster,
-		fatSectorStart:           fatSectorStart,
-		fatSectorCount:           fatSectorCount,
-		rootDirectorySectorStart: rootDirectorySectorStart,
-		rootDirectorySectorCount: rootDirectorySectorCount,
-		dataSectorStart:          dataSectorStart,
-
-		table: table,
-	}, nil
+	return fs, nil
 }
 
 func (fs *FileSystem) Close() error {
@@ -91,12 +99,21 @@ func (fs *FileSystem) Close() error {
 }
 
 func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
+	return fs.readDir(path, false)
+}
+
+func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
+	return (fs.dataSectorStart + uint32(cluster-2)*fs.sectorsPerCluster)
+}
+
+func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid path: %s", path)
 	}
 
-	bytes, err := fs.getRootDirectoryBytes()
+	var currentEntryCluster *uint16 = nil
+	currentBytes, err := fs.getRootDirectoryBytes()
 	if err != nil {
 		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
 	}
@@ -106,7 +123,7 @@ func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
 			continue
 		}
 
-		entries, err := fs.readDirectoryEntries(bytes)
+		entries, err := fs.readDirectoryEntries(currentBytes)
 		if err != nil {
 			return nil, fmt.Errorf("could not read directory entries: %w", err)
 		}
@@ -118,27 +135,119 @@ func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
 			}
 
 			if entry.IsDir() {
-				bytes, err = fs.getDirectoryBytes(entry.clusterNumber())
+				clusterNumber := entry.clusterNumber()
+				currentBytes, err = fs.getDirectoryBytes(clusterNumber)
 				if err != nil {
 					return nil, fmt.Errorf("could not read directory bytes: %w", err)
 				}
+
+				currentEntryCluster = &clusterNumber
 				found = true
 				break
 			} else {
 				return nil, fmt.Errorf("%s is not a directory", path)
 			}
-
 		}
 
 		if !found {
-			return nil, fmt.Errorf("no such file or directory %s", path)
+			if mkdir {
+				// TODO: abstract into directory.go
+				freeIndex, ok := fs.findAvailableDirectoryEntry(currentBytes)
+				if !ok {
+					// TODO: expand cluster here (if not root)
+					return nil, fmt.Errorf("no available space for creating directory entry")
+				}
+				newCluster, err := fs.allocateCluster()
+				if err != nil {
+					return nil, err
+				}
+
+				time, date, tenth := asFatTime(time.Now())
+				newFatDirEntry := fatDirectoryEntry{
+					DIR_Name:         part,
+					DIR_Attr:         0x10,
+					DIR_NTRes:        0x00,
+					DIR_CrtTimeTenth: tenth,
+					DIR_CrtTime:      time,
+					DIR_CrtDate:      date,
+					DIR_LstAccDate:   date,
+					DIR_FstClusHI:    0,
+					DIR_WrtTime:      time,
+					DIR_WrtDate:      date,
+					DIR_FstClusLO:    newCluster,
+					DIR_FileSize:     0,
+				}
+
+				// write new directory into parent's directory
+				copy(currentBytes[freeIndex:freeIndex+directoryEntrySize], newFatDirEntry.toBytes())
+				var currentSector uint32
+				if currentEntryCluster == nil {
+					currentSector = fs.rootDirectorySectorStart
+				} else {
+					currentSector = fs.clusterToSector(*currentEntryCluster)
+				}
+				_, err = fs.file.WriteAt(currentBytes, int64(currentSector*fs.bytesPerSector))
+				if err != nil {
+					return nil, err
+				}
+
+				// create special directory entries
+				dotDirEntry := fatDirectoryEntry{
+					DIR_Name:         ".",
+					DIR_Attr:         0x10,
+					DIR_CrtTimeTenth: tenth,
+					DIR_CrtTime:      time,
+					DIR_CrtDate:      date,
+					DIR_LstAccDate:   date,
+					DIR_FstClusHI:    0,
+					DIR_WrtTime:      time,
+					DIR_WrtDate:      date,
+					DIR_FstClusLO:    newCluster,
+					DIR_FileSize:     0,
+				}
+				dotDotDirEntry := fatDirectoryEntry{
+					DIR_Name:         "..",
+					DIR_Attr:         0x10,
+					DIR_CrtTimeTenth: tenth,
+					DIR_CrtTime:      time,
+					DIR_CrtDate:      date,
+					DIR_LstAccDate:   date,
+					DIR_FstClusHI:    0,
+					DIR_WrtTime:      time,
+					DIR_WrtDate:      date,
+					DIR_FstClusLO:    0,
+					DIR_FileSize:     0,
+				}
+				if currentEntryCluster != nil {
+					dotDotDirEntry.DIR_FstClusLO = *currentEntryCluster
+				}
+
+				// write . and .. into new cluster in data region
+				toWrite := make([]byte, directoryEntrySize*2)
+				copy(toWrite[:directoryEntrySize], dotDirEntry.toBytes())
+				copy(toWrite[directoryEntrySize:], dotDotDirEntry.toBytes())
+				_, err = fs.file.WriteAt(toWrite, int64(fs.clusterToSector(newCluster)*fs.bytesPerSector))
+				if err != nil {
+					return nil, err
+				}
+
+				currentBytes = toWrite
+				currentEntryCluster = &newCluster
+			} else {
+				return nil, fmt.Errorf("no such file or directory %s", path)
+			}
 		}
 	}
 
-	entries, err := fs.readDirectoryEntries(bytes)
+	entries, err := fs.readDirectoryEntries(currentBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not read directory entries: %w", err)
 	}
 
 	return entries, nil
+}
+
+func (fs *FileSystem) Mkdir(path string) error {
+	_, err := fs.readDir(path, true)
+	return err
 }

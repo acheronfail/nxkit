@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"strings"
+	"time"
 )
 
 const (
@@ -74,6 +75,19 @@ type fatLongFileName struct {
 	LDIR_Name3 [4]byte
 }
 
+func asFatTime(t time.Time) (uint16, uint16, uint8) {
+	// FAT16 time format: Bits 15-11: Hours (0-23), Bits 10-5: Minutes (0-59), Bits 4-0: Seconds/2 (0-29)
+	fatTime := uint16((t.Hour() << 11) | (t.Minute() << 5) | (t.Second() / 2))
+
+	// FAT16 date format: Bits 15-9: Year (0 = 1980), Bits 8-5: Month (1-12), Bits 4-0: Day (1-31)
+	fatDate := uint16(((t.Year() - 1980) << 9) | (int(t.Month()) << 5) | t.Day())
+
+	// FAT16 CrtTimeTenth: Sub-second information in 10ms units (0-199)
+	fatCrtTimeTenth := uint8(t.Nanosecond() / 1e7) // Convert nanoseconds to 10ms units
+
+	return fatTime, fatDate, fatCrtTimeTenth
+}
+
 func (d *DirectoryEntry) names() []string {
 	names := []string{d.ShortName()}
 	if d.longFileName != "" {
@@ -83,7 +97,6 @@ func (d *DirectoryEntry) names() []string {
 	return names
 }
 
-// TODO: casing on short names doesn't seem correct - may need to read flags
 func (d *DirectoryEntry) ShortName() string {
 	if d.IsVolumeId() {
 		return strings.TrimRight(d.DIR_Name[:11], " ")
@@ -138,6 +151,28 @@ func (d *fatDirectoryEntry) IsArchive() bool {
 	return d.DIR_Attr&0x20 == 0x20
 }
 
+func (d *fatDirectoryEntry) toBytes() []byte {
+	data := make([]byte, 32)
+
+	copy(data, d.DIR_Name)
+	for i := len(d.DIR_Name); i < 11; i++ {
+		data[i] = 0x20
+	}
+	data[11] = d.DIR_Attr
+	data[12] = d.DIR_NTRes
+	data[13] = d.DIR_CrtTimeTenth
+	binary.LittleEndian.PutUint16(data[14:16], d.DIR_CrtTime)
+	binary.LittleEndian.PutUint16(data[16:18], d.DIR_CrtDate)
+	binary.LittleEndian.PutUint16(data[18:20], d.DIR_LstAccDate)
+	binary.LittleEndian.PutUint16(data[20:22], d.DIR_FstClusHI)
+	binary.LittleEndian.PutUint16(data[22:24], d.DIR_WrtTime)
+	binary.LittleEndian.PutUint16(data[24:26], d.DIR_WrtDate)
+	binary.LittleEndian.PutUint16(data[26:28], d.DIR_FstClusLO)
+	binary.LittleEndian.PutUint32(data[28:32], d.DIR_FileSize)
+
+	return data
+}
+
 func (d *DirectoryEntry) clusterNumber() uint16 {
 	return d.DIR_FstClusLO
 }
@@ -155,14 +190,11 @@ func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
 }
 
 func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
-	bytesPerCluster := int64(fs.bytesPerSector * fs.sectorsPerCluster)
-
 	var bytes []byte
 	currentCluster := startCluster
 	for {
-		clusterSector := (fs.dataSectorStart + uint32(currentCluster-2)*fs.sectorsPerCluster)
-		clusterBytes := make([]byte, bytesPerCluster)
-		_, err := fs.file.ReadAt(clusterBytes, int64(clusterSector*fs.bytesPerSector))
+		clusterBytes := make([]byte, fs.bytesPerCluster)
+		_, err := fs.file.ReadAt(clusterBytes, int64(fs.clusterToSector(currentCluster)*fs.bytesPerSector))
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cluster data: %w", err)
 		}
@@ -180,30 +212,45 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FileSystem) readDirectoryEntries(b []byte) ([]DirectoryEntry, error) {
+func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte) (int, bool) {
+	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+		// 0 indicates a free slot for an entry
+		if dirBytes[i] == 0x00 {
+			return i, true
+		}
+		// 0xE5 indicates a deleted entry, which we can re-use
+		if dirBytes[i] == 0xE5 {
+			return i, true
+		}
+	}
+
+	return 0, false
+}
+
+func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
 	entries := make([]DirectoryEntry, 0)
 
 	longFileName := ""
-	for i := 0; i < len(b); i += directoryEntrySize {
-		if b[i] == 0x00 {
+	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+		if dirBytes[i] == 0x00 {
 			break
 		}
 
-		if b[i] == 0xE5 {
+		if dirBytes[i] == 0xE5 {
 			continue
 		}
 
-		if b[i+11] == 0x0F {
+		if dirBytes[i+11] == 0x0F {
 			lfn := fatLongFileName{
-				LDIR_Ord:       b[i],
-				LDIR_Attr:      b[i+11],
-				LDIR_Type:      b[i+12],
-				LDIR_Chksum:    b[i+13],
-				LDIR_FstClusLO: binary.LittleEndian.Uint16(b[i+26 : i+28]),
+				LDIR_Ord:       dirBytes[i],
+				LDIR_Attr:      dirBytes[i+11],
+				LDIR_Type:      dirBytes[i+12],
+				LDIR_Chksum:    dirBytes[i+13],
+				LDIR_FstClusLO: binary.LittleEndian.Uint16(dirBytes[i+26 : i+28]),
 			}
-			copy(lfn.LDIR_Name1[:], b[i+1:i+11])
-			copy(lfn.LDIR_Name2[:], b[i+14:i+26])
-			copy(lfn.LDIR_Name3[:], b[i+28:i+32])
+			copy(lfn.LDIR_Name1[:], dirBytes[i+1:i+11])
+			copy(lfn.LDIR_Name2[:], dirBytes[i+14:i+26])
+			copy(lfn.LDIR_Name3[:], dirBytes[i+28:i+32])
 
 			// Extract the actual name parts and prepend them (since LFN entries are stored in reverse order)
 			namePart := lfn.extractNamePart()
@@ -215,18 +262,18 @@ func (fs *FileSystem) readDirectoryEntries(b []byte) ([]DirectoryEntry, error) {
 		}
 
 		fatEntry := fatDirectoryEntry{
-			DIR_Name:         string(b[i : i+11]),
-			DIR_Attr:         b[i+11],
-			DIR_NTRes:        b[i+12],
-			DIR_CrtTimeTenth: b[i+13],
-			DIR_CrtTime:      binary.LittleEndian.Uint16(b[i+14 : i+16]),
-			DIR_CrtDate:      binary.LittleEndian.Uint16(b[i+16 : i+18]),
-			DIR_LstAccDate:   binary.LittleEndian.Uint16(b[i+18 : i+20]),
-			DIR_FstClusHI:    binary.LittleEndian.Uint16(b[i+20 : i+22]),
-			DIR_WrtTime:      binary.LittleEndian.Uint16(b[i+22 : i+24]),
-			DIR_WrtDate:      binary.LittleEndian.Uint16(b[i+24 : i+26]),
-			DIR_FstClusLO:    binary.LittleEndian.Uint16(b[i+26 : i+28]),
-			DIR_FileSize:     binary.LittleEndian.Uint32(b[i+28 : i+32]),
+			DIR_Name:         string(dirBytes[i : i+11]),
+			DIR_Attr:         dirBytes[i+11],
+			DIR_NTRes:        dirBytes[i+12],
+			DIR_CrtTimeTenth: dirBytes[i+13],
+			DIR_CrtTime:      binary.LittleEndian.Uint16(dirBytes[i+14 : i+16]),
+			DIR_CrtDate:      binary.LittleEndian.Uint16(dirBytes[i+16 : i+18]),
+			DIR_LstAccDate:   binary.LittleEndian.Uint16(dirBytes[i+18 : i+20]),
+			DIR_FstClusHI:    binary.LittleEndian.Uint16(dirBytes[i+20 : i+22]),
+			DIR_WrtTime:      binary.LittleEndian.Uint16(dirBytes[i+22 : i+24]),
+			DIR_WrtDate:      binary.LittleEndian.Uint16(dirBytes[i+24 : i+26]),
+			DIR_FstClusLO:    binary.LittleEndian.Uint16(dirBytes[i+26 : i+28]),
+			DIR_FileSize:     binary.LittleEndian.Uint32(dirBytes[i+28 : i+32]),
 		}
 
 		entries = append(entries, DirectoryEntry{fatDirectoryEntry: fatEntry, longFileName: longFileName})

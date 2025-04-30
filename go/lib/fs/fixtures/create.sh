@@ -5,7 +5,7 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 image_name="nxkit-fs-fixtures"
 
 docker build -t "${image_name}" .
-cat <<"EOF" | docker run --rm -i -v "${PWD}:/mnt" "${image_name}"
+cat <<"EOF" | docker run --rm --user "$(id -u):$(id -g)" -i -v "${PWD}:/mnt" "${image_name}"
 set -euo pipefail
 
 echo "Creating fixtures..."

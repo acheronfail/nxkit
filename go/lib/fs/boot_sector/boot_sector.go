@@ -299,7 +299,7 @@ func (bs *BootSector) TotalSize() int64 {
 	return bs.totalSize(0)
 }
 
-func (bs *BootSector) FatSectorSize() uint32 {
+func (bs *BootSector) FatSectorCount() uint32 {
 	if bs.Fat32 != nil {
 		return bs.Fat32.BPB_FATSz32
 	}

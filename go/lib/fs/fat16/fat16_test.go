@@ -7,6 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const (
+	diskImagePath = "../fixtures/fat16/disk.img"
+)
+
 func mapSlice[T any, U any](things []T, f func(T) U) []U {
 	mapped := make([]U, len(things))
 	for i, thing := range things {
@@ -16,10 +20,8 @@ func mapSlice[T any, U any](things []T, f func(T) U) []U {
 }
 
 func TestReadDir(t *testing.T) {
-	fs, err := fat16.NewFromPath("../fixtures/fat16/disk.img")
-	if err != nil {
-		t.Fatalf("failed to create filesystem: %v", err)
-	}
+	fs, err := fat16.NewFromPath(diskImagePath)
+	assert.Nil(t, err)
 	defer fs.Close()
 
 	t.Run("path:/", func(t *testing.T) {
@@ -61,5 +63,26 @@ func TestReadDir(t *testing.T) {
 		assert.Len(t, entries, 6)
 		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.Equal(t, []string{".", "..", "lower.low", "lower.UPP", "UPPER.low", "UPPER.UPP"}, shortNames)
+	})
+}
+
+func TestMkdir(t *testing.T) {
+	fs, err := fat16.NewFromPath(diskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("mkdir /dir/subdir/new", func(t *testing.T) {
+		err := fs.Mkdir("/dir/subdir/new")
+		assert.Nil(t, err)
+
+		entries, err := fs.ReadDir("/dir/subdir")
+		assert.Nil(t, err)
+		assert.Len(t, entries, 4)
+		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.Equal(t, []string{".", "..", "SOME_L~1", "new"}, shortNames)
+		longNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.Equal(t, []string{".", "..", "some_long_embedded_nameא", "new"}, longNames)
+
+		assert.True(t, entries[3].IsDir())
 	})
 }
