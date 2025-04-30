@@ -1,7 +1,6 @@
-package fat12
+package fat16
 
 import (
-	"encoding/binary"
 	"fmt"
 	"os"
 	"slices"
@@ -12,15 +11,8 @@ import (
 
 const (
 	directoryEntrySize = 32
-	eoc                = 0xFFFF
+	eoc                = 0xFFF8
 )
-
-type table16 struct {
-	fatId      uint16
-	eoc        uint16
-	clusters   []uint16
-	maxCluster uint16
-}
 
 type FileSystem struct {
 	file                     *os.File
@@ -32,28 +24,7 @@ type FileSystem struct {
 	rootDirectorySectorStart uint32
 	rootDirectorySectorCount uint32
 	dataSectorStart          uint32
-	table                    table16
-}
-
-func parseFat16Table(fatBytes []byte) table16 {
-	maxCluster := uint16(len(fatBytes) / 2)
-	table := table16{
-		fatId:      binary.LittleEndian.Uint16(fatBytes[0:2]),
-		eoc:        binary.LittleEndian.Uint16(fatBytes[2:4]),
-		clusters:   make([]uint16, maxCluster+1),
-		maxCluster: maxCluster,
-	}
-
-	for i := uint16(2); i < maxCluster; i++ {
-		start := i * 2
-		end := start + 2
-		val := binary.LittleEndian.Uint16(fatBytes[start:end])
-		if val != 0 {
-			table.clusters[i] = val
-		}
-	}
-
-	return table
+	table                    table
 }
 
 func NewFromPath(path string) (*FileSystem, error) {
@@ -117,47 +88,6 @@ func NewFromPath(path string) (*FileSystem, error) {
 
 func (fs *FileSystem) Close() error {
 	return fs.file.Close()
-}
-
-func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
-	start := fs.rootDirectorySectorStart * fs.bytesPerSector
-	rootDirSize := fs.bootSector.BPB_RootEntCnt * directoryEntrySize
-	b := make([]byte, rootDirSize)
-	_, err := fs.file.ReadAt(b, int64(start))
-	if err != nil {
-		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
-	}
-
-	return b, nil
-}
-
-func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
-	bytesPerCluster := int64(fs.bytesPerSector * fs.sectorsPerCluster)
-
-	var bytes []byte
-	currentCluster := startCluster
-	for {
-		clusterSector := (fs.dataSectorStart + uint32(currentCluster-2)*fs.sectorsPerCluster)
-
-		clusterBytes := make([]byte, bytesPerCluster)
-		_, err := fs.file.ReadAt(clusterBytes, int64(clusterSector*fs.bytesPerSector))
-		if err != nil {
-			return nil, fmt.Errorf("failed to read cluster data: %w", err)
-		}
-
-		bytes = append(bytes, clusterBytes...)
-		nextCluster := fs.table.clusters[currentCluster]
-
-		// TODO: check between 0xfff8 - 0xffff
-		// TODO: check invalid 0xfff7
-		if nextCluster >= eoc {
-			break
-		}
-
-		currentCluster = nextCluster
-	}
-
-	return bytes, nil
 }
 
 func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {

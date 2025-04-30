@@ -1,7 +1,8 @@
-package fat12
+package fat16
 
 import (
 	"encoding/binary"
+	"fmt"
 	"strings"
 )
 
@@ -139,6 +140,44 @@ func (d *fatDirectoryEntry) IsArchive() bool {
 
 func (d *DirectoryEntry) clusterNumber() uint16 {
 	return d.DIR_FstClusLO
+}
+
+func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
+	start := fs.rootDirectorySectorStart * fs.bytesPerSector
+	rootDirSize := fs.bootSector.BPB_RootEntCnt * directoryEntrySize
+	b := make([]byte, rootDirSize)
+	_, err := fs.file.ReadAt(b, int64(start))
+	if err != nil {
+		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
+	}
+
+	return b, nil
+}
+
+func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
+	bytesPerCluster := int64(fs.bytesPerSector * fs.sectorsPerCluster)
+
+	var bytes []byte
+	currentCluster := startCluster
+	for {
+		clusterSector := (fs.dataSectorStart + uint32(currentCluster-2)*fs.sectorsPerCluster)
+		clusterBytes := make([]byte, bytesPerCluster)
+		_, err := fs.file.ReadAt(clusterBytes, int64(clusterSector*fs.bytesPerSector))
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cluster data: %w", err)
+		}
+
+		bytes = append(bytes, clusterBytes...)
+		nextCluster := fs.table.clusters[currentCluster]
+
+		if nextCluster >= eoc {
+			break
+		}
+
+		currentCluster = nextCluster
+	}
+
+	return bytes, nil
 }
 
 func (fs *FileSystem) readDirectoryEntries(b []byte) ([]DirectoryEntry, error) {
