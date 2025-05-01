@@ -29,9 +29,6 @@ func parseFat16Table(fatBytes []byte) table {
 		start := cluster * entrySize
 		end := start + entrySize
 		val := binary.LittleEndian.Uint16(fatBytes[start:end])
-		if cluster == 100 {
-			fmt.Println("start", start)
-		}
 		if val != 0 {
 			fatTable.clusters[cluster] = val
 		}
@@ -54,22 +51,31 @@ func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FileSystem) allocateCluster() (uint16, error) {
+func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
+	// set in memory cluster table
+	fs.table.clusters[cluster] = target
+
+	// also write back to all FATs
+	for i := range uint32(fs.bootSector.BPB_NumFATs) {
+		offset := fs.getFatSectorOffset(i)
+		clusterOffset := offset + int64(cluster*entrySize)
+		toWrite := make([]byte, 2)
+		binary.LittleEndian.PutUint16(toWrite, target)
+		_, err := fs.file.WriteAt(toWrite, clusterOffset)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) allocateNextFreeCluster() (uint16, error) {
 	for cluster := uint16(2); cluster < fs.table.maxCluster; cluster++ {
 		if fs.table.clusters[cluster] == 0x0000 {
-			// set in memory cluster table
-			fs.table.clusters[cluster] = eoc
-
-			// also write back to all FATs
-			for i := range uint32(fs.bootSector.BPB_NumFATs) {
-				offset := fs.getFatSectorOffset(i)
-				clusterOffset := offset + int64(cluster*entrySize)
-				toWrite := make([]byte, 2)
-				binary.LittleEndian.PutUint16(toWrite, eoc)
-				_, err := fs.file.WriteAt(toWrite, clusterOffset)
-				if err != nil {
-					return 0, err
-				}
+			err := fs.writeClusterToFats(cluster, eoc)
+			if err != nil {
+				return 0, err
 			}
 
 			return cluster, nil

@@ -1,6 +1,7 @@
 package fat16_test
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fs/fat16"
@@ -72,8 +73,9 @@ func TestMkdir(t *testing.T) {
 	assert.Nil(t, err)
 	defer fs.Close()
 
-	testMkdirWorked := func(fs *fat16.FileSystem) {
-		entries, err := fs.ReadDir("/mkdir")
+	testSingleMkdirWorked := func(fs *fat16.FileSystem) {
+		t.Helper()
+		entries, err := fs.ReadDir("/mkdir/single")
 		assert.Nil(t, err)
 		assert.Len(t, entries, 3)
 		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
@@ -85,14 +87,30 @@ func TestMkdir(t *testing.T) {
 		assert.Equal(t, entries[2].ShortName(), "new")
 	}
 
-	t.Run("mkdir /mkdir/new", func(t *testing.T) {
-		err := fs.Mkdir("/mkdir/new")
+	t.Run("mkdir /mkdir/single/new", func(t *testing.T) {
+		err := fs.Mkdir("/mkdir/single/new")
 		assert.Nil(t, err)
 
-		testMkdirWorked(fs)
+		testSingleMkdirWorked(fs)
 
 		newFs, err := fat16.NewFromPath(diskImagePath)
 		assert.Nil(t, err)
-		testMkdirWorked(newFs)
+		testSingleMkdirWorked(newFs)
+	})
+
+	t.Run("mkdir requiring new cluster", func(t *testing.T) {
+		info := fs.Info()
+
+		// keep adding directories until we go over the cluster size
+		i := int64(0)
+		for ; i*32 < info["bytesPerCluster"].(int64)+32; i++ {
+			err := fs.Mkdir(fmt.Sprintf("/mkdir/many/%d", i))
+			assert.Nil(t, err)
+		}
+
+		entries, err := fs.ReadDir("/mkdir/many")
+		assert.Nil(t, err)
+		entryNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.Len(t, entryNames, int(i+2)) // +2 for . and ..
 	})
 }

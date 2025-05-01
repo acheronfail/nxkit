@@ -5,7 +5,6 @@ import (
 	"os"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/acheronfail/nxkit/lib/fs/boot_sector"
 )
@@ -94,6 +93,20 @@ func NewFromPath(path string) (*FileSystem, error) {
 	return fs, nil
 }
 
+func (fs *FileSystem) Info() map[string]any {
+	return map[string]any{
+		"bootSector":               fs.bootSector,
+		"bytesPerSector":           fs.bytesPerSector,
+		"bytesPerCluster":          fs.bytesPerCluster,
+		"sectorsPerCluster":        fs.sectorsPerCluster,
+		"fatSectorCount":           fs.fatSectorCount,
+		"fatsSectorStart":          fs.fatsSectorStart,
+		"fatsSectorCount":          fs.fatsSectorCount,
+		"rootDirectorySectorStart": fs.rootDirectorySectorStart,
+		"rootDirectorySectorCount": fs.rootDirectorySectorCount,
+	}
+}
+
 func (fs *FileSystem) Close() error {
 	return fs.file.Close()
 }
@@ -151,88 +164,46 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 
 		if !found {
 			if mkdir {
-				// TODO: abstract into directory.go
 				freeIndex, ok := fs.findAvailableDirectoryEntry(currentBytes)
 				if !ok {
-					// TODO: expand cluster here (if not root)
-					return nil, fmt.Errorf("no available space for creating directory entry")
+					// if we're in the root directory area we can't expand on fat16
+					if currentEntryCluster == nil {
+						return nil, fmt.Errorf("no available space for creating directory entry")
+					}
+
+					// expand the current directory's cluster chain since we're out of space
+					extraCluster, err := fs.allocateNextFreeCluster()
+					if err != nil {
+						return nil, err
+					}
+
+					err = fs.writeClusterToFats(*currentEntryCluster, extraCluster)
+					if err != nil {
+						return nil, err
+					}
+
+					currentBytes, err = fs.getDirectoryBytes(*currentEntryCluster)
+					if err != nil {
+						return nil, fmt.Errorf("could not read directory bytes: %w", err)
+					}
+
+					// TODONICE: can optimise and return start of new cluster
+					// NOTE: don't bother checking ok since we just allocated a new cluster
+					freeIndex, _ = fs.findAvailableDirectoryEntry(currentBytes)
 				}
-				newCluster, err := fs.allocateCluster()
+
+				newDirectoryCluster, err := fs.allocateNextFreeCluster()
 				if err != nil {
 					return nil, err
 				}
 
-				time, date, tenth := asFatTime(time.Now())
-				newFatDirEntry := fatDirectoryEntry{
-					DIR_Name:         part,
-					DIR_Attr:         0x10,
-					DIR_NTRes:        0x00,
-					DIR_CrtTimeTenth: tenth,
-					DIR_CrtTime:      time,
-					DIR_CrtDate:      date,
-					DIR_LstAccDate:   date,
-					DIR_FstClusHI:    0,
-					DIR_WrtTime:      time,
-					DIR_WrtDate:      date,
-					DIR_FstClusLO:    newCluster,
-					DIR_FileSize:     0,
-				}
-
-				// write new directory into parent's directory
-				copy(currentBytes[freeIndex:freeIndex+directoryEntrySize], newFatDirEntry.toBytes())
-				var currentSector uint32
-				if currentEntryCluster == nil {
-					currentSector = fs.rootDirectorySectorStart
-				} else {
-					currentSector = fs.clusterToSector(*currentEntryCluster)
-				}
-				_, err = fs.file.WriteAt(currentBytes, int64(currentSector*fs.bytesPerSector))
+				newDirectoryBytes, err := fs.writeDirectoryEntry(part, newDirectoryCluster, currentBytes, currentEntryCluster, freeIndex)
 				if err != nil {
-					return nil, err
+					return nil, fmt.Errorf("could not write directory entry: %w", err)
 				}
 
-				// create special directory entries
-				dotDirEntry := fatDirectoryEntry{
-					DIR_Name:         ".",
-					DIR_Attr:         0x10,
-					DIR_CrtTimeTenth: tenth,
-					DIR_CrtTime:      time,
-					DIR_CrtDate:      date,
-					DIR_LstAccDate:   date,
-					DIR_FstClusHI:    0,
-					DIR_WrtTime:      time,
-					DIR_WrtDate:      date,
-					DIR_FstClusLO:    newCluster,
-					DIR_FileSize:     0,
-				}
-				dotDotDirEntry := fatDirectoryEntry{
-					DIR_Name:         "..",
-					DIR_Attr:         0x10,
-					DIR_CrtTimeTenth: tenth,
-					DIR_CrtTime:      time,
-					DIR_CrtDate:      date,
-					DIR_LstAccDate:   date,
-					DIR_FstClusHI:    0,
-					DIR_WrtTime:      time,
-					DIR_WrtDate:      date,
-					DIR_FstClusLO:    0,
-					DIR_FileSize:     0,
-				}
-				if currentEntryCluster != nil {
-					dotDotDirEntry.DIR_FstClusLO = *currentEntryCluster
-				}
-
-				// write . and .. into new cluster in data region
-				toWrite := make([]byte, directoryEntrySize*2)
-				copy(toWrite[:directoryEntrySize], dotDirEntry.toBytes())
-				copy(toWrite[directoryEntrySize:], dotDotDirEntry.toBytes())
-				_, err = fs.file.WriteAt(toWrite, int64(fs.clusterToSector(newCluster)*fs.bytesPerSector))
-				if err != nil {
-					return nil, err
-				}
-
-				currentBytes = toWrite
-				currentEntryCluster = &newCluster
+				currentBytes = newDirectoryBytes
+				currentEntryCluster = &newDirectoryCluster
 			} else {
 				return nil, fmt.Errorf("no such file or directory %s", path)
 			}
