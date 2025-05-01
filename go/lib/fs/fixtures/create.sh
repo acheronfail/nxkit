@@ -41,6 +41,8 @@ for n in $(echo "12 16 32"); do
   mcopy -i "${disk}" "${fixtures_dir}/INFO.TXT" ::/lower83/UPPER.low
   mcopy -i "${disk}" "${fixtures_dir}/INFO.TXT" ::/lower83/UPPER.UPP
 
+  mmd   -i "${disk}" ::/mkdir
+
   i=0
   until [ $i -gt 75 ]; do mmd -i "${disk}" ::/dir/subdir_${i}; i=$(( $i+1 )); done
 

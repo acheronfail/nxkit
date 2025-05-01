@@ -194,7 +194,8 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 	currentCluster := startCluster
 	for {
 		clusterBytes := make([]byte, fs.bytesPerCluster)
-		_, err := fs.file.ReadAt(clusterBytes, int64(fs.clusterToSector(currentCluster)*fs.bytesPerSector))
+		fileOffset := int64(fs.clusterToSector(currentCluster) * fs.bytesPerSector)
+		_, err := fs.file.ReadAt(clusterBytes, fileOffset)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read cluster data: %w", err)
 		}
@@ -204,6 +205,13 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 
 		if nextCluster >= eoc {
 			break
+		}
+
+		if nextCluster < 2 {
+			return nil, fmt.Errorf("invalid cluster number: %d", nextCluster)
+		}
+		if nextCluster > fs.table.maxCluster {
+			return nil, fmt.Errorf("cluster number out of range: %d", nextCluster)
 		}
 
 		currentCluster = nextCluster

@@ -5,6 +5,10 @@ import (
 	"fmt"
 )
 
+const (
+	entrySize = uint16(2)
+)
+
 type table struct {
 	fatId      uint16
 	eoc        uint16
@@ -13,20 +17,23 @@ type table struct {
 }
 
 func parseFat16Table(fatBytes []byte) table {
-	maxCluster := uint16(len(fatBytes) / 2)
+	maxCluster := uint16(len(fatBytes)) / entrySize
 	fatTable := table{
-		fatId:      binary.LittleEndian.Uint16(fatBytes[0:2]),
-		eoc:        binary.LittleEndian.Uint16(fatBytes[2:4]),
+		fatId:      binary.LittleEndian.Uint16(fatBytes[0:entrySize]),
+		eoc:        binary.LittleEndian.Uint16(fatBytes[entrySize : entrySize*2]),
 		clusters:   make([]uint16, maxCluster+1),
 		maxCluster: maxCluster,
 	}
 
-	for i := uint16(2); i < maxCluster; i++ {
-		start := i * 2
-		end := start + 2
+	for cluster := uint16(2); cluster < maxCluster; cluster++ {
+		start := cluster * entrySize
+		end := start + entrySize
 		val := binary.LittleEndian.Uint16(fatBytes[start:end])
+		if cluster == 100 {
+			fmt.Println("start", start)
+		}
 		if val != 0 {
-			fatTable.clusters[i] = val
+			fatTable.clusters[cluster] = val
 		}
 	}
 
@@ -50,12 +57,13 @@ func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
 func (fs *FileSystem) allocateCluster() (uint16, error) {
 	for cluster := uint16(2); cluster < fs.table.maxCluster; cluster++ {
 		if fs.table.clusters[cluster] == 0x0000 {
+			// set in memory cluster table
 			fs.table.clusters[cluster] = eoc
 
-			// FIXME: ensure this is working
+			// also write back to all FATs
 			for i := range uint32(fs.bootSector.BPB_NumFATs) {
 				offset := fs.getFatSectorOffset(i)
-				clusterOffset := offset + 4 + int64(cluster*2)
+				clusterOffset := offset + int64(cluster*entrySize)
 				toWrite := make([]byte, 2)
 				binary.LittleEndian.PutUint16(toWrite, eoc)
 				_, err := fs.file.WriteAt(toWrite, clusterOffset)

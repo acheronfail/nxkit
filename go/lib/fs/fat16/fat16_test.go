@@ -27,18 +27,19 @@ func TestReadDir(t *testing.T) {
 	t.Run("path:/", func(t *testing.T) {
 		entries, err := fs.ReadDir("/")
 		assert.Nil(t, err)
-		assert.Len(t, entries, 6)
+		assert.Len(t, entries, 7)
 		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{"dir", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "FAT16-TEST"}, shortNames)
+		assert.Equal(t, []string{"dir", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "mkdir", "FAT16-TEST"}, shortNames)
 		longNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{"dir", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "FAT16-TEST"}, longNames)
+		assert.Equal(t, []string{"dir", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "mkdir", "FAT16-TEST"}, longNames)
 
 		assert.True(t, entries[0].IsDir())
 		assert.True(t, !entries[1].IsDir())
 		assert.True(t, !entries[2].IsDir())
 		assert.True(t, !entries[3].IsDir())
 		assert.True(t, entries[4].IsDir())
-		assert.True(t, entries[5].IsVolumeId())
+		assert.True(t, entries[5].IsDir())
+		assert.True(t, entries[6].IsVolumeId())
 	})
 
 	t.Run("path:/dir", func(t *testing.T) {
@@ -71,18 +72,27 @@ func TestMkdir(t *testing.T) {
 	assert.Nil(t, err)
 	defer fs.Close()
 
-	t.Run("mkdir /dir/subdir/new", func(t *testing.T) {
-		err := fs.Mkdir("/dir/subdir/new")
+	testMkdirWorked := func(fs *fat16.FileSystem) {
+		entries, err := fs.ReadDir("/mkdir")
 		assert.Nil(t, err)
-
-		entries, err := fs.ReadDir("/dir/subdir")
-		assert.Nil(t, err)
-		assert.Len(t, entries, 4)
+		assert.Len(t, entries, 3)
 		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{".", "..", "SOME_L~1", "new"}, shortNames)
+		assert.Equal(t, []string{".", "..", "new"}, shortNames)
 		longNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{".", "..", "some_long_embedded_nameא", "new"}, longNames)
+		assert.Equal(t, []string{".", "..", "new"}, longNames)
 
-		assert.True(t, entries[3].IsDir())
+		assert.True(t, entries[2].IsDir())
+		assert.Equal(t, entries[2].ShortName(), "new")
+	}
+
+	t.Run("mkdir /mkdir/new", func(t *testing.T) {
+		err := fs.Mkdir("/mkdir/new")
+		assert.Nil(t, err)
+
+		testMkdirWorked(fs)
+
+		newFs, err := fat16.NewFromPath(diskImagePath)
+		assert.Nil(t, err)
+		testMkdirWorked(newFs)
 	})
 }
