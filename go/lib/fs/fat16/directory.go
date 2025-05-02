@@ -1,6 +1,7 @@
 package fat16
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"strings"
@@ -18,7 +19,7 @@ type DirectoryEntry struct {
 
 type fatDirectoryEntry struct {
 	// Short file name (SFN) of the object.
-	DIR_Name string
+	DIR_Name [11]byte
 	//File attribute in combination of following flags. Upper 2 bits are reserved and must be zero.
 	// 0x01: ATTR_READ_ONLY (Read-only)
 	// 0x02: ATTR_HIDDEN (Hidden)
@@ -98,25 +99,27 @@ func (d *DirectoryEntry) names() []string {
 }
 
 func (d *DirectoryEntry) ShortName() string {
+	sfnBytes := bytes.Clone(d.DIR_Name[:])
+
 	if d.IsVolumeId() {
-		return strings.TrimRight(d.DIR_Name[:11], " ")
+		return string(bytes.TrimRight(sfnBytes[:11], " "))
 	}
 
-	sfn := strings.TrimRight(d.DIR_Name[:8], " ")
-	ext := strings.TrimRight(d.DIR_Name[8:11], " ")
+	sfnBytes = bytes.TrimRight(sfnBytes[:8], " ")
+	ext := bytes.TrimRight(sfnBytes[8:11], " ")
 
 	if d.DIR_NTRes&0x08 == 0x08 {
-		sfn = strings.ToLower(sfn)
+		sfnBytes = bytes.ToLower(sfnBytes)
 	}
 	if d.DIR_NTRes&0x10 == 0x10 {
-		ext = strings.ToLower(ext)
+		ext = bytes.ToLower(ext)
 	}
 
 	if len(ext) == 0 {
-		return sfn
+		return string(sfnBytes)
 	}
 
-	return sfn + "." + ext
+	return string(sfnBytes) + "." + string(ext)
 }
 
 func (d *DirectoryEntry) LongName() string {
@@ -154,7 +157,7 @@ func (d *fatDirectoryEntry) IsArchive() bool {
 func (d *fatDirectoryEntry) toBytes() []byte {
 	data := make([]byte, 32)
 
-	copy(data, d.DIR_Name)
+	copy(data, d.DIR_Name[:])
 	for i := len(d.DIR_Name); i < 11; i++ {
 		data[i] = 0x20
 	}
@@ -233,14 +236,29 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte) (int, bool) {
+func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, error) {
+	panic("not implemented")
+}
+
+func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
+	if len(dirName) <= 8 {
+		return 1
+	}
+
+	return (len(dirName) / longFileNameUtf16Length) + 1
+}
+
+func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries int) (int, bool) {
+	count := 0
 	for i := 0; i < len(dirBytes); i += directoryEntrySize {
-		// 0 indicates a free slot for an entry
-		if dirBytes[i] == 0x00 {
-			return i, true
+		// 0x00 == free, 0xE5 == deleted
+		if dirBytes[i] == 0x00 || dirBytes[i] == 0xE5 {
+			count++
+		} else {
+			count = 0
 		}
-		// 0xE5 indicates a deleted entry, which we can re-use
-		if dirBytes[i] == 0xE5 {
+
+		if count == numEntries {
 			return i, true
 		}
 	}
@@ -282,8 +300,10 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 			continue
 		}
 
+		var name [11]byte
+		copy(name[:], dirBytes[i:i+11])
 		fatEntry := fatDirectoryEntry{
-			DIR_Name:         string(dirBytes[i : i+11]),
+			DIR_Name:         name,
 			DIR_Attr:         dirBytes[i+11],
 			DIR_NTRes:        dirBytes[i+12],
 			DIR_CrtTimeTenth: dirBytes[i+13],
@@ -338,8 +358,13 @@ func (fs *FileSystem) writeDirectoryEntry(
 	time, date, tenth := asFatTime(time.Now())
 
 	// create new directory entry
+	var name [11]byte // TODO: use helper
+	copy(name[:], newDirName)
+	for i := len(newDirName); i < 11; i++ {
+		name[i] = 0x20
+	}
 	newFatDirEntry := fatDirectoryEntry{
-		DIR_Name:         newDirName,
+		DIR_Name:         name,
 		DIR_Attr:         0x10,
 		DIR_NTRes:        0x00,
 		DIR_CrtTimeTenth: tenth,
@@ -383,7 +408,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 
 	// create special directory entries
 	dotDirEntry := fatDirectoryEntry{
-		DIR_Name:         ".",
+		DIR_Name:         [11]byte{'.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
 		DIR_Attr:         0x10,
 		DIR_CrtTimeTenth: tenth,
 		DIR_CrtTime:      time,
@@ -396,7 +421,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 		DIR_FileSize:     0,
 	}
 	dotDotDirEntry := fatDirectoryEntry{
-		DIR_Name:         "..",
+		DIR_Name:         [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
 		DIR_Attr:         0x10,
 		DIR_CrtTimeTenth: tenth,
 		DIR_CrtTime:      time,
