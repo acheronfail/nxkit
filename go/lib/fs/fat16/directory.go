@@ -173,7 +173,23 @@ func (d *fatDirectoryEntry) toBytes() []byte {
 	return data
 }
 
+func (lfn *fatLongFileName) toBytes() []byte {
+	data := make([]byte, 32)
+
+	data[0] = lfn.LDIR_Ord
+	data[11] = lfn.LDIR_Attr
+	data[12] = lfn.LDIR_Type
+	data[13] = lfn.LDIR_Chksum
+	binary.LittleEndian.PutUint16(data[26:28], lfn.LDIR_FstClusLO)
+	copy(data[1:11], lfn.LDIR_Name1[:])
+	copy(data[14:26], lfn.LDIR_Name2[:])
+	copy(data[28:32], lfn.LDIR_Name3[:])
+
+	return data
+}
+
 func (d *DirectoryEntry) clusterNumber() uint16 {
+	// d.DIR_FstClusHI unused in FAT16 and always zero
 	return d.DIR_FstClusLO
 }
 
@@ -233,14 +249,19 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 	return bytes, nil
 }
 
-func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte) (int, bool) {
+func (fs *FileSystem) findAvailableDirectoryEntryPos(dirBytes []byte, desiredCount int) (int, bool) {
+	freeEntry := byte(0x00)
+	deletedEntry := byte(0xE5)
+
+	freeSlotCount := 0
 	for i := 0; i < len(dirBytes); i += directoryEntrySize {
-		// 0 indicates a free slot for an entry
-		if dirBytes[i] == 0x00 {
-			return i, true
+		if dirBytes[i] == freeEntry || dirBytes[i] == deletedEntry {
+			freeSlotCount++
+		} else {
+			freeSlotCount = 0
 		}
-		// 0xE5 indicates a deleted entry, which we can re-use
-		if dirBytes[i] == 0xE5 {
+
+		if freeSlotCount == desiredCount {
 			return i, true
 		}
 	}
@@ -275,7 +296,8 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 
 			// Extract the actual name parts and prepend them (since LFN entries are stored in reverse order)
 			namePart := lfn.extractNamePart()
-			if lfn.LDIR_Ord&0x40 != 0 { // Last entry
+			fmt.Println("parse", lfn, namePart)
+			if lfn.LDIR_Ord&0x40 != 0 {
 				longFileName = ""
 			}
 			longFileName = namePart + longFileName
@@ -317,14 +339,94 @@ func (lfn *fatLongFileName) extractNamePart() string {
 		if lfnBytes[i] == 0x00 && lfnBytes[i+1] == 0x00 {
 			break
 		}
-		runeValue := binary.LittleEndian.Uint16(lfnBytes[i : i+2])
-		if runeValue == 0x0000 {
-			break
-		}
-		name.WriteRune(rune(runeValue))
+
+		name.WriteRune(rune(binary.LittleEndian.Uint16(lfnBytes[i : i+2])))
 	}
 
 	return name.String()
+}
+
+func (fs *FileSystem) dirEntrySlotsRequired(name string) int {
+	length := len(name)
+	if length <= 8 {
+		return 1
+	}
+
+	return 1 + ((length + longFileNameUtf16Length - 1) / longFileNameUtf16Length)
+}
+
+func calculateShortNameChecksum(shortName string) uint8 {
+	var sum uint8 = 0
+	for i := 0; i < 11; i++ {
+		sum = ((sum & 1) << 7) + (sum >> 1) + uint8(shortName[i])
+	}
+	return sum
+}
+
+func (fs *FileSystem) createLongFileNameEntries(longName string, checksum uint8) []fatLongFileName {
+	if len(longName) <= 8 {
+		return nil
+	}
+
+	nameRunes := []rune(longName)
+	numEntries := (len(nameRunes) + longFileNameUtf16Length - 1) / longFileNameUtf16Length
+	lfnEntries := make([]fatLongFileName, numEntries)
+
+	// Process the name parts in reverse order (last part first)
+	for i := 0; i < numEntries; i++ {
+		// Calculate the start and end indices for this part
+		startIdx := len(nameRunes) - ((i + 1) * longFileNameUtf16Length)
+		if startIdx < 0 {
+			startIdx = 0
+		}
+		endIdx := len(nameRunes) - (i * longFileNameUtf16Length)
+
+		// Get the name part for this entry
+		namePart := nameRunes[startIdx:endIdx]
+
+		// Create UTF-16 bytes for this part
+		lfnBytes := make([]byte, longFileNameUtf16Length*2)
+
+		// Fill with 0xFF as padding
+		for j := 0; j < len(lfnBytes); j++ {
+			lfnBytes[j] = 0xFF
+		}
+
+		// Convert name part to UTF-16
+		for j, char := range namePart {
+			binary.LittleEndian.PutUint16(lfnBytes[j*2:j*2+2], uint16(char))
+		}
+
+		// If this is the last part of the name (might be shorter), null terminate
+		if i == 0 {
+			if len(namePart) < longFileNameUtf16Length {
+				binary.LittleEndian.PutUint16(lfnBytes[len(namePart)*2:len(namePart)*2+2], 0x0000)
+			}
+		}
+
+		// Calculate sequence number
+		seqNum := uint8(i + 1)
+		if i == numEntries-1 {
+			seqNum |= 0x40 // Set LAST_LONG_ENTRY flag for the first entry
+		}
+
+		lfnEntry := fatLongFileName{
+			LDIR_Ord:       seqNum,
+			LDIR_Attr:      0x0F,
+			LDIR_Type:      0x00,
+			LDIR_Chksum:    checksum,
+			LDIR_FstClusLO: 0,
+		}
+
+		// Copy the name parts into the entry
+		copy(lfnEntry.LDIR_Name1[:], lfnBytes[:10])
+		copy(lfnEntry.LDIR_Name2[:], lfnBytes[10:22])
+		copy(lfnEntry.LDIR_Name3[:], lfnBytes[22:26])
+
+		lfnEntries[numEntries-1-i] = lfnEntry
+	}
+
+	return lfnEntries
 }
 
 // TODO: support writing long file names
@@ -333,13 +435,16 @@ func (fs *FileSystem) writeDirectoryEntry(
 	newDirCluster uint16,
 	parentDirBytes []byte,
 	parentDirCluster *uint16,
-	atParentByteIndex int,
+	atParentDirByteIndex int,
 ) ([]byte, error) {
 	time, date, tenth := asFatTime(time.Now())
 
 	// create new directory entry
+	// TODO: create short name without conflicts
+	sfn := make([]byte, 11)
+	copy(sfn, newDirName)
 	newFatDirEntry := fatDirectoryEntry{
-		DIR_Name:         newDirName,
+		DIR_Name:         string(sfn),
 		DIR_Attr:         0x10,
 		DIR_NTRes:        0x00,
 		DIR_CrtTimeTenth: tenth,
@@ -353,8 +458,22 @@ func (fs *FileSystem) writeDirectoryEntry(
 		DIR_FileSize:     0,
 	}
 
+	// collect all the bytes for the new directory entry, including long file name entries
+	newDirEntriesBytes := make([][]byte, 0)
+	for _, lfnEntry := range fs.createLongFileNameEntries(newDirName, calculateShortNameChecksum(string(sfn))) {
+		newDirEntriesBytes = append(newDirEntriesBytes, lfnEntry.toBytes())
+	}
+	newDirEntriesBytes = append(newDirEntriesBytes, newFatDirEntry.toBytes())
+
 	// write new directory into parent's directory bytes
-	copy(parentDirBytes[atParentByteIndex:atParentByteIndex+directoryEntrySize], newFatDirEntry.toBytes())
+	fmt.Println(newDirName)
+	for i, entryBytes := range newDirEntriesBytes {
+		start := atParentDirByteIndex + (directoryEntrySize * i)
+		end := start + directoryEntrySize
+		fmt.Println("writing", atParentDirByteIndex, len(entryBytes), start, end)
+		copy(parentDirBytes[start:end], entryBytes)
+		fmt.Println("wrote", parentDirBytes[start:end], parentDirBytes[start+11])
+	}
 
 	// write back to disk
 	if parentDirCluster == nil {

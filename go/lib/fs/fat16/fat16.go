@@ -164,7 +164,8 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 
 		if !found {
 			if mkdir {
-				freeIndex, ok := fs.findAvailableDirectoryEntry(currentBytes)
+				numSlotsNeeded := fs.dirEntrySlotsRequired(part)
+				freeIndex, ok := fs.findAvailableDirectoryEntryPos(currentBytes, numSlotsNeeded)
 				if !ok {
 					// if we're in the root directory area we can't expand on fat16
 					if currentEntryCluster == nil {
@@ -188,8 +189,10 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 					}
 
 					// TODONICE: can optimise and return start of new cluster
-					// NOTE: don't bother checking ok since we just allocated a new cluster
-					freeIndex, _ = fs.findAvailableDirectoryEntry(currentBytes)
+					freeIndex, ok = fs.findAvailableDirectoryEntryPos(currentBytes, numSlotsNeeded)
+					if !ok {
+						return nil, fmt.Errorf("no available space for creating directory entry")
+					}
 				}
 
 				newDirectoryCluster, err := fs.allocateNextFreeCluster()

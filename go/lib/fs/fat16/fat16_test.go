@@ -113,4 +113,18 @@ func TestMkdir(t *testing.T) {
 		entryNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.Len(t, entryNames, int(i+2)) // +2 for . and ..
 	})
+
+	t.Run("mkdir /mkdir/long/this_name_exceeds_8_characters", func(t *testing.T) {
+		err := fs.Mkdir("/mkdir/long/this_name_exceeds_8_characters")
+		assert.Nil(t, err)
+
+		fmt.Println("long")
+		entries, err := fs.ReadDir("/mkdir/long")
+		assert.Nil(t, err)
+		assert.Len(t, entries, 3)
+		shortNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.Equal(t, []string{".", "..", "THIS_N~1"}, shortNames)
+		longNames := mapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.Equal(t, []string{".", "..", "this_name_exceeds_8_characters"}, longNames)
+	})
 }
