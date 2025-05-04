@@ -353,6 +353,22 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 	return finalName, nil
 }
 
+func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []DirectoryEntry) ([11]byte, error) {
+	var shortNameBytes [11]byte
+
+	sfn, err := fs.createShortName(desiredName, siblingEntries)
+	if err != nil {
+		return shortNameBytes, err
+	}
+
+	copy(shortNameBytes[:], sfn)
+	for i := len(sfn); i < 11; i++ {
+		shortNameBytes[i] = 0x20
+	}
+
+	return shortNameBytes, nil
+}
+
 func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
 	if len(dirName) <= 8 {
 		return 1
@@ -472,15 +488,9 @@ func (fs *FileSystem) writeDirectoryEntry(
 	time, date, tenth := asFatTime(time.Now())
 
 	// create new directory entry
-	shortName, err := fs.createShortName(newDirName, parentDirEntries)
+	shortNameBytes, err := fs.createShortNameBytes(newDirName, parentDirEntries)
 	if err != nil {
 		return nil, err
-	}
-
-	var shortNameBytes [11]byte
-	copy(shortNameBytes[:], shortName)
-	for i := len(shortName); i < 11; i++ {
-		shortNameBytes[i] = 0x20
 	}
 
 	newFatDirEntry := fatDirectoryEntry{
