@@ -2,6 +2,7 @@ package fat16
 
 import (
 	"fmt"
+	"math/rand"
 	"os"
 	"slices"
 	"strings"
@@ -27,6 +28,7 @@ type FileSystem struct {
 	rootDirectorySectorCount uint32
 	dataSectorStart          uint32
 	table                    table
+	rand                     *rand.Rand
 }
 
 func NewFromPath(path string) (*FileSystem, error) {
@@ -78,6 +80,7 @@ func NewFromPath(path string) (*FileSystem, error) {
 		rootDirectorySectorStart: rootDirectorySectorStart,
 		rootDirectorySectorCount: rootDirectorySectorCount,
 		dataSectorStart:          dataSectorStart,
+		rand:                     rand.New(rand.NewSource(0)),
 	}
 
 	// TODONICE: support more than 2 fats

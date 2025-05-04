@@ -4,8 +4,12 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
+	"slices"
 	"strings"
 	"time"
+
+	"github.com/acheronfail/nxkit/lib/utils"
 )
 
 const (
@@ -236,8 +240,117 @@ func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
 	return bytes, nil
 }
 
+// http://elm-chan.org/docs/fat_e.html#name_conversion
 func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, error) {
-	panic("not implemented")
+	lossy := false
+
+	// 1. convert to upper
+	name := strings.ToUpper(desiredName)
+
+	// 2. remove any space
+	if strings.Contains(name, " ") {
+		lossy = true
+		name = strings.ReplaceAll(name, " ", "")
+	}
+
+	// 3. remove leading dots
+	for strings.HasPrefix(name, ".") {
+		lossy = true
+		name = strings.TrimPrefix(name, ".")
+	}
+
+	// 4. remove all but last dot
+	dotCount := strings.Count(name, ".")
+	if dotCount > 1 {
+		lossy = true
+		lastDot := strings.LastIndex(name, ".")
+		first := name[:lastDot]
+		last := name[lastDot:]
+		name = strings.ReplaceAll(first, ".", "") + last
+	}
+
+	// 5. remove disallowed ascii chars
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 {
+			lossy = true
+			return '_'
+		}
+
+		switch r {
+		case '"', '*', '+', ',', '/', ':', ';', '<', '=', '>', '?', '[', '\\', ']', '|':
+			lossy = true
+			return '_'
+		}
+
+		return r
+	}, name)
+
+	// 6. convert unicode to ansi/oem code (and replace with random 4-digit hex if empty after that)
+	name = strings.Map(func(r rune) rune {
+		if r < 0x20 || r > 0x7E {
+			lossy = true
+			return -1
+		}
+		return r
+	}, name)
+	if len(name) == 0 || strings.HasPrefix(name, ".") {
+		name = fmt.Sprintf("%04X%s", fs.rand.Intn(0x10000), name)
+	}
+
+	// 7. truncate body and extension to 8 and 3 bytes (if truncation occurs, set lossy)
+	var body, ext string
+	if strings.Contains(name, ".") {
+		parts := strings.Split(name, ".")
+		body = parts[0]
+		ext = parts[1]
+		if len(body) > 8 {
+			lossy = true
+			body = body[:8]
+		}
+		if len(ext) > 3 {
+			lossy = true
+			ext = ext[:3]
+		}
+	} else {
+		body = name
+		if len(body) > 8 {
+			lossy = true
+			body = body[:8]
+		}
+	}
+
+	var finalName string
+	if ext == "" {
+		finalName = body
+	} else {
+		finalName = body + "." + ext
+	}
+
+	existingNames := utils.MapSlice(siblingEntries, func(entry DirectoryEntry) string { return entry.ShortName() })
+	if !lossy && !slices.Contains(existingNames, finalName) {
+		return finalName, nil
+	}
+
+	n := 1
+	l := len(body)
+	for {
+		digitCount := int(math.Log10(float64(n))) + 1
+		trimmed := body[:min(l, 8-digitCount-1)]
+
+		if ext == "" {
+			finalName = fmt.Sprintf("%s~%d", trimmed, n)
+		} else {
+			finalName = fmt.Sprintf("%s~%d.%s", trimmed, n, ext)
+		}
+
+		if !slices.Contains(existingNames, finalName) {
+			break
+		}
+
+		n++
+	}
+
+	return finalName, nil
 }
 
 func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
