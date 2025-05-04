@@ -465,19 +465,26 @@ func (fs *FileSystem) writeDirectoryEntry(
 	newDirName string,
 	newDirCluster uint16,
 	parentDirBytes []byte,
+	parentDirEntries []DirectoryEntry,
 	parentDirCluster *uint16,
 	atParentByteIndex int,
 ) ([]byte, error) {
 	time, date, tenth := asFatTime(time.Now())
 
 	// create new directory entry
-	var name [11]byte // TODO: use helper
-	copy(name[:], newDirName)
-	for i := len(newDirName); i < 11; i++ {
-		name[i] = 0x20
+	shortName, err := fs.createShortName(newDirName, parentDirEntries)
+	if err != nil {
+		return nil, err
 	}
+
+	var shortNameBytes [11]byte
+	copy(shortNameBytes[:], shortName)
+	for i := len(shortName); i < 11; i++ {
+		shortNameBytes[i] = 0x20
+	}
+
 	newFatDirEntry := fatDirectoryEntry{
-		DIR_Name:         name,
+		DIR_Name:         shortNameBytes,
 		DIR_Attr:         0x10,
 		DIR_NTRes:        0x00,
 		DIR_CrtTimeTenth: tenth,
@@ -556,7 +563,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 	copy(newDirectoryDataBytes[directoryEntrySize:], dotDotDirEntry.toBytes())
 
 	// write . and .. into new cluster in data region
-	_, err := fs.file.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.bytesPerSector))
+	_, err = fs.file.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.bytesPerSector))
 	if err != nil {
 		return nil, err
 	}

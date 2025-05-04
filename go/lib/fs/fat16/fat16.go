@@ -139,13 +139,13 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 			continue
 		}
 
-		entries, err := fs.readDirectoryEntries(currentBytes)
+		currentEntries, err := fs.readDirectoryEntries(currentBytes)
 		if err != nil {
 			return nil, fmt.Errorf("could not read directory entries: %w", err)
 		}
 
 		found := false
-		for _, entry := range entries {
+		for _, entry := range currentEntries {
 			if !slices.ContainsFunc(entry.names(), func(name string) bool { return strings.EqualFold(name, part) }) {
 				continue
 			}
@@ -203,7 +203,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 					return nil, err
 				}
 
-				newDirectoryBytes, err := fs.writeDirectoryEntry(part, newDirectoryCluster, currentBytes, currentEntryCluster, freeIndex)
+				newDirectoryBytes, err := fs.writeDirectoryEntry(part, newDirectoryCluster, currentBytes, currentEntries, currentEntryCluster, freeIndex)
 				if err != nil {
 					return nil, fmt.Errorf("could not write directory entry: %w", err)
 				}

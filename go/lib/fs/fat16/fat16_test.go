@@ -63,18 +63,19 @@ func TestMkdir(t *testing.T) {
 	assert.Nil(t, err)
 	defer fs.Close()
 
+	// TODO: verify should this be uppercase?
 	testSingleMkdirWorked := func(fs *fat16.FileSystem) {
 		t.Helper()
 		entries, err := fs.ReadDir("/mkdir/single")
 		assert.Nil(t, err)
 		assert.Len(t, entries, 3)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{".", "..", "new"}, shortNames)
+		assert.Equal(t, []string{".", "..", "NEW"}, shortNames)
 		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{".", "..", "new"}, longNames)
+		assert.Equal(t, []string{".", "..", "NEW"}, longNames)
 
 		assert.True(t, entries[2].IsDir())
-		assert.Equal(t, entries[2].ShortName(), "new")
+		assert.Equal(t, entries[2].ShortName(), "NEW")
 	}
 
 	t.Run("mkdir /mkdir/single/new", func(t *testing.T) {

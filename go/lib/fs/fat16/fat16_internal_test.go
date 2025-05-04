@@ -8,14 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// File.txt	FILE.TXT
-// foo.tar.gz	FOOTAR~1.GZ
-// .conf	CONF~1
-// a+b=c	A_B_C~1
-// 💩.png	3F04~1.PNG
-// Asakura Otome.jpeg	ASAKUR~1.JPE
-// Asakura Yume.jpeg	ASAKUR~2.JPE
-
 func mockDirEntry(sfn, lfn string) DirectoryEntry {
 	var name [11]byte
 	copy(name[:], strings.ReplaceAll(sfn, ".", ""))
