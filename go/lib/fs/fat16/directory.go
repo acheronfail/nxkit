@@ -429,10 +429,7 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 			continue
 		}
 
-		var name [11]byte
-		copy(name[:], dirBytes[i:i+11])
 		fatEntry := fatDirectoryEntry{
-			DIR_Name:         name,
 			DIR_Attr:         dirBytes[i+11],
 			DIR_NTRes:        dirBytes[i+12],
 			DIR_CrtTimeTenth: dirBytes[i+13],
@@ -445,6 +442,7 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 			DIR_FstClusLO:    binary.LittleEndian.Uint16(dirBytes[i+26 : i+28]),
 			DIR_FileSize:     binary.LittleEndian.Uint32(dirBytes[i+28 : i+32]),
 		}
+		copy(fatEntry.DIR_Name[:], dirBytes[i:i+11])
 
 		entries = append(entries, DirectoryEntry{fatDirectoryEntry: fatEntry, longFileName: longFileName})
 		longFileName = ""

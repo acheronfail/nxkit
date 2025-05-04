@@ -9,12 +9,12 @@ setup:
 fixtures:
   bash ./lib/fs/fixtures/create.sh
 
-test: fixtures
-  go test github.com/acheronfail/nxkit/...
-  go test github.com/acheronfail/nxkit/...
+test *args: fixtures
+  go test github.com/acheronfail/nxkit/... {{args}}
+  go test github.com/acheronfail/nxkit/... {{args}}
 
-testw:
-  reflex -d none -sr '\.go$' -- just test
+testw *args:
+  reflex -d none -sr '\.go$' -- just test {{args}}
 
 bench:
   go test -bench=. github.com/acheronfail/nxkit/...
