@@ -56,6 +56,16 @@ func TestReadDir(t *testing.T) {
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.Equal(t, []string{".", "..", "lower.low", "lower.UPP", "UPPER.low", "UPPER.UPP"}, shortNames)
 	})
+
+	t.Run("path:/not_here", func(t *testing.T) {
+		_, err := fs.ReadDir("/not_here")
+		assert.Error(t, err, "no such file or directory /not_here")
+	})
+
+	t.Run("path:/dir/not_here", func(t *testing.T) {
+		_, err := fs.ReadDir("/dir/not_here")
+		assert.Error(t, err, "no such file or directory /dir/not_here")
+	})
 }
 
 func TestMkdir(t *testing.T) {
