@@ -377,6 +377,10 @@ func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
 	return (len(dirName) / longFileNameUtf16Length) + 1
 }
 
+// TODO: improve this - with tests - to:
+//
+//	(1) stop scanning when 0x00 is found, and
+//	(2) handle issues when near end of `dirBytes`
 func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries int) (int, bool) {
 	count := 0
 	for i := 0; i < len(dirBytes); i += directoryEntrySize {
@@ -388,7 +392,7 @@ func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries in
 		}
 
 		if count == numEntries {
-			return i, true
+			return i - (numEntries-1)*directoryEntrySize, true
 		}
 	}
 
