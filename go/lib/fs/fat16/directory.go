@@ -158,6 +158,19 @@ func (d *fatDirectoryEntry) IsArchive() bool {
 	return d.DIR_Attr&0x20 == 0x20
 }
 
+func (lfn *fatLongFileName) toBytes() []byte {
+	data := make([]byte, 32)
+	data[0] = lfn.LDIR_Ord
+	data[11] = lfn.LDIR_Attr
+	data[12] = lfn.LDIR_Type
+	data[13] = lfn.LDIR_Chksum
+	binary.LittleEndian.PutUint16(data[26:28], lfn.LDIR_FstClusLO)
+	copy(data[1:11], lfn.LDIR_Name1[:])
+	copy(data[14:26], lfn.LDIR_Name2[:])
+	copy(data[28:32], lfn.LDIR_Name3[:])
+	return data
+}
+
 func (d *fatDirectoryEntry) toBytes() []byte {
 	data := make([]byte, 32)
 
@@ -181,6 +194,7 @@ func (d *fatDirectoryEntry) toBytes() []byte {
 }
 
 func (d *DirectoryEntry) clusterNumber() uint16 {
+	// d.DIR_FstClusHI unused in FAT16 and always zero
 	return d.DIR_FstClusLO
 }
 
@@ -370,7 +384,7 @@ func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []
 }
 
 func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
-	if len(dirName) <= 8 {
+	if len(dirName) <= 11 {
 		return 1
 	}
 
@@ -468,17 +482,70 @@ func (lfn *fatLongFileName) extractNamePart() string {
 		if lfnBytes[i] == 0x00 && lfnBytes[i+1] == 0x00 {
 			break
 		}
-		runeValue := binary.LittleEndian.Uint16(lfnBytes[i : i+2])
-		if runeValue == 0x0000 {
-			break
-		}
-		name.WriteRune(rune(runeValue))
+		name.WriteRune(rune(binary.LittleEndian.Uint16(lfnBytes[i : i+2])))
 	}
 
 	return name.String()
 }
 
-// TODO: support writing long file names
+func calculateShortNameChecksum(shortName []byte) uint8 {
+	var sum uint8 = 0
+	for i := range 11 {
+		sum = ((sum & 1) << 7) + (sum >> 1) + uint8(shortName[i])
+	}
+	return sum
+}
+
+func (fs *FileSystem) createLongFileNameEntries(longName string, checksum uint8) []fatLongFileName {
+	numEntries := fs.numDirectoryEntriesRequired(longName)
+	if numEntries <= 1 {
+		return nil
+	}
+
+	lfnEntries := make([]fatLongFileName, numEntries)
+	max := numEntries - 1
+	for i := max; i >= 0; i-- {
+		start := i * longFileNameUtf16Length
+		end := min((i+1)*longFileNameUtf16Length, len(longName))
+		chunk := longName[start:end]
+
+		lfnBytes := make([]byte, longFileNameUtf16Length*2)
+		for j := range lfnBytes {
+			lfnBytes[j] = 0xFF
+		}
+
+		for j, char := range chunk {
+			binary.LittleEndian.PutUint16(lfnBytes[j*2:j*2+2], uint16(char))
+		}
+
+		// null terminate
+		chunkLen := len(chunk)
+		if chunkLen < longFileNameUtf16Length {
+			binary.LittleEndian.PutUint16(lfnBytes[chunkLen*2:chunkLen*2+2], 0x0000)
+		}
+
+		// Calculate sequence number
+		seqNum := uint8(i + 1)
+		// Set the last entry flag for the last LFN entry
+		if i == max {
+			seqNum |= 0x40
+		}
+		lfnEntry := fatLongFileName{
+			LDIR_Ord:       seqNum,
+			LDIR_Attr:      0x0F,
+			LDIR_Type:      0x00,
+			LDIR_Chksum:    checksum,
+			LDIR_FstClusLO: 0,
+		}
+		copy(lfnEntry.LDIR_Name1[:], lfnBytes[:10])
+		copy(lfnEntry.LDIR_Name2[:], lfnBytes[10:22])
+		copy(lfnEntry.LDIR_Name3[:], lfnBytes[22:26])
+		lfnEntries[max-i] = lfnEntry
+	}
+
+	return lfnEntries
+}
+
 func (fs *FileSystem) writeDirectoryEntry(
 	newDirName string,
 	newDirCluster uint16,
@@ -510,8 +577,18 @@ func (fs *FileSystem) writeDirectoryEntry(
 		DIR_FileSize:     0,
 	}
 
+	newDirEntriesBytes := make([][]byte, 0)
+	for _, lfnEntry := range fs.createLongFileNameEntries(newDirName, calculateShortNameChecksum(shortNameBytes[:])) {
+		newDirEntriesBytes = append(newDirEntriesBytes, lfnEntry.toBytes())
+	}
+	newDirEntriesBytes = append(newDirEntriesBytes, newFatDirEntry.toBytes())
+
 	// write new directory into parent's directory bytes
-	copy(parentDirBytes[atParentByteIndex:atParentByteIndex+directoryEntrySize], newFatDirEntry.toBytes())
+	for i, entryBytes := range newDirEntriesBytes {
+		start := atParentByteIndex + (directoryEntrySize * i)
+		end := start + directoryEntrySize
+		copy(parentDirBytes[start:end], entryBytes)
+	}
 
 	// write back to disk
 	if parentDirCluster == nil {

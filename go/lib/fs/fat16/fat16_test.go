@@ -116,8 +116,6 @@ func TestMkdir(t *testing.T) {
 	})
 
 	t.Run("mkdir with long name", func(t *testing.T) {
-		t.Skip()
-
 		err := fs.Mkdir("/mkdir/long/a_directory_with_a_long_name")
 		assert.Nil(t, err)
 
