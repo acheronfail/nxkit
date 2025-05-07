@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/acheronfail/nxkit/lib/fs"
 	"github.com/acheronfail/nxkit/lib/fs/boot_sector"
@@ -117,7 +118,12 @@ func (fs *FileSystem) Close() error {
 }
 
 func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
-	return fs.readDir(path, false)
+	result, err := fs.readDir(path, false)
+	if err != nil {
+		return nil, err
+	}
+
+	return result.entries, nil
 }
 
 func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
@@ -133,7 +139,13 @@ func (fs *FileSystem) splitPath(path string) ([]string, error) {
 	return parts, nil
 }
 
-func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error) {
+type readDirResult struct {
+	entries []DirectoryEntry
+	bytes   []byte
+	cluster *uint16
+}
+
+func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 	parts, err := fs.splitPath(path)
 	if err != nil {
 		return nil, err
@@ -179,34 +191,9 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 		if !found {
 			if mkdir {
 				nRequired := fs.numDirectoryEntriesRequired(part)
-				freeIndex, ok := fs.findAvailableDirectoryEntry(currentBytes, nRequired)
-				if !ok {
-					// if we're in the root directory area we can't expand on fat16
-					if currentEntryCluster == nil {
-						return nil, fmt.Errorf("no available space for creating root directory entry")
-					}
-
-					// expand the current directory's cluster chain since we're out of space
-					extraCluster, err := fs.allocateNextFreeCluster()
-					if err != nil {
-						return nil, err
-					}
-
-					err = fs.writeClusterToFats(*currentEntryCluster, extraCluster)
-					if err != nil {
-						return nil, err
-					}
-
-					currentBytes, err = fs.getClusterChainBytes(*currentEntryCluster)
-					if err != nil {
-						return nil, fmt.Errorf("could not read directory bytes: %w", err)
-					}
-
-					// TODONICE: can optimise and return start of new cluster
-					freeIndex, ok = fs.findAvailableDirectoryEntry(currentBytes, nRequired)
-					if !ok {
-						return nil, fmt.Errorf("no available space for creating directory entry")
-					}
+				freeIndex, newDirectoryBytes, err := fs.getAvailableDirectoryEntry(nRequired, currentEntryCluster, currentBytes)
+				if err != nil {
+					return nil, err
 				}
 
 				newDirectoryCluster, err := fs.allocateNextFreeCluster()
@@ -214,7 +201,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 					return nil, err
 				}
 
-				newDirectoryBytes, err := fs.writeDirectoryEntry(part, newDirectoryCluster, currentBytes, currentEntries, currentEntryCluster, freeIndex)
+				newDirectoryBytes, err = fs.writeDirectoryEntry(part, newDirectoryCluster, newDirectoryBytes, currentEntries, currentEntryCluster, freeIndex)
 				if err != nil {
 					return nil, fmt.Errorf("could not write directory entry: %w", err)
 				}
@@ -232,7 +219,49 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 		return nil, fmt.Errorf("could not read directory entries: %w", err)
 	}
 
-	return entries, nil
+	return &readDirResult{
+		entries: entries,
+		bytes:   currentBytes,
+		cluster: currentEntryCluster,
+	}, nil
+}
+
+func (fs *FileSystem) getAvailableDirectoryEntry(
+	nRequired int,
+	parentDirCluster *uint16,
+	parentDirBytes []byte,
+) (int, []byte, error) {
+	freeIndex, ok := fs.findAvailableDirectoryEntry(parentDirBytes, nRequired)
+	if !ok {
+		// if we're in the root directory area we can't expand on fat16
+		if parentDirCluster == nil {
+			return 0, nil, fmt.Errorf("no available space for creating root directory entry")
+		}
+
+		// expand the current directory's cluster chain since we're out of space
+		extraCluster, err := fs.allocateNextFreeCluster()
+		if err != nil {
+			return 0, nil, err
+		}
+
+		err = fs.writeClusterToFats(*parentDirCluster, extraCluster)
+		if err != nil {
+			return 0, nil, err
+		}
+
+		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
+		if err != nil {
+			return 0, nil, fmt.Errorf("could not read directory bytes: %w", err)
+		}
+
+		// TODONICE: can optimise and return start of new cluster
+		freeIndex, ok = fs.findAvailableDirectoryEntry(parentDirBytes, nRequired)
+		if !ok {
+			return 0, nil, fmt.Errorf("no available space for creating directory entry")
+		}
+	}
+
+	return freeIndex, parentDirBytes, nil
 }
 
 func (fs *FileSystem) Mkdir(path string) error {
@@ -240,15 +269,16 @@ func (fs *FileSystem) Mkdir(path string) error {
 	return err
 }
 
-func (fs *FileSystem) OpenFile(path string) (fs.File, error) {
+// accepts os.OpenFile flags
+func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
-	entries, err := fs.readDir(dirPath, false)
+	result, err := fs.readDir(dirPath, false)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range entries {
+	for _, entry := range result.entries {
 		if strings.EqualFold(entry.LongName(), baseName) || strings.EqualFold(entry.ShortName(), baseName) {
 			if entry.IsDir() {
 				return nil, fmt.Errorf("failed to open '%s': is a directory", path)
@@ -256,11 +286,62 @@ func (fs *FileSystem) OpenFile(path string) (fs.File, error) {
 
 			return &fatFile{
 				DirectoryEntry: entry,
-				parent:         &entry,
 				fs:             fs,
 			}, nil
 		}
 	}
 
-	return nil, fmt.Errorf("no such file or directory %s", path)
+	if flags&os.O_CREATE == 0 {
+		return nil, fmt.Errorf("no such file or directory %s", path)
+	}
+
+	// TODO: lfn
+	// TODO: de-duplicate with create dir, since there's a bunch the same
+
+	nRequired := fs.numDirectoryEntriesRequired(baseName)
+	startIndex, newDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, result.cluster, result.bytes)
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: move to file
+
+	shortNameBytes, err := fs.createShortNameBytes(baseName, result.entries)
+	if err != nil {
+		return nil, err
+	}
+
+	date, time, tenth := asFatTime(time.Now())
+	newFileEntry := &fatFile{
+		DirectoryEntry: DirectoryEntry{
+			fatDirectoryEntry: fatDirectoryEntry{
+				DIR_Name:         shortNameBytes,
+				DIR_Attr:         0x00,
+				DIR_NTRes:        0x00,
+				DIR_CrtTimeTenth: tenth,
+				DIR_CrtTime:      time,
+				DIR_CrtDate:      date,
+				DIR_LstAccDate:   date,
+				DIR_FstClusHI:    0,
+				DIR_WrtTime:      time,
+				DIR_WrtDate:      date,
+				DIR_FstClusLO:    0,
+				DIR_FileSize:     0,
+			},
+			longFileName: baseName,
+		},
+		fs: fs,
+	}
+
+	// write new entry into parent dir's bytes
+	copy(newDirBytes[startIndex:startIndex+directoryEntrySize], newFileEntry.toBytes())
+
+	// TODO: write back to disk
+	if result.cluster == nil {
+		fmt.Println("writing to root")
+	} else {
+		fmt.Println("writing to parent dir clusters")
+	}
+
+	panic("unimplemented")
 }

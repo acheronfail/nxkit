@@ -90,7 +90,7 @@ func asFatTime(t time.Time) (uint16, uint16, uint8) {
 	// FAT16 CrtTimeTenth: Sub-second information in 10ms units (0-199)
 	fatCrtTimeTenth := uint8(t.Nanosecond() / 1e7) // Convert nanoseconds to 10ms units
 
-	return fatTime, fatDate, fatCrtTimeTenth
+	return fatDate, fatTime, fatCrtTimeTenth
 }
 
 func (d *DirectoryEntry) names() []string {
@@ -554,7 +554,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 	parentDirCluster *uint16,
 	atParentByteIndex int,
 ) ([]byte, error) {
-	time, date, tenth := asFatTime(time.Now())
+	date, time, tenth := asFatTime(time.Now())
 
 	// create new directory entry
 	shortNameBytes, err := fs.createShortNameBytes(newDirName, parentDirEntries)

@@ -7,8 +7,7 @@ import (
 
 type fatFile struct {
 	DirectoryEntry
-	parent *DirectoryEntry
-	fs     *FileSystem
+	fs *FileSystem
 }
 
 func (f *fatFile) Close() error {
