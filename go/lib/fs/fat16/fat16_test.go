@@ -127,3 +127,28 @@ func TestMkdir(t *testing.T) {
 		assert.Equal(t, []string{".", "..", "a_directory_with_a_long_name"}, longNames)
 	})
 }
+
+func TestOpenFile(t *testing.T) {
+	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("read file", func(t *testing.T) {
+		file, err := fs.OpenFile("/INFO.TXT")
+		assert.Nil(t, err)
+
+		data := make([]byte, file.Size())
+		n, err := file.ReadAt(data, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, file.Size(), int64(n))
+		assert.Equal(t, "text file\n", string(data))
+	})
+
+	// TODO: try to open dir
+	// TODO: try to open non-existent file
+	// TODO: long file name
+	// TODO: read past end
+	// TODO: try to read more than size size
+	// TODO: close file and try to read again
+	// TODO: same with writes ^^
+}

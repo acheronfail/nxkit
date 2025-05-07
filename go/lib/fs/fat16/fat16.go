@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
+	"github.com/acheronfail/nxkit/lib/fs"
 	"github.com/acheronfail/nxkit/lib/fs/boot_sector"
 )
 
@@ -122,10 +124,19 @@ func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
 	return (fs.dataSectorStart + uint32(cluster-2)*fs.sectorsPerCluster)
 }
 
-func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error) {
+func (fs *FileSystem) splitPath(path string) ([]string, error) {
 	parts := strings.Split(path, "/")
 	if len(parts) == 0 {
 		return nil, fmt.Errorf("invalid path: %s", path)
+	}
+
+	return parts, nil
+}
+
+func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error) {
+	parts, err := fs.splitPath(path)
+	if err != nil {
+		return nil, err
 	}
 
 	var currentEntryCluster *uint16 = nil
@@ -152,7 +163,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 
 			if entry.IsDir() {
 				clusterNumber := entry.clusterNumber()
-				currentBytes, err = fs.getDirectoryBytes(clusterNumber)
+				currentBytes, err = fs.getClusterChainBytes(clusterNumber)
 				if err != nil {
 					return nil, fmt.Errorf("could not read directory bytes: %w", err)
 				}
@@ -186,7 +197,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 						return nil, err
 					}
 
-					currentBytes, err = fs.getDirectoryBytes(*currentEntryCluster)
+					currentBytes, err = fs.getClusterChainBytes(*currentEntryCluster)
 					if err != nil {
 						return nil, fmt.Errorf("could not read directory bytes: %w", err)
 					}
@@ -227,4 +238,25 @@ func (fs *FileSystem) readDir(path string, mkdir bool) ([]DirectoryEntry, error)
 func (fs *FileSystem) Mkdir(path string) error {
 	_, err := fs.readDir(path, true)
 	return err
+}
+
+func (fs *FileSystem) OpenFile(path string) (fs.File, error) {
+	dirPath := filepath.Dir(path)
+	baseName := filepath.Base(path)
+	entries, err := fs.readDir(dirPath, false)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, entry := range entries {
+		if strings.EqualFold(entry.LongName(), baseName) {
+			return &fatFile{
+				DirectoryEntry: entry,
+				parent:         &entry,
+				fs:             fs,
+			}, nil
+		}
+	}
+
+	return nil, fmt.Errorf("file %s not found in directory %s", filepath.Base(path), dirPath)
 }

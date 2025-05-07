@@ -210,7 +210,7 @@ func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
 	return b, nil
 }
 
-func (fs *FileSystem) getDirectoryClusterChain(startCluster uint16) ([]uint16, error) {
+func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
 	var clusters []uint16
 	currentCluster := startCluster
 	for {
@@ -233,8 +233,8 @@ func (fs *FileSystem) getDirectoryClusterChain(startCluster uint16) ([]uint16, e
 	return clusters, nil
 }
 
-func (fs *FileSystem) getDirectoryBytes(startCluster uint16) ([]byte, error) {
-	clusterChain, err := fs.getDirectoryClusterChain(startCluster)
+func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) {
+	clusterChain, err := fs.getClusterChain(startCluster)
 	if err != nil {
 		return nil, err
 	}
@@ -599,7 +599,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 		}
 	} else {
 		// if not root, then write the entire parent directory back to disk, along its cluster chain
-		clusterChain, err := fs.getDirectoryClusterChain(*parentDirCluster)
+		clusterChain, err := fs.getClusterChain(*parentDirCluster)
 		if err != nil {
 			return nil, err
 		}
