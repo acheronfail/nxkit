@@ -42,8 +42,7 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 		return 0, err
 	}
 
-	copy(p, bytes[off:fileSize])
-	n = int(fileSize - off)
+	n = copy(p, bytes[off:fileSize])
 	if len(p) > n {
 		return n, io.EOF
 	}

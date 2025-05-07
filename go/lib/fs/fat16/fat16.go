@@ -249,7 +249,11 @@ func (fs *FileSystem) OpenFile(path string) (fs.File, error) {
 	}
 
 	for _, entry := range entries {
-		if strings.EqualFold(entry.LongName(), baseName) {
+		if strings.EqualFold(entry.LongName(), baseName) || strings.EqualFold(entry.ShortName(), baseName) {
+			if entry.IsDir() {
+				return nil, fmt.Errorf("failed to open '%s': is a directory", path)
+			}
+
 			return &fatFile{
 				DirectoryEntry: entry,
 				parent:         &entry,
@@ -258,5 +262,5 @@ func (fs *FileSystem) OpenFile(path string) (fs.File, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("file %s not found in directory %s", filepath.Base(path), dirPath)
+	return nil, fmt.Errorf("no such file or directory %s", path)
 }

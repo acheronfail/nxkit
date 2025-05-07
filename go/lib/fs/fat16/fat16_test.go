@@ -2,6 +2,7 @@ package fat16_test
 
 import (
 	"fmt"
+	"io"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fs/fat16"
@@ -18,19 +19,20 @@ func TestReadDir(t *testing.T) {
 	t.Run("path:/", func(t *testing.T) {
 		entries, err := fs.ReadDir("/")
 		assert.Nil(t, err)
-		assert.Len(t, entries, 7)
+		assert.Len(t, entries, 8)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{"dir", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "mkdir", "FAT16-TEST"}, shortNames)
+		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "mkdir", "FAT16-TEST"}, shortNames)
 		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{"dir", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "mkdir", "FAT16-TEST"}, longNames)
+		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "mkdir", "FAT16-TEST"}, longNames)
 
 		assert.True(t, entries[0].IsDir())
 		assert.True(t, !entries[1].IsDir())
 		assert.True(t, !entries[2].IsDir())
 		assert.True(t, !entries[3].IsDir())
-		assert.True(t, entries[4].IsDir())
+		assert.True(t, !entries[4].IsDir())
 		assert.True(t, entries[5].IsDir())
-		assert.True(t, entries[6].IsVolumeId())
+		assert.True(t, entries[6].IsDir())
+		assert.True(t, entries[7].IsVolumeId())
 	})
 
 	t.Run("path:/dir", func(t *testing.T) {
@@ -59,12 +61,12 @@ func TestReadDir(t *testing.T) {
 
 	t.Run("path:/not_here", func(t *testing.T) {
 		_, err := fs.ReadDir("/not_here")
-		assert.Error(t, err, "no such file or directory /not_here")
+		assert.EqualError(t, err, "no such file or directory /not_here")
 	})
 
 	t.Run("path:/dir/not_here", func(t *testing.T) {
 		_, err := fs.ReadDir("/dir/not_here")
-		assert.Error(t, err, "no such file or directory /dir/not_here")
+		assert.EqualError(t, err, "no such file or directory /dir/not_here")
 	})
 }
 
@@ -133,7 +135,7 @@ func TestOpenFile(t *testing.T) {
 	assert.Nil(t, err)
 	defer fs.Close()
 
-	t.Run("read file", func(t *testing.T) {
+	t.Run("read - sfn", func(t *testing.T) {
 		file, err := fs.OpenFile("/INFO.TXT")
 		assert.Nil(t, err)
 
@@ -144,11 +146,86 @@ func TestOpenFile(t *testing.T) {
 		assert.Equal(t, "text file\n", string(data))
 	})
 
-	// TODO: try to open dir
-	// TODO: try to open non-existent file
-	// TODO: long file name
-	// TODO: read past end
-	// TODO: try to read more than size size
-	// TODO: close file and try to read again
+	t.Run("read - open dir", func(t *testing.T) {
+	})
+	file, err := fs.OpenFile("/mkdir")
+	assert.Nil(t, file)
+	assert.EqualError(t, err, "failed to open '/mkdir': is a directory")
+
+	t.Run("read - no file", func(t *testing.T) {
+		file, err := fs.OpenFile("/not_here")
+		assert.Nil(t, file)
+		assert.EqualError(t, err, "no such file or directory /not_here")
+	})
+
+	t.Run("read - lfn", func(t *testing.T) {
+		file, err := fs.OpenFile("/a file with a long name.dat")
+		assert.Nil(t, err)
+
+		data := make([]byte, file.Size())
+		n, err := file.ReadAt(data, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, file.Size(), int64(n))
+		assert.Equal(t, file.Size(), int64(7168))
+		assert.Equal(t, data, make([]byte, 7168))
+	})
+
+	t.Run("read - lfn by sfn", func(t *testing.T) {
+		file, err := fs.OpenFile("/AFILEW~1.DAT")
+		assert.Nil(t, err)
+
+		data := make([]byte, file.Size())
+		n, err := file.ReadAt(data, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, file.Size(), int64(n))
+		assert.Equal(t, file.Size(), int64(7168))
+		assert.Equal(t, data, make([]byte, 7168))
+	})
+
+	t.Run("read - less than file size", func(t *testing.T) {
+		file, err := fs.OpenFile("/INFO.TXT")
+		assert.Nil(t, err)
+
+		data := make([]byte, 4)
+		n, err := file.ReadAt(data, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, 4, n)
+		assert.Equal(t, string(data), "text")
+	})
+
+	t.Run("read - more than file size", func(t *testing.T) {
+		file, err := fs.OpenFile("/INFO.TXT")
+		assert.Nil(t, err)
+
+		data := make([]byte, 100)
+		n, err := file.ReadAt(data, 0)
+		assert.Equal(t, err, io.EOF)
+		assert.Equal(t, 10, n)
+		assert.Equal(t, string(data[:10]), "text file\n")
+		assert.Equal(t, data[10:], make([]byte, 90))
+	})
+
+	t.Run("read - after close", func(t *testing.T) {
+		file, err := fs.OpenFile("/INFO.TXT")
+		assert.Nil(t, err)
+
+		err = file.Close()
+		assert.Nil(t, err)
+
+		data := make([]byte, 100)
+		_, err = file.ReadAt(data, 0)
+		assert.EqualError(t, err, "file already closed")
+	})
+
+	t.Run("read - empty file", func(t *testing.T) {
+		file, err := fs.OpenFile("/empty.bin")
+		assert.Nil(t, err)
+
+		data := make([]byte, 10)
+		n, err := file.ReadAt(data, 0)
+		assert.Equal(t, n, 0)
+		assert.Equal(t, err, io.EOF)
+	})
+
 	// TODO: same with writes ^^
 }

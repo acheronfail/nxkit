@@ -6,6 +6,7 @@ fixtures_dir="/tmp/fixtures"
 mkdir -p "${fixtures_dir}"
 
 echo 'text file' > "${fixtures_dir}/INFO.TXT"
+touch "${fixtures_dir}/empty.bin"
 dd if=/dev/zero of="${fixtures_dir}/a file with a long name.dat" bs=1024 count=2 2>/dev/null
 dd if=/dev/zero of="${fixtures_dir}/another file" bs=1024 count=6                2>/dev/null
 dd if=/dev/zero of="${fixtures_dir}/a file with a long name.dat" bs=1024 count=7 2>/dev/null
@@ -23,6 +24,7 @@ for n in $(echo "12 16 32"); do
 
   mmd -i "${disk}" ::/dir
   mmd -i "${disk}" ::/dir/subdir
+  mcopy -i "${disk}" "${fixtures_dir}/empty.bin" ::/
   mcopy -i "${disk}" "${fixtures_dir}/INFO.TXT" ::/
   mcopy -i "${disk}" "${fixtures_dir}/a file with a long name.dat" ::/
   mcopy -i "${disk}" "${fixtures_dir}/another file" ::/
