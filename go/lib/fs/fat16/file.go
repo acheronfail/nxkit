@@ -1,13 +1,16 @@
 package fat16
 
 import (
+	"fmt"
 	"io"
 	"os"
+	"strings"
 )
 
 type fatFile struct {
 	DirectoryEntry
-	fs *FileSystem
+	parentDirCluster *uint16
+	fs               *FileSystem
 }
 
 func (f *fatFile) Close() error {
@@ -24,7 +27,7 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 		return 0, os.ErrClosed
 	}
 
-	fileSize := int64(f.DirectoryEntry.DIR_FileSize)
+	fileSize := int64(f.DIR_FileSize)
 
 	// if file size is zero, then this file has no cluster chain so read nothing
 	if fileSize == 0 {
@@ -36,7 +39,7 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 
 	// if size non-zero, then find cluster chain and read from it
-	bytes, err := f.fs.getClusterChainBytes(f.DirectoryEntry.clusterNumber())
+	bytes, err := f.fs.getClusterChainBytes(f.clusterNumber())
 	if err != nil {
 		return 0, err
 	}
@@ -56,7 +59,110 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 	return n, nil
 }
 
-// WriteAt implements fs.File.
 func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
-	panic("unimplemented")
+	if f.fs == nil {
+		return 0, os.ErrClosed
+	}
+
+	writeLen := int64(len(p))
+	totalLen := writeLen + off
+
+	if writeLen == 0 {
+		return 0, nil
+	}
+
+	// allocate cluster if file is empty
+	if f.clusterNumber() == 0 {
+		cluster, err := f.fs.allocateClusterChain(totalLen)
+		if err != nil {
+			return 0, err
+		}
+
+		f.setCluster(cluster)
+	}
+
+	cluster := f.clusterNumber()
+	clusterBytes, err := f.fs.getClusterChainBytes(cluster)
+	if err != nil {
+		return 0, err
+	}
+
+	// extend cluster chain if current doesn't have enough space
+	if len(clusterBytes) < int(totalLen) {
+		err = f.fs.extendClusterChain(cluster, totalLen)
+		if err != nil {
+			return 0, err
+		}
+
+		clusterBytes, err = f.fs.getClusterChainBytes(cluster)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	// write data into cluster's bytes
+	n = copy(clusterBytes[off:off+writeLen], p)
+
+	// write cluster back to disk
+	err = f.fs.writeClusterChain(cluster, clusterBytes)
+	if err != nil {
+		return 0, err
+	}
+
+	// update file size
+	f.DIR_FileSize = uint32(totalLen)
+
+	// write file entry back to parent
+	err = f.writeEntryToParent()
+	if err != nil {
+		return 0, err
+	}
+
+	return n, nil
+}
+
+func (f *fatFile) writeEntryToParent() error {
+	// get parent bytes
+	parentDirBytes, err := f.fs.getClusterChainBytes(*f.parentDirCluster)
+	if err != nil {
+		return err
+	}
+
+	// get parent entries
+	parentEntries, err := f.fs.readDirectoryEntries(parentDirBytes)
+	if err != nil {
+		return err
+	}
+
+	// find index of current file entry in parent
+	var index int
+	found := false
+	sfn := f.ShortName()
+	lfn := f.LongName()
+	for i, entry := range parentEntries {
+		lfnMatched := strings.EqualFold(entry.LongName(), lfn)
+		sfnMatched := strings.EqualFold(entry.ShortName(), sfn)
+		if lfnMatched || sfnMatched {
+			index = i * directoryEntrySize
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("failed to find %s in parent directory", f.LongName())
+	}
+
+	// write back to disk
+	err = f.fs.writeEntriesToParent(
+		[]to32Bytes{&f.fatDirectoryEntry},
+		f.parentDirCluster,
+		parentDirBytes,
+		index,
+	)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

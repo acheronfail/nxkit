@@ -196,7 +196,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 					return nil, err
 				}
 
-				newDirectoryCluster, err := fs.allocateNextFreeCluster()
+				newDirectoryCluster, err := fs.allocateClusterChain(directoryEntrySize * 2)
 				if err != nil {
 					return nil, err
 				}
@@ -239,7 +239,7 @@ func (fs *FileSystem) getAvailableDirectoryEntry(
 		}
 
 		// expand the current directory's cluster chain since we're out of space
-		extraCluster, err := fs.allocateNextFreeCluster()
+		extraCluster, err := fs.allocateClusterChain(int64(nRequired * directoryEntrySize))
 		if err != nil {
 			return 0, nil, err
 		}
@@ -294,8 +294,9 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 			}
 
 			return &fatFile{
-				DirectoryEntry: existing,
-				fs:             fs,
+				DirectoryEntry:   existing,
+				parentDirCluster: parent.cluster,
+				fs:               fs,
 			}, nil
 		}
 	}
@@ -310,10 +311,14 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 		return nil, err
 	}
 
-	err = fs.writeNewEntryToParent(baseName, newFileEntry, parent.cluster, parent.entries, newParentDirBytes, startIndex)
+	err = fs.writeEntryWithLfnToParent(baseName, newFileEntry, parent.cluster, newParentDirBytes, startIndex)
 	if err != nil {
 		return nil, err
 	}
 
-	return &fatFile{DirectoryEntry: *newFileEntry, fs: fs}, nil
+	return &fatFile{
+		DirectoryEntry:   *newFileEntry,
+		parentDirCluster: parent.cluster,
+		fs:               fs,
+	}, nil
 }

@@ -70,17 +70,87 @@ func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
 	return nil
 }
 
-func (fs *FileSystem) allocateNextFreeCluster() (uint16, error) {
+// TODO: wherever this is called, if an error happens before writing to disk then handle appropriate
+// to prevent allocating unused clusters
+func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) {
+	nClustersAllocated := 0
+	nClustersRequired := max(1, bytesRequired/fs.bytesPerCluster)
+
+	prevCluster := uint16(eoc)
 	for cluster := uint16(2); cluster < fs.table.maxCluster; cluster++ {
 		if fs.table.clusters[cluster] == 0x0000 {
-			err := fs.writeClusterToFats(cluster, eoc)
+			err := fs.writeClusterToFats(cluster, prevCluster)
 			if err != nil {
 				return 0, err
 			}
 
-			return cluster, nil
+			nClustersAllocated++
+			if nClustersAllocated == int(nClustersRequired) {
+				return cluster, nil
+			}
+
+			prevCluster = cluster
 		}
 	}
 
 	return 0, fmt.Errorf("no available clusters")
+}
+
+func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return nil
+	}
+
+	for i, cluster := range clusterChain {
+		toWrite := make([]byte, fs.bytesPerCluster)
+		copy(toWrite, clusterBytes[int64(i)*fs.bytesPerCluster:int64(i+1)*fs.bytesPerCluster])
+		_, err := fs.file.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.bytesPerSector))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) extendClusterChain(clusterStart uint16, totalBytesNeeded int64) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return nil
+	}
+
+	totalClustersNeeded := max(1, totalBytesNeeded/fs.bytesPerCluster)
+	if totalBytesNeeded%fs.bytesPerCluster > 0 {
+		totalClustersNeeded++
+	}
+
+	nClustersToAllocate := totalClustersNeeded - int64(len(clusterChain))
+
+	if nClustersToAllocate == 0 {
+		return nil
+	}
+
+	prevCluster := clusterChain[len(clusterChain)-1]
+	for cluster := uint16(2); cluster < fs.table.maxCluster; cluster++ {
+		if fs.table.clusters[cluster] == 0x0000 {
+			err := fs.writeClusterToFats(prevCluster, cluster)
+			if err != nil {
+				return err
+			}
+			err = fs.writeClusterToFats(cluster, eoc)
+			if err != nil {
+				return err
+			}
+
+			nClustersToAllocate--
+			prevCluster = cluster
+
+			if nClustersToAllocate == 0 {
+				break
+			}
+		}
+	}
+
+	return nil
 }

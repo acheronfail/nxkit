@@ -163,8 +163,8 @@ func (d *fatDirectoryEntry) IsArchive() bool {
 	return d.DIR_Attr&0x20 == 0x20
 }
 
-func (lfn *fatLongFileName) toBytes() []byte {
-	data := make([]byte, 32)
+func (lfn *fatLongFileName) toBytes() [32]byte {
+	var data [32]byte
 	data[0] = lfn.LDIR_Ord
 	data[11] = lfn.LDIR_Attr
 	data[12] = lfn.LDIR_Type
@@ -176,10 +176,10 @@ func (lfn *fatLongFileName) toBytes() []byte {
 	return data
 }
 
-func (d *fatDirectoryEntry) toBytes() []byte {
-	data := make([]byte, 32)
+func (d *fatDirectoryEntry) toBytes() [32]byte {
+	var data [32]byte
 
-	copy(data, d.DIR_Name[:])
+	copy(data[:], d.DIR_Name[:])
 	for i := len(d.DIR_Name); i < 11; i++ {
 		data[i] = 0x20
 	}
@@ -201,6 +201,10 @@ func (d *fatDirectoryEntry) toBytes() []byte {
 func (d *DirectoryEntry) clusterNumber() uint16 {
 	// d.DIR_FstClusHI unused in FAT16 and always zero
 	return d.DIR_FstClusLO
+}
+
+func (d *DirectoryEntry) setCluster(cluster uint16) {
+	d.DIR_FstClusLO = cluster
 }
 
 func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
@@ -589,25 +593,38 @@ func (fs *FileSystem) createNewEntry(
 	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}, nil
 }
 
-func (fs *FileSystem) writeNewEntryToParent(
-	newEntName string,
-	newEntry *DirectoryEntry,
+func (fs *FileSystem) writeEntryWithLfnToParent(
+	entLongName string,
+	ent *DirectoryEntry,
 	parentDirCluster *uint16,
-	parentDirEntries []DirectoryEntry,
 	parentDirBytes []byte,
 	atParentByteIndex int,
 ) error {
-	newDirEntriesBytes := make([][]byte, 0)
-	for _, lfnEntry := range fs.createLongFileNameEntries(newEntName, calculateShortNameChecksum(newEntry.fatDirectoryEntry.DIR_Name[:])) {
-		newDirEntriesBytes = append(newDirEntriesBytes, lfnEntry.toBytes())
+	items := []to32Bytes{}
+	for _, lfnEntry := range fs.createLongFileNameEntries(entLongName, calculateShortNameChecksum(ent.fatDirectoryEntry.DIR_Name[:])) {
+		items = append(items, &lfnEntry)
 	}
-	newDirEntriesBytes = append(newDirEntriesBytes, newEntry.fatDirectoryEntry.toBytes())
+	items = append(items, &ent.fatDirectoryEntry)
 
+	return fs.writeEntriesToParent(items, parentDirCluster, parentDirBytes, atParentByteIndex)
+}
+
+type to32Bytes interface {
+	toBytes() [32]byte
+}
+
+func (fs *FileSystem) writeEntriesToParent(
+	items []to32Bytes,
+	parentDirCluster *uint16,
+	parentDirBytes []byte,
+	atParentByteIndex int,
+) error {
 	// write new directory into parent's directory bytes
-	for i, entryBytes := range newDirEntriesBytes {
+	for i, item := range items {
 		start := atParentByteIndex + (directoryEntrySize * i)
 		end := start + directoryEntrySize
-		copy(parentDirBytes[start:end], entryBytes)
+		bytesToWrite := item.toBytes()
+		copy(parentDirBytes[start:end], bytesToWrite[:])
 	}
 
 	// write back to disk
@@ -619,19 +636,9 @@ func (fs *FileSystem) writeNewEntryToParent(
 		}
 	} else {
 		// if not root, then write the entire parent directory back to disk, along its cluster chain
-		clusterChain, err := fs.getClusterChain(*parentDirCluster)
+		err := fs.writeClusterChain(*parentDirCluster, parentDirBytes)
 		if err != nil {
 			return err
-		}
-
-		// TODONICE: likely just need to write the last cluster rather than re-writing all of them?
-		for i, cluster := range clusterChain {
-			toWrite := make([]byte, fs.bytesPerCluster)
-			copy(toWrite, parentDirBytes[int64(i)*fs.bytesPerCluster:int64(i+1)*fs.bytesPerCluster])
-			_, err := fs.file.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.bytesPerSector))
-			if err != nil {
-				return err
-			}
 		}
 	}
 
@@ -652,7 +659,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 		return nil, err
 	}
 
-	err = fs.writeNewEntryToParent(newDirName, newDirEntry, parentDirCluster, parentDirEntries, parentDirBytes, atParentByteIndex)
+	err = fs.writeEntryWithLfnToParent(newDirName, newDirEntry, parentDirCluster, parentDirBytes, atParentByteIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -690,8 +697,10 @@ func (fs *FileSystem) writeDirectoryEntry(
 
 	// create directory bytes for the new directory
 	newDirectoryDataBytes := make([]byte, fs.bytesPerCluster)
-	copy(newDirectoryDataBytes[:directoryEntrySize], dotDirEntry.toBytes())
-	copy(newDirectoryDataBytes[directoryEntrySize:], dotDotDirEntry.toBytes())
+	dotBytes := dotDirEntry.toBytes()
+	dotDotBytes := dotDotDirEntry.toBytes()
+	copy(newDirectoryDataBytes[:directoryEntrySize], dotBytes[:])
+	copy(newDirectoryDataBytes[directoryEntrySize:], dotDotBytes[:])
 
 	// write . and .. into new cluster in data region
 	_, err = fs.file.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.bytesPerSector))
