@@ -80,17 +80,21 @@ type fatLongFileName struct {
 	LDIR_Name3 [4]byte
 }
 
-func asFatTime(t time.Time) (uint16, uint16, uint8) {
-	// FAT16 time format: Bits 15-11: Hours (0-23), Bits 10-5: Minutes (0-59), Bits 4-0: Seconds/2 (0-29)
-	fatTime := uint16((t.Hour() << 11) | (t.Minute() << 5) | (t.Second() / 2))
+type fatTime struct {
+	date  uint16
+	time  uint16
+	tenth uint8
+}
 
-	// FAT16 date format: Bits 15-9: Year (0 = 1980), Bits 8-5: Month (1-12), Bits 4-0: Day (1-31)
-	fatDate := uint16(((t.Year() - 1980) << 9) | (int(t.Month()) << 5) | t.Day())
-
-	// FAT16 CrtTimeTenth: Sub-second information in 10ms units (0-199)
-	fatCrtTimeTenth := uint8(t.Nanosecond() / 1e7) // Convert nanoseconds to 10ms units
-
-	return fatDate, fatTime, fatCrtTimeTenth
+func asFatTime(t time.Time) *fatTime {
+	return &fatTime{
+		// FAT16 date format: Bits 15-9: Year (0 = 1980), Bits 8-5: Month (1-12), Bits 4-0: Day (1-31)
+		date: uint16(((t.Year() - 1980) << 9) | (int(t.Month()) << 5) | t.Day()),
+		// FAT16 time format: Bits 15-11: Hours (0-23), Bits 10-5: Minutes (0-59), Bits 4-0: Seconds/2 (0-29)
+		time: uint16((t.Hour() << 11) | (t.Minute() << 5) | (t.Second() / 2)),
+		// FAT16 CrtTimeTenth: Sub-second information in 10ms units (0-199)
+		tenth: uint8(t.Nanosecond() / 1e7),
+	}
 }
 
 func (d *DirectoryEntry) names() []string {
@@ -103,27 +107,28 @@ func (d *DirectoryEntry) names() []string {
 }
 
 func (d *DirectoryEntry) ShortName() string {
-	sfnBytes := bytes.Clone(d.DIR_Name[:])
+	nameBytes := bytes.Clone(d.DIR_Name[:])
 
 	if d.IsVolumeId() {
-		return string(bytes.TrimRight(sfnBytes[:11], " "))
+		return string(bytes.TrimRight(nameBytes[:11], " "))
 	}
 
-	sfnBytes = bytes.TrimRight(sfnBytes[:8], " ")
-	ext := bytes.TrimRight(sfnBytes[8:11], " ")
+	sfnBytes := bytes.TrimRight(nameBytes[:8], " ")
+	extBytes := bytes.TrimRight(sfnBytes[8:11], " ")
 
 	if d.DIR_NTRes&0x08 == 0x08 {
 		sfnBytes = bytes.ToLower(sfnBytes)
 	}
-	if d.DIR_NTRes&0x10 == 0x10 {
-		ext = bytes.ToLower(ext)
-	}
 
-	if len(ext) == 0 {
+	if len(extBytes) == 0 {
 		return string(sfnBytes)
 	}
 
-	return string(sfnBytes) + "." + string(ext)
+	if d.DIR_NTRes&0x10 == 0x10 {
+		extBytes = bytes.ToLower(extBytes)
+	}
+
+	return string(sfnBytes) + "." + string(extBytes)
 }
 
 func (d *DirectoryEntry) LongName() string {
@@ -255,7 +260,7 @@ func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) 
 }
 
 // http://elm-chan.org/docs/fat_e.html#name_conversion
-func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, error) {
+func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, [11]byte, error) {
 	lossy := false
 
 	// 1. convert to upper
@@ -340,23 +345,38 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 		finalName = body + "." + ext
 	}
 
-	existingNames := utils.MapSlice(siblingEntries, func(entry DirectoryEntry) string { return entry.ShortName() })
-	if !lossy && !slices.Contains(existingNames, finalName) {
-		return finalName, nil
+	make83 := func(body, ext string) [11]byte {
+		value := [11]byte{}
+		copy(value[:8], body)
+		copy(value[8:11], ext)
+		for i := len(body); i < 8; i++ {
+			value[i] = 0x20
+		}
+		for i := len(ext); i < 3; i++ {
+			value[i+8] = 0x20
+		}
+
+		return value
 	}
 
+	existingNames := utils.MapSlice(siblingEntries, func(entry DirectoryEntry) string { return entry.ShortName() })
+	if !lossy && !slices.Contains(existingNames, finalName) {
+		return finalName, make83(body, ext), nil
+	}
+
+	var asBytes [11]byte
 	n := 1
 	l := len(body)
 	for {
 		digitCount := int(math.Log10(float64(n))) + 1
-		trimmed := body[:min(l, 8-digitCount-1)]
+		newBody := fmt.Sprintf("%s~%d", body[:min(l, 8-digitCount-1)], n)
+		asBytes = make83(newBody, ext)
 
 		if ext == "" {
-			finalName = fmt.Sprintf("%s~%d", trimmed, n)
+			finalName = newBody
 		} else {
-			finalName = fmt.Sprintf("%s~%d.%s", trimmed, n, ext)
+			finalName = fmt.Sprintf("%s.%s", newBody, ext)
 		}
-
 		if !slices.Contains(existingNames, finalName) {
 			break
 		}
@@ -364,23 +384,16 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 		n++
 	}
 
-	return finalName, nil
+	return finalName, asBytes, nil
 }
 
 func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []DirectoryEntry) ([11]byte, error) {
-	var shortNameBytes [11]byte
-
-	sfn, err := fs.createShortName(desiredName, siblingEntries)
+	_, sfnBytes, err := fs.createShortName(desiredName, siblingEntries)
 	if err != nil {
-		return shortNameBytes, err
+		return [11]byte{}, err
 	}
 
-	copy(shortNameBytes[:], sfn)
-	for i := len(sfn); i < 11; i++ {
-		shortNameBytes[i] = 0x20
-	}
-
-	return shortNameBytes, nil
+	return sfnBytes, nil
 }
 
 func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
@@ -546,42 +559,49 @@ func (fs *FileSystem) createLongFileNameEntries(longName string, checksum uint8)
 	return lfnEntries
 }
 
-func (fs *FileSystem) writeDirectoryEntry(
-	newDirName string,
-	newDirCluster uint16,
-	parentDirBytes []byte,
+func (fs *FileSystem) createNewEntry(
+	newEntName string,
+	newEntTime *fatTime,
+	newEntAttr uint8,
+	newEntCluster uint16,
 	parentDirEntries []DirectoryEntry,
-	parentDirCluster *uint16,
-	atParentByteIndex int,
-) ([]byte, error) {
-	date, time, tenth := asFatTime(time.Now())
-
-	// create new directory entry
-	shortNameBytes, err := fs.createShortNameBytes(newDirName, parentDirEntries)
+) (*DirectoryEntry, error) {
+	shortNameBytes, err := fs.createShortNameBytes(newEntName, parentDirEntries)
 	if err != nil {
 		return nil, err
 	}
 
 	newFatDirEntry := fatDirectoryEntry{
 		DIR_Name:         shortNameBytes,
-		DIR_Attr:         0x10,
+		DIR_Attr:         newEntAttr,
 		DIR_NTRes:        0x00,
-		DIR_CrtTimeTenth: tenth,
-		DIR_CrtTime:      time,
-		DIR_CrtDate:      date,
-		DIR_LstAccDate:   date,
+		DIR_CrtTimeTenth: newEntTime.tenth,
+		DIR_CrtTime:      newEntTime.time,
+		DIR_CrtDate:      newEntTime.date,
+		DIR_LstAccDate:   newEntTime.date,
 		DIR_FstClusHI:    0,
-		DIR_WrtTime:      time,
-		DIR_WrtDate:      date,
-		DIR_FstClusLO:    newDirCluster,
+		DIR_WrtTime:      newEntTime.time,
+		DIR_WrtDate:      newEntTime.date,
+		DIR_FstClusLO:    newEntCluster,
 		DIR_FileSize:     0,
 	}
 
+	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}, nil
+}
+
+func (fs *FileSystem) writeNewEntryToParent(
+	newEntName string,
+	newEntry *DirectoryEntry,
+	parentDirCluster *uint16,
+	parentDirEntries []DirectoryEntry,
+	parentDirBytes []byte,
+	atParentByteIndex int,
+) error {
 	newDirEntriesBytes := make([][]byte, 0)
-	for _, lfnEntry := range fs.createLongFileNameEntries(newDirName, calculateShortNameChecksum(shortNameBytes[:])) {
+	for _, lfnEntry := range fs.createLongFileNameEntries(newEntName, calculateShortNameChecksum(newEntry.fatDirectoryEntry.DIR_Name[:])) {
 		newDirEntriesBytes = append(newDirEntriesBytes, lfnEntry.toBytes())
 	}
-	newDirEntriesBytes = append(newDirEntriesBytes, newFatDirEntry.toBytes())
+	newDirEntriesBytes = append(newDirEntriesBytes, newEntry.fatDirectoryEntry.toBytes())
 
 	// write new directory into parent's directory bytes
 	for i, entryBytes := range newDirEntriesBytes {
@@ -595,13 +615,13 @@ func (fs *FileSystem) writeDirectoryEntry(
 		// if root, just write it all back since it's in the dedicated root directory area
 		_, err := fs.file.WriteAt(parentDirBytes, int64(fs.rootDirectorySectorStart*fs.bytesPerSector))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	} else {
 		// if not root, then write the entire parent directory back to disk, along its cluster chain
 		clusterChain, err := fs.getClusterChain(*parentDirCluster)
 		if err != nil {
-			return nil, err
+			return err
 		}
 
 		// TODONICE: likely just need to write the last cluster rather than re-writing all of them?
@@ -610,35 +630,57 @@ func (fs *FileSystem) writeDirectoryEntry(
 			copy(toWrite, parentDirBytes[int64(i)*fs.bytesPerCluster:int64(i+1)*fs.bytesPerCluster])
 			_, err := fs.file.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.bytesPerSector))
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) writeDirectoryEntry(
+	newDirName string,
+	newDirCluster uint16,
+	parentDirBytes []byte,
+	parentDirEntries []DirectoryEntry,
+	parentDirCluster *uint16,
+	atParentByteIndex int,
+) ([]byte, error) {
+	t := asFatTime(time.Now())
+	newDirEntry, err := fs.createNewEntry(newDirName, t, 0x10, newDirCluster, parentDirEntries)
+	if err != nil {
+		return nil, err
+	}
+
+	err = fs.writeNewEntryToParent(newDirName, newDirEntry, parentDirCluster, parentDirEntries, parentDirBytes, atParentByteIndex)
+	if err != nil {
+		return nil, err
 	}
 
 	// create special directory entries
 	dotDirEntry := fatDirectoryEntry{
 		DIR_Name:         [11]byte{'.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
 		DIR_Attr:         0x10,
-		DIR_CrtTimeTenth: tenth,
-		DIR_CrtTime:      time,
-		DIR_CrtDate:      date,
-		DIR_LstAccDate:   date,
+		DIR_CrtTimeTenth: t.tenth,
+		DIR_CrtTime:      t.time,
+		DIR_CrtDate:      t.date,
+		DIR_LstAccDate:   t.date,
 		DIR_FstClusHI:    0,
-		DIR_WrtTime:      time,
-		DIR_WrtDate:      date,
+		DIR_WrtTime:      t.time,
+		DIR_WrtDate:      t.date,
 		DIR_FstClusLO:    newDirCluster,
 		DIR_FileSize:     0,
 	}
 	dotDotDirEntry := fatDirectoryEntry{
 		DIR_Name:         [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
 		DIR_Attr:         0x10,
-		DIR_CrtTimeTenth: tenth,
-		DIR_CrtTime:      time,
-		DIR_CrtDate:      date,
-		DIR_LstAccDate:   date,
+		DIR_CrtTimeTenth: t.tenth,
+		DIR_CrtTime:      t.time,
+		DIR_CrtDate:      t.date,
+		DIR_LstAccDate:   t.date,
 		DIR_FstClusHI:    0,
-		DIR_WrtTime:      time,
-		DIR_WrtDate:      date,
+		DIR_WrtTime:      t.time,
+		DIR_WrtDate:      t.date,
 		DIR_FstClusLO:    0,
 		DIR_FileSize:     0,
 	}

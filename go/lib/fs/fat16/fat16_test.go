@@ -149,10 +149,10 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	t.Run("read - open dir", func(t *testing.T) {
+		file, err := fs.OpenFile("/mkdir", os.O_RDONLY)
+		assert.Nil(t, file)
+		assert.EqualError(t, err, "failed to open '/mkdir': is a directory")
 	})
-	file, err := fs.OpenFile("/mkdir", os.O_RDONLY)
-	assert.Nil(t, file)
-	assert.EqualError(t, err, "failed to open '/mkdir': is a directory")
 
 	t.Run("read - no file", func(t *testing.T) {
 		file, err := fs.OpenFile("/not_here", os.O_RDONLY)
@@ -230,15 +230,20 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	// TODO: create if not exist
-	// t.Run("read - create if not exist", func(t *testing.T) {
-	// 	file, err := fs.OpenFile("/write/created.txt", os.O_CREATE)
-	// 	assert.Nil(t, err)
+	t.Run("read - create if not exist", func(t *testing.T) {
+		file, err := fs.OpenFile("/write/created.txt", os.O_CREATE)
+		assert.Nil(t, err)
 
-	// 	data := make([]byte, 10)
-	// 	n, err := file.ReadAt(data, 0)
-	// 	assert.Equal(t, n, 0)
-	// 	assert.Equal(t, err, io.EOF)
-	// })
+		data := make([]byte, 10)
+		n, err := file.ReadAt(data, 0)
+		assert.Equal(t, n, 0)
+		assert.Equal(t, err, io.EOF)
+
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.Len(t, shortNames, 3)
+	})
 
 	// TODO: read/write @ offset
 

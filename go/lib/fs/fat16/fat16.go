@@ -269,23 +269,32 @@ func (fs *FileSystem) Mkdir(path string) error {
 	return err
 }
 
-// accepts os.OpenFile flags
+// use os.OpenFile flags
+// currently supports O_RDONLY and O_CREATE
 func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
-	result, err := fs.readDir(dirPath, false)
+	parent, err := fs.readDir(dirPath, false)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, entry := range result.entries {
-		if strings.EqualFold(entry.LongName(), baseName) || strings.EqualFold(entry.ShortName(), baseName) {
-			if entry.IsDir() {
+	t := asFatTime(time.Now())
+	newFileEntry, err := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, existing := range parent.entries {
+		lfnMatched := strings.EqualFold(existing.LongName(), newFileEntry.LongName())
+		sfnMatched := strings.EqualFold(existing.ShortName(), newFileEntry.ShortName())
+		if lfnMatched || sfnMatched {
+			if existing.IsDir() {
 				return nil, fmt.Errorf("failed to open '%s': is a directory", path)
 			}
 
 			return &fatFile{
-				DirectoryEntry: entry,
+				DirectoryEntry: existing,
 				fs:             fs,
 			}, nil
 		}
@@ -295,53 +304,16 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 		return nil, fmt.Errorf("no such file or directory %s", path)
 	}
 
-	// TODO: lfn
-	// TODO: de-duplicate with create dir, since there's a bunch the same
-
 	nRequired := fs.numDirectoryEntriesRequired(baseName)
-	startIndex, newDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, result.cluster, result.bytes)
+	startIndex, newParentDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, parent.cluster, parent.bytes)
 	if err != nil {
 		return nil, err
 	}
 
-	// TODO: move to file
-
-	shortNameBytes, err := fs.createShortNameBytes(baseName, result.entries)
+	err = fs.writeNewEntryToParent(baseName, newFileEntry, parent.cluster, parent.entries, newParentDirBytes, startIndex)
 	if err != nil {
 		return nil, err
 	}
 
-	date, time, tenth := asFatTime(time.Now())
-	newFileEntry := &fatFile{
-		DirectoryEntry: DirectoryEntry{
-			fatDirectoryEntry: fatDirectoryEntry{
-				DIR_Name:         shortNameBytes,
-				DIR_Attr:         0x00,
-				DIR_NTRes:        0x00,
-				DIR_CrtTimeTenth: tenth,
-				DIR_CrtTime:      time,
-				DIR_CrtDate:      date,
-				DIR_LstAccDate:   date,
-				DIR_FstClusHI:    0,
-				DIR_WrtTime:      time,
-				DIR_WrtDate:      date,
-				DIR_FstClusLO:    0,
-				DIR_FileSize:     0,
-			},
-			longFileName: baseName,
-		},
-		fs: fs,
-	}
-
-	// write new entry into parent dir's bytes
-	copy(newDirBytes[startIndex:startIndex+directoryEntrySize], newFileEntry.toBytes())
-
-	// TODO: write back to disk
-	if result.cluster == nil {
-		fmt.Println("writing to root")
-	} else {
-		fmt.Println("writing to parent dir clusters")
-	}
-
-	panic("unimplemented")
+	return &fatFile{DirectoryEntry: *newFileEntry, fs: fs}, nil
 }
