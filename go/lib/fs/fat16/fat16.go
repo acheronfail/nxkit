@@ -322,3 +322,10 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 		fs:               fs,
 	}, nil
 }
+
+// TODO: stat
+// TODO: rename
+// TODO: rm file
+// TODO: rm dir
+// TODO: rm -rf
+// TODO: reformat fs
