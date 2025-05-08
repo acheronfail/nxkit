@@ -41,7 +41,14 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 		return 0, err
 	}
 
-	n = copy(p, bytes[off:fileSize])
+	// though we have allocated more space than the current file size, we don't
+	// allow reading beyond the file contents itself
+	if off >= int64(fileSize) {
+		return 0, io.EOF
+	}
+
+	end := min(off+int64(len(p)), int64(fileSize))
+	n = copy(p, bytes[off:end])
 	if len(p) > n {
 		return n, io.EOF
 	}

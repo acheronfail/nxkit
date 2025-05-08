@@ -229,7 +229,6 @@ func TestOpenFile(t *testing.T) {
 		assert.Equal(t, err, io.EOF)
 	})
 
-	// TODO: create if not exist
 	t.Run("read - create if not exist", func(t *testing.T) {
 		file, err := fs.OpenFile("/write/created.txt", os.O_CREATE)
 		assert.Nil(t, err)
@@ -245,7 +244,15 @@ func TestOpenFile(t *testing.T) {
 		assert.Len(t, shortNames, 3)
 	})
 
-	// TODO: read/write @ offset
+	t.Run("read - at offset", func(t *testing.T) {
+		file, err := fs.OpenFile("/INFO.TXT", os.O_RDONLY)
+		assert.Nil(t, err)
+		data := make([]byte, 5)
+		n, err := file.ReadAt(data, 4)
+		assert.Nil(t, err)
+		assert.Equal(t, n, 5)
+		assert.Equal(t, string(data), " file")
+	})
 
 	// TODO writes
 	// t.Run("write - sfn", func(t *testing.T) {
