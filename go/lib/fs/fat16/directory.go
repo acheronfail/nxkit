@@ -238,6 +238,37 @@ func (d *fatDirectoryEntry) toBytes() [32]byte {
 	return data
 }
 
+func fatDirectoryEntryFromBytes(data []byte) fatDirectoryEntry {
+	fatEntry := fatDirectoryEntry{
+		DIR_Attr:         data[11],
+		DIR_NTRes:        data[12],
+		DIR_CrtTimeTenth: data[13],
+		DIR_CrtTime:      binary.LittleEndian.Uint16(data[14:16]),
+		DIR_CrtDate:      binary.LittleEndian.Uint16(data[16:18]),
+		DIR_LstAccDate:   binary.LittleEndian.Uint16(data[18:20]),
+		DIR_FstClusHI:    binary.LittleEndian.Uint16(data[20:22]),
+		DIR_WrtTime:      binary.LittleEndian.Uint16(data[22:24]),
+		DIR_WrtDate:      binary.LittleEndian.Uint16(data[24:26]),
+		DIR_FstClusLO:    binary.LittleEndian.Uint16(data[26:28]),
+		DIR_FileSize:     binary.LittleEndian.Uint32(data[28:32]),
+	}
+	copy(fatEntry.DIR_Name[:], data[:11])
+
+	return fatEntry
+}
+
+func (d *fatDirectoryEntry) clone() fatDirectoryEntry {
+	data := d.toBytes()
+	return fatDirectoryEntryFromBytes(data[:])
+}
+
+func (d *DirectoryEntry) clone() DirectoryEntry {
+	return DirectoryEntry{
+		fatDirectoryEntry: d.fatDirectoryEntry.clone(),
+		longFileName:      d.longFileName,
+	}
+}
+
 func (d *DirectoryEntry) clusterNumber() uint16 {
 	// d.DIR_FstClusHI unused in FAT16 and always zero
 	return d.DIR_FstClusLO
@@ -504,21 +535,7 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 			continue
 		}
 
-		fatEntry := fatDirectoryEntry{
-			DIR_Attr:         dirBytes[i+11],
-			DIR_NTRes:        dirBytes[i+12],
-			DIR_CrtTimeTenth: dirBytes[i+13],
-			DIR_CrtTime:      binary.LittleEndian.Uint16(dirBytes[i+14 : i+16]),
-			DIR_CrtDate:      binary.LittleEndian.Uint16(dirBytes[i+16 : i+18]),
-			DIR_LstAccDate:   binary.LittleEndian.Uint16(dirBytes[i+18 : i+20]),
-			DIR_FstClusHI:    binary.LittleEndian.Uint16(dirBytes[i+20 : i+22]),
-			DIR_WrtTime:      binary.LittleEndian.Uint16(dirBytes[i+22 : i+24]),
-			DIR_WrtDate:      binary.LittleEndian.Uint16(dirBytes[i+24 : i+26]),
-			DIR_FstClusLO:    binary.LittleEndian.Uint16(dirBytes[i+26 : i+28]),
-			DIR_FileSize:     binary.LittleEndian.Uint32(dirBytes[i+28 : i+32]),
-		}
-		copy(fatEntry.DIR_Name[:], dirBytes[i:i+11])
-
+		fatEntry := fatDirectoryEntryFromBytes(dirBytes[i : i+32])
 		entries = append(entries, DirectoryEntry{fatDirectoryEntry: fatEntry, longFileName: longFileName})
 		longFileName = ""
 	}

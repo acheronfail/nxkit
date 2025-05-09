@@ -269,21 +269,21 @@ func (fs *FileSystem) Mkdir(path string) error {
 	return err
 }
 
-func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, bool) {
+func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, bool, error) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
 	parent, err := fs.readDir(dirPath, false)
 	if err != nil {
-		return nil, nil, false
+		return nil, nil, false, err
 	}
 
 	for _, existing := range parent.entries {
 		if slices.ContainsFunc(existing.names(), func(name string) bool { return strings.EqualFold(name, baseName) }) {
-			return &existing, parent, true
+			return &existing, parent, true, nil
 		}
 	}
 
-	return nil, parent, false
+	return nil, parent, false, nil
 }
 
 // use os.OpenFile flags
@@ -291,7 +291,11 @@ func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, b
 func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 	canWrite := flags&os.O_WRONLY != 0 || flags&os.O_RDWR != 0
 
-	existing, parent, found := fs.findEntry(path)
+	existing, parent, found, err := fs.findEntry(path)
+	if err != nil {
+		return nil, err
+	}
+
 	if found {
 		if existing.IsDir() {
 			return nil, fmt.Errorf("failed to open '%s': is a directory", path)
@@ -382,21 +386,25 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 }
 
 func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
-	entry, _, found := fs.findEntry(path)
+	entry, _, found, err := fs.findEntry(path)
+	if err != nil {
+		return nil, err
+	}
+
 	if !found {
 		return nil, fmt.Errorf("no such file or directory %s", path)
 	}
 
 	return entry, nil
 }
-
-func (fs *FileSystem) removeEntryWithCluster(entry *DirectoryEntry, parentDirCluster *uint16) error {
+func (fs *FileSystem) removeEntryFromParent(entry *DirectoryEntry, parentDirCluster *uint16) error {
 	index, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
 	if err != nil {
 		return err
 	}
 
 	// TODO: also delete lfn entries
+
 	// set first byte of entry to 0xE5 to mark as deleted
 	entry.fatDirectoryEntry.DIR_Name[0] = 0xE5
 
@@ -407,6 +415,15 @@ func (fs *FileSystem) removeEntryWithCluster(entry *DirectoryEntry, parentDirClu
 		parentDirBytes,
 		index,
 	)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) removeEntryFromParentWithCluster(entry *DirectoryEntry, parentDirCluster *uint16) error {
+	err := fs.removeEntryFromParent(entry, parentDirCluster)
 	if err != nil {
 		return err
 	}
@@ -422,7 +439,11 @@ func (fs *FileSystem) removeEntryWithCluster(entry *DirectoryEntry, parentDirClu
 }
 
 func (fs *FileSystem) Unlink(path string) error {
-	entry, parent, found := fs.findEntry(path)
+	entry, parent, found, err := fs.findEntry(path)
+	if err != nil {
+		return err
+	}
+
 	if !found {
 		return fmt.Errorf("no such file or directory %s", path)
 	}
@@ -433,11 +454,15 @@ func (fs *FileSystem) Unlink(path string) error {
 		return fmt.Errorf("cannot unlink read-only file %s", path)
 	}
 
-	return fs.removeEntryWithCluster(entry, parent.cluster)
+	return fs.removeEntryFromParentWithCluster(entry, parent.cluster)
 }
 
 func (fs *FileSystem) Rmdir(path string) error {
-	entry, parent, found := fs.findEntry(path)
+	entry, parent, found, err := fs.findEntry(path)
+	if err != nil {
+		return err
+	}
+
 	if !found {
 		return fmt.Errorf("no such file or directory %s", path)
 	}
@@ -448,7 +473,7 @@ func (fs *FileSystem) Rmdir(path string) error {
 		return fmt.Errorf("cannot rmdir read-only directory %s", path)
 	}
 
-	// 1. check if directory is empty
+	// check if directory is empty
 	entryBytes, err := fs.getClusterChainBytes(entry.clusterNumber())
 	if err != nil {
 		return err
@@ -459,17 +484,85 @@ func (fs *FileSystem) Rmdir(path string) error {
 		return err
 	}
 
-	// 2 for . and ..
+	// at least 2 for . and ..
 	if len(entries) > 2 {
 		return fmt.Errorf("directory %s is not empty", path)
 	}
 
-	return fs.removeEntryWithCluster(entry, parent.cluster)
+	return fs.removeEntryFromParentWithCluster(entry, parent.cluster)
 }
 
-// TODO: rename
+// Rename renames (moves) oldpath to newpath. If newpath already exists and is not a directory, Rename replaces it.
+func (fs *FileSystem) Rename(srcPath, dstPath string) error {
+	// find source entry
+	srcEntry, srcParent, found, err := fs.findEntry(srcPath)
+	if err != nil {
+		return err
+	}
+
+	if !found {
+		return fmt.Errorf("no such file or directory %s", srcPath)
+	}
+	if srcEntry.IsReadOnly() {
+		return fmt.Errorf("cannot rename read-only file %s", srcPath)
+	}
+
+	// find destination entry (if it exists)
+	dstEntry, dstParent, found, err := fs.findEntry(dstPath)
+	if err != nil {
+		return err
+	}
+
+	if found {
+		if dstEntry.IsDir() {
+			return fmt.Errorf("cannot rename to directory %s", dstPath)
+		}
+		if dstEntry.IsReadOnly() {
+			return fmt.Errorf("cannot rename to read-only file %s", dstPath)
+		}
+
+		// remove overwritten entry and any associated clusters here
+		err = fs.removeEntryFromParentWithCluster(dstEntry, dstParent.cluster)
+		if err != nil {
+			return err
+		}
+	}
+
+	// write source entry to destination parent directory
+	baseName := filepath.Base(dstPath)
+	nRequired := fs.numDirectoryEntriesRequired(baseName)
+	startIndex, newParentDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, dstParent.cluster, dstParent.bytes)
+	if err != nil {
+		return err
+	}
+
+	newShortNameBytes, err := fs.createShortNameBytes(baseName, dstParent.entries)
+	if err != nil {
+		return err
+	}
+
+	// create new entry from src, with new name and copy over cluster number
+	newEntry := srcEntry.clone()
+	copy(newEntry.DIR_Name[:], newShortNameBytes[:])
+	newEntry.setCluster(srcEntry.clusterNumber())
+
+	err = fs.writeEntryWithLfnToParent(baseName, &newEntry, dstParent.cluster, newParentDirBytes, startIndex)
+	if err != nil {
+		return err
+	}
+
+	// remove source entry from source parent directory
+	return fs.removeEntryFromParent(srcEntry, srcParent.cluster)
+}
+
 // TODO: rm -rf
-// TODO: unlink lfn
-// TODO: rmdir  lfn
+// TODO: complete lfn support:
+//	read entries  - ignore invalid lfn entries
+//	unlink, rmdir - also remove lfn entries
+// 	rename        - update lfn entries
+// 	operations    - clean up garbage lfn entries (when other systems without lfn use the disk)
+// TODO: support NT_Res attributes
 // TODO: reformat fs
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
+// TODO: defragmentation operation (since renames and such will cause fragmentation with lfn support)
+//	or, alternatively re-write the entire directory clusters in a de-fragmented state each time

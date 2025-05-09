@@ -465,3 +465,143 @@ func TestRmdir(t *testing.T) {
 		assert.EqualError(t, err, "directory /dir is not empty")
 	})
 }
+
+func TestRename(t *testing.T) {
+	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("rename - file - same parent", func(t *testing.T) {
+		// create empty file
+		_, err := fs.OpenFile("/write/rename1.fil", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// rename
+		err = fs.Rename("/write/rename1.fil", "/write/rename2.fil")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "RENAME2.FIL"))
+
+		// rename back
+		err = fs.Rename("/write/rename2.fil", "/write/rename1.fil")
+		assert.Nil(t, err)
+	})
+
+	t.Run("rename - dir - same parent", func(t *testing.T) {
+		// create empty dir
+		err := fs.Mkdir("/write/rename1.dir")
+		assert.Nil(t, err)
+
+		// rename
+		err = fs.Rename("/write/rename1.dir", "/write/rename2.dir")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "RENAME2.DIR"))
+
+		// rename back
+		err = fs.Rename("/write/rename2.dir", "/write/rename1.dir")
+		assert.Nil(t, err)
+	})
+
+	t.Run("rename - file - different parent", func(t *testing.T) {
+		err := fs.Mkdir("/write/rename")
+		assert.Nil(t, err)
+
+		// create empty file
+		_, err = fs.OpenFile("/write/r1", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// rename
+		err = fs.Rename("/write/r1", "/write/rename/r1")
+		assert.Nil(t, err)
+
+		// check not exists in old parent
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "R1"))
+		// check exists in new parent
+		entries, err = fs.ReadDir("/write/rename")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "R1"))
+
+		// rename back
+		err = fs.Rename("/write/rename/r1", "/write/r1")
+		assert.Nil(t, err)
+	})
+
+	t.Run("rename - dir - different parent", func(t *testing.T) {
+		err := fs.Mkdir("/write/rename")
+		assert.Nil(t, err)
+
+		// create empty dir
+		err = fs.Mkdir("/write/r2")
+		assert.Nil(t, err)
+
+		// rename
+		err = fs.Rename("/write/r2", "/write/rename/r2")
+		assert.Nil(t, err)
+
+		// check not exists in old parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "R2"))
+		// check exists in new parent dir
+		entries, err = fs.ReadDir("/write/rename")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "R2"))
+
+		// rename back
+		err = fs.Rename("/write/rename/r2", "/write/r2")
+		assert.Nil(t, err)
+	})
+
+	t.Run("rename - to existing file", func(t *testing.T) {
+		// create empty files
+		_, err = fs.OpenFile("/write/r3.1", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+		_, err = fs.OpenFile("/write/r3.2", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// check both exist
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "R3.1"))
+		assert.True(t, slices.Contains(shortNames, "R3.2"))
+
+		// rename
+		err = fs.Rename("/write/r3.1", "/write/r3.2")
+		assert.Nil(t, err)
+
+		// check only one exists
+		entries, err = fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "R3.1"))
+		assert.True(t, slices.Contains(shortNames, "R3.2"))
+
+		// TODO: internal test to check that the cluster chain is deleted from target file
+	})
+
+	t.Run("rename - to existing dir", func(t *testing.T) {
+		// create empty file
+		_, err = fs.OpenFile("/write/r4", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// rename
+		err = fs.Rename("/write/r4", "/dir")
+		assert.EqualError(t, err, "cannot rename to directory /dir")
+	})
+}
