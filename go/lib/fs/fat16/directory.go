@@ -526,6 +526,31 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 	return entries, nil
 }
 
+func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirCluster *uint16) (int, []byte, error) {
+	parentDirBytes, err := fs.getClusterChainBytes(*parentDirCluster)
+	if err != nil {
+		return -1, nil, err
+	}
+
+	for i := 0; i < len(parentDirBytes); i += directoryEntrySize {
+		if parentDirBytes[i] == 0x00 {
+			break
+		}
+
+		// skip deleted and lfn entries
+		if parentDirBytes[i] == 0xE5 || parentDirBytes[i+11] == 0x0F {
+			continue
+		}
+
+		// check if this is the entry we are looking for
+		if bytes.Equal(parentDirBytes[i:i+11], ent.DIR_Name[:]) {
+			return i, parentDirBytes, nil
+		}
+	}
+
+	return -1, nil, fmt.Errorf("entry not found in parent directory")
+}
+
 func (lfn *fatLongFileName) extractNamePart() string {
 	var name strings.Builder
 

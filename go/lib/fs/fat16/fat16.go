@@ -351,6 +351,48 @@ func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
 	return entry, nil
 }
 
+func (fs *FileSystem) Unlink(path string) error {
+	entry, parent, found := fs.findEntry(path)
+	if !found {
+		return fmt.Errorf("no such file or directory %s", path)
+	}
+	if entry.IsDir() {
+		return fmt.Errorf("cannot unlink directory %s", path)
+	}
+	if entry.IsReadOnly() {
+		return fmt.Errorf("cannot unlink read-only file %s", path)
+	}
+
+	// 1. delete the entry from the parent directory
+	index, parentDirBytes, err := fs.findIndexInParentBytes(entry, parent.cluster)
+	if err != nil {
+		return err
+	}
+
+	// set first byte of entry to 0xE5 to mark as deleted
+	entry.fatDirectoryEntry.DIR_Name[0] = 0xE5
+
+	// write back to disk
+	err = fs.writeEntriesToParent(
+		[]to32Bytes{&entry.fatDirectoryEntry},
+		parent.cluster,
+		parentDirBytes,
+		index,
+	)
+	if err != nil {
+		return err
+	}
+
+	// 2. remove any allocated clusters from FATs
+	cluster := entry.clusterNumber()
+	if cluster == 0 {
+		return nil
+	}
+
+	err = fs.deleteClusterChain(cluster)
+	return err
+}
+
 // TODO: rename
 // TODO: rm file
 // TODO:   O_TRUNC support for OpenFile

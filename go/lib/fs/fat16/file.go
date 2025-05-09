@@ -1,10 +1,8 @@
 package fat16
 
 import (
-	"fmt"
 	"io"
 	"os"
-	"strings"
 )
 
 type fatFile struct {
@@ -134,35 +132,9 @@ func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 }
 
 func (f *fatFile) writeEntryToParent() error {
-	// get parent bytes
-	parentDirBytes, err := f.fs.getClusterChainBytes(*f.parentDirCluster)
+	index, parentDirBytes, err := f.fs.findIndexInParentBytes(&f.DirectoryEntry, f.parentDirCluster)
 	if err != nil {
 		return err
-	}
-
-	// get parent entries
-	parentEntries, err := f.fs.readDirectoryEntries(parentDirBytes)
-	if err != nil {
-		return err
-	}
-
-	// find index of current file entry in parent
-	var index int
-	found := false
-	sfn := f.ShortName()
-	lfn := f.LongName()
-	for i, entry := range parentEntries {
-		lfnMatched := strings.EqualFold(entry.LongName(), lfn)
-		sfnMatched := strings.EqualFold(entry.ShortName(), sfn)
-		if lfnMatched || sfnMatched {
-			index = i * directoryEntrySize
-			found = true
-			break
-		}
-	}
-
-	if !found {
-		return fmt.Errorf("failed to find %s in parent directory", f.LongName())
 	}
 
 	// write back to disk

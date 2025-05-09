@@ -99,13 +99,29 @@ func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) 
 func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte) error {
 	clusterChain, err := fs.getClusterChain(clusterStart)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	for i, cluster := range clusterChain {
 		toWrite := make([]byte, fs.bytesPerCluster)
 		copy(toWrite, clusterBytes[int64(i)*fs.bytesPerCluster:int64(i+1)*fs.bytesPerCluster])
 		_, err := fs.file.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.bytesPerSector))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) deleteClusterChain(clusterStart uint16) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusterChain {
+		err := fs.writeClusterToFats(cluster, 0x0000)
 		if err != nil {
 			return err
 		}

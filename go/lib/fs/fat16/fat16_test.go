@@ -347,3 +347,63 @@ func TestStat(t *testing.T) {
 		assert.True(t, stat.IsVolumeId())
 	})
 }
+
+func TestUnlink(t *testing.T) {
+	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("unlink - empty file", func(t *testing.T) {
+		// create empty file
+		_, err := fs.OpenFile("/write/unlink", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "UNLINK"))
+
+		// unlink
+		err = fs.Unlink("/write/unlink")
+		assert.Nil(t, err)
+
+		// check it doesn't exist in parent dir
+		entries, err = fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "UNLINK"))
+	})
+
+	t.Run("unlink - non-empty file", func(t *testing.T) {
+		// create non-empty file
+		file, err := fs.OpenFile("/write/unlink", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+		n, err := file.WriteAt([]byte{0, 1, 2, 3, 4}, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, 5, n)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "UNLINK"))
+
+		// unlink
+		err = fs.Unlink("/write/unlink")
+		assert.Nil(t, err)
+
+		// check it doesn't exist in parent dir
+		entries, err = fs.ReadDir("/write")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "UNLINK"))
+
+		// TODO: an internal test which checks the cluster chain is deleted
+	})
+
+	t.Run("unlink - dir", func(t *testing.T) {
+		err := fs.Unlink("/write")
+		assert.EqualError(t, err, "cannot unlink directory /write")
+	})
+}
