@@ -289,10 +289,50 @@ func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, b
 // use os.OpenFile flags
 // currently supports O_RDONLY and O_CREATE
 func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
+	canWrite := flags&os.O_WRONLY != 0 || flags&os.O_RDWR != 0
+
 	existing, parent, found := fs.findEntry(path)
 	if found {
 		if existing.IsDir() {
 			return nil, fmt.Errorf("failed to open '%s': is a directory", path)
+		}
+
+		// truncate file if requested
+		if flags&os.O_TRUNC != 0 {
+			if !canWrite {
+				return nil, os.ErrPermission
+			}
+
+			index, parentDirBytes, err := fs.findIndexInParentBytes(existing, parent.cluster)
+			if err != nil {
+				return nil, err
+			}
+
+			// save existing cluster
+			cluster := existing.clusterNumber()
+
+			// set file size to 0 and cluster chain to 0
+			existing.DIR_FileSize = 0
+			existing.setCluster(0)
+
+			// write truncated entry back to parent
+			err = fs.writeEntriesToParent(
+				[]to32Bytes{existing},
+				parent.cluster,
+				parentDirBytes,
+				index,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			// remove any allocated clusters from FATs
+			if cluster != 0 {
+				err = fs.deleteClusterChain(cluster)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 
 		return &fatFile{
@@ -311,7 +351,6 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 		return nil, fmt.Errorf("no such file or directory %s", path)
 	}
 
-	canWrite := flags&os.O_WRONLY != 0 || flags&os.O_RDWR != 0
 	if !canWrite {
 		return nil, os.ErrPermission
 	}
@@ -394,8 +433,6 @@ func (fs *FileSystem) Unlink(path string) error {
 }
 
 // TODO: rename
-// TODO: rm file
-// TODO:   O_TRUNC support for OpenFile
 // TODO: rm dir
 // TODO: rm -rf
 // TODO: reformat fs

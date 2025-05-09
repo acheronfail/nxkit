@@ -305,6 +305,29 @@ func TestOpenFile(t *testing.T) {
 		assert.Equal(t, file.Size(), bytesPerCluster+1)
 	})
 
+	t.Run("write - truncate", func(t *testing.T) {
+		// create the file and write some data
+		file, err := fs.OpenFile("/write/trunc.txt", os.O_RDWR|os.O_CREATE)
+		assert.Nil(t, err)
+		n, err := file.WriteAt([]byte{0, 1, 2, 3, 4}, 0)
+		assert.Nil(t, err)
+		assert.Equal(t, 5, n)
+		assert.Equal(t, int64(5), file.Size())
+		err = file.Close()
+		assert.Nil(t, err)
+
+		// now re-open the file with truncate
+		file, err = fs.OpenFile("/write/trunc.txt", os.O_RDWR|os.O_TRUNC)
+		assert.Nil(t, err)
+		assert.Equal(t, int64(0), file.Size())
+
+		// double check reading the file returns EOF
+		data := make([]byte, 5)
+		n, err = file.ReadAt(data, 0)
+		assert.Equal(t, io.EOF, err)
+		assert.Equal(t, 0, n)
+	})
+
 	// TODO: more extensive write test suite (offsets, edge cases, etc)
 }
 
