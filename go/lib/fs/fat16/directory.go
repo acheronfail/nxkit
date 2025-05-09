@@ -21,6 +21,46 @@ type DirectoryEntry struct {
 	longFileName string
 }
 
+// IsArchive implements fs.Stat.
+func (d *DirectoryEntry) IsArchive() bool {
+	return d.fatDirectoryEntry.IsArchive()
+}
+
+// IsDir implements fs.Stat.
+func (d *DirectoryEntry) IsDir() bool {
+	return d.fatDirectoryEntry.IsDir()
+}
+
+// IsFile implements fs.Stat.
+func (d *DirectoryEntry) IsFile() bool {
+	return !d.fatDirectoryEntry.IsDir()
+}
+
+// IsHidden implements fs.Stat.
+func (d *DirectoryEntry) IsHidden() bool {
+	return d.fatDirectoryEntry.IsHidden()
+}
+
+// IsReadOnly implements fs.Stat.
+func (d *DirectoryEntry) IsReadOnly() bool {
+	return d.fatDirectoryEntry.IsReadOnly()
+}
+
+// IsSystem implements fs.Stat.
+func (d *DirectoryEntry) IsSystem() bool {
+	return d.fatDirectoryEntry.IsSystem()
+}
+
+// IsVolumeId implements fs.Stat.
+func (d *DirectoryEntry) IsVolumeId() bool {
+	return d.fatDirectoryEntry.IsVolumeId()
+}
+
+// Size implements fs.Stat.
+func (d *DirectoryEntry) Size() int64 {
+	return int64(d.fatDirectoryEntry.DIR_FileSize)
+}
+
 type fatDirectoryEntry struct {
 	// Short file name (SFN) of the object.
 	DIR_Name [11]byte

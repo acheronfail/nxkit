@@ -10,7 +10,9 @@ import (
 type fatFile struct {
 	DirectoryEntry
 	parentDirCluster *uint16
-	fs               *FileSystem
+	// this value is the same as `os.OpenFile`'s flags ANDed with `0b11`
+	accessMode int
+	fs         *FileSystem
 }
 
 func (f *fatFile) Close() error {
@@ -25,6 +27,11 @@ func (f *fatFile) Size() int64 {
 func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 	if f.fs == nil {
 		return 0, os.ErrClosed
+	}
+
+	canRead := f.accessMode == os.O_RDONLY || f.accessMode == os.O_RDWR
+	if !canRead {
+		return 0, os.ErrPermission
 	}
 
 	fileSize := int64(f.DIR_FileSize)
@@ -62,6 +69,11 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 	if f.fs == nil {
 		return 0, os.ErrClosed
+	}
+
+	canWrite := f.accessMode == os.O_WRONLY || f.accessMode == os.O_RDWR
+	if !canWrite || f.IsReadOnly() {
+		return 0, os.ErrPermission
 	}
 
 	writeLen := int64(len(p))

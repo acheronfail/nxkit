@@ -242,13 +242,18 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	t.Run("open - create if not exist", func(t *testing.T) {
-		file, err := fs.OpenFile("/write/created.txt", os.O_CREATE)
+		file, err := fs.OpenFile("/write/created.txt", os.O_WRONLY|os.O_CREATE)
 		assert.Nil(t, err)
 
 		data := make([]byte, 10)
+		_, err = file.ReadAt(data, 0)
+		assert.EqualError(t, err, "permission denied")
+
+		file, err = fs.OpenFile("/write/created.txt", os.O_RDWR|os.O_CREATE)
+		assert.Nil(t, err)
 		n, err := file.ReadAt(data, 0)
-		assert.Equal(t, 0, n)
 		assert.Equal(t, io.EOF, err)
+		assert.Equal(t, 0, n)
 
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
@@ -262,7 +267,7 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	t.Run("write - create if not exist", func(t *testing.T) {
-		file, err := fs.OpenFile("/write/new.txt", os.O_CREATE)
+		file, err := fs.OpenFile("/write/new.txt", os.O_RDWR|os.O_CREATE)
 		assert.Nil(t, err)
 
 		n, err := file.WriteAt([]byte{0, 1, 2, 3, 4}, 0)
@@ -281,7 +286,7 @@ func TestOpenFile(t *testing.T) {
 		info := fs.Info()
 		bytesPerCluster := info["bytesPerCluster"].(int64)
 
-		file, err := fs.OpenFile("/write/extend_cluster.txt", os.O_CREATE)
+		file, err := fs.OpenFile("/write/extend_cluster.txt", os.O_RDWR|os.O_CREATE)
 		assert.Nil(t, err)
 
 		toWrite := make([]byte, bytesPerCluster)
@@ -301,4 +306,44 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	// TODO: more extensive write test suite (offsets, edge cases, etc)
+}
+
+func TestStat(t *testing.T) {
+	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("stat - file", func(t *testing.T) {
+		stat, err := fs.Stat("/INFO.TXT")
+		assert.Nil(t, err)
+		assert.Equal(t, int64(10), stat.Size())
+		assert.True(t, !stat.IsReadOnly())
+		assert.True(t, !stat.IsHidden())
+		assert.True(t, !stat.IsSystem())
+		assert.True(t, !stat.IsVolumeId())
+		assert.True(t, !stat.IsDir())
+		assert.True(t, stat.IsFile())
+	})
+
+	t.Run("stat - dir", func(t *testing.T) {
+		stat, err := fs.Stat("/dir")
+		assert.Nil(t, err)
+		assert.Equal(t, int64(0), stat.Size())
+		assert.True(t, !stat.IsReadOnly())
+		assert.True(t, !stat.IsHidden())
+		assert.True(t, !stat.IsSystem())
+		assert.True(t, !stat.IsVolumeId())
+		assert.True(t, stat.IsDir())
+		assert.True(t, !stat.IsFile())
+	})
+
+	t.Run("stat - volume id", func(t *testing.T) {
+		stat, err := fs.Stat("/FAT16-TEST")
+		assert.Nil(t, err)
+		assert.Equal(t, int64(0), stat.Size())
+		assert.True(t, !stat.IsReadOnly())
+		assert.True(t, !stat.IsHidden())
+		assert.True(t, !stat.IsSystem())
+		assert.True(t, stat.IsVolumeId())
+	})
 }

@@ -269,40 +269,58 @@ func (fs *FileSystem) Mkdir(path string) error {
 	return err
 }
 
-// use os.OpenFile flags
-// currently supports O_RDONLY and O_CREATE
-func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
+func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, bool) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
 	parent, err := fs.readDir(dirPath, false)
 	if err != nil {
-		return nil, err
-	}
-
-	t := asFatTime(time.Now())
-	newFileEntry, err := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
-	if err != nil {
-		return nil, err
+		return nil, nil, false
 	}
 
 	for _, existing := range parent.entries {
-		lfnMatched := strings.EqualFold(existing.LongName(), newFileEntry.LongName())
-		sfnMatched := strings.EqualFold(existing.ShortName(), newFileEntry.ShortName())
-		if lfnMatched || sfnMatched {
-			if existing.IsDir() {
-				return nil, fmt.Errorf("failed to open '%s': is a directory", path)
-			}
-
-			return &fatFile{
-				DirectoryEntry:   existing,
-				parentDirCluster: parent.cluster,
-				fs:               fs,
-			}, nil
+		if slices.ContainsFunc(existing.names(), func(name string) bool { return strings.EqualFold(name, baseName) }) {
+			return &existing, parent, true
 		}
+	}
+
+	return nil, parent, false
+}
+
+// use os.OpenFile flags
+// currently supports O_RDONLY and O_CREATE
+func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
+	existing, parent, found := fs.findEntry(path)
+	if found {
+		if existing.IsDir() {
+			return nil, fmt.Errorf("failed to open '%s': is a directory", path)
+		}
+
+		return &fatFile{
+			DirectoryEntry:   *existing,
+			parentDirCluster: parent.cluster,
+			accessMode:       flags & 0b11,
+			fs:               fs,
+		}, nil
+	}
+
+	if parent == nil {
+		return nil, fmt.Errorf("failed to open '%s': no such file or directory", path)
 	}
 
 	if flags&os.O_CREATE == 0 {
 		return nil, fmt.Errorf("no such file or directory %s", path)
+	}
+
+	canWrite := flags&os.O_WRONLY != 0 || flags&os.O_RDWR != 0
+	if !canWrite {
+		return nil, os.ErrPermission
+	}
+
+	t := asFatTime(time.Now())
+	baseName := filepath.Base(path)
+	newFileEntry, err := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
+	if err != nil {
+		return nil, err
 	}
 
 	nRequired := fs.numDirectoryEntriesRequired(baseName)
@@ -319,13 +337,23 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 	return &fatFile{
 		DirectoryEntry:   *newFileEntry,
 		parentDirCluster: parent.cluster,
+		accessMode:       flags & 0b11,
 		fs:               fs,
 	}, nil
 }
 
-// TODO: stat
+func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
+	entry, _, found := fs.findEntry(path)
+	if !found {
+		return nil, fmt.Errorf("no such file or directory %s", path)
+	}
+
+	return entry, nil
+}
+
 // TODO: rename
 // TODO: rm file
+// TODO:   O_TRUNC support for OpenFile
 // TODO: rm dir
 // TODO: rm -rf
 // TODO: reformat fs
