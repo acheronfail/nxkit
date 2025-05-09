@@ -21,11 +21,11 @@ func TestReadDir(t *testing.T) {
 	t.Run("path:/", func(t *testing.T) {
 		entries, err := fs.ReadDir("/")
 		assert.Nil(t, err)
-		assert.Len(t, entries, 9)
+		assert.Len(t, entries, 8)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "mkdir", "write", "FAT16-TEST"}, shortNames) // TODO
+		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "AFILEW~1.DAT", "ANOTHE~1", "lower83", "mkdir", "write"}, shortNames)
 		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "mkdir", "write", "FAT16-TEST"}, longNames) // TODO
+		assert.Equal(t, []string{"dir", "empty.bin", "INFO.TXT", "a file with a long name.dat", "another file", "lower83", "mkdir", "write"}, longNames)
 
 		assert.True(t, entries[0].IsDir())
 		assert.True(t, !entries[1].IsDir())
@@ -35,7 +35,6 @@ func TestReadDir(t *testing.T) {
 		assert.True(t, entries[5].IsDir())
 		assert.True(t, entries[6].IsDir())
 		assert.True(t, entries[7].IsDir())
-		assert.True(t, entries[8].IsVolumeId())
 	})
 
 	t.Run("path:/dir", func(t *testing.T) {
@@ -64,12 +63,12 @@ func TestReadDir(t *testing.T) {
 
 	t.Run("path:/not_here", func(t *testing.T) {
 		_, err := fs.ReadDir("/not_here")
-		assert.EqualError(t, err, "no such file or directory /not_here") // TODO
+		assert.EqualError(t, err, "no such file or directory /not_here")
 	})
 
 	t.Run("path:/dir/not_here", func(t *testing.T) {
 		_, err := fs.ReadDir("/dir/not_here")
-		assert.EqualError(t, err, "no such file or directory /dir/not_here") // TODO
+		assert.EqualError(t, err, "no such file or directory /dir/not_here")
 	})
 }
 
@@ -142,6 +141,22 @@ func TestMkdir(t *testing.T) {
 		assert.Equal(t, []string{".", "..", "A_DIRE~1"}, shortNames)
 		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
 		assert.Equal(t, []string{".", "..", "a_directory_with_a_long_name"}, longNames)
+	})
+
+	t.Run("mkdir same as volume id", func(t *testing.T) {
+		err := fs.Mkdir("/FAT16-TEST")
+		assert.Nil(t, err)
+
+		entries, err := fs.ReadDir("/")
+		assert.Nil(t, err)
+		assert.Len(t, entries, 9)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "FAT16-~1"))
+		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.True(t, slices.Contains(longNames, "FAT16-TEST"))
+
+		err = fs.Rmdir("/FAT16-TEST")
+		assert.Nil(t, err)
 	})
 }
 
@@ -272,6 +287,30 @@ func TestOpenFile(t *testing.T) {
 		assert.True(t, slices.Contains(shortNames, "created.txt"))
 	})
 
+	t.Run("open - try volume id", func(t *testing.T) {
+		// try opening it
+		_, err := fs.OpenFile("/FAT16-TEST", os.O_RDONLY)
+		assert.EqualError(t, err, "no such file or directory /FAT16-TEST")
+
+		// create a file with the same name
+		_, err = fs.OpenFile("/FAT16-TEST", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// check vol id is good
+		id, err := fs.GetVolumeId()
+		assert.Nil(t, err)
+		assert.Equal(t, "FAT16-TEST", id)
+
+		// now remove for other tests
+		err = fs.Unlink("/FAT16-TEST")
+		assert.Nil(t, err)
+
+		// check vol id is still good
+		id, err = fs.GetVolumeId()
+		assert.Nil(t, err)
+		assert.Equal(t, "FAT16-TEST", id)
+	})
+
 	t.Run("write - not exist", func(t *testing.T) {
 		_, err := fs.OpenFile("/write/not_here", os.O_RDONLY)
 		assert.EqualError(t, err, "no such file or directory /write/not_here")
@@ -369,16 +408,6 @@ func TestStat(t *testing.T) {
 		assert.True(t, !stat.IsVolumeId())
 		assert.True(t, stat.IsDir())
 		assert.True(t, !stat.IsFile())
-	})
-
-	t.Run("stat - volume id", func(t *testing.T) {
-		stat, err := fs.Stat("/FAT16-TEST")
-		assert.Nil(t, err)
-		assert.Equal(t, int64(0), stat.Size())
-		assert.True(t, !stat.IsReadOnly())
-		assert.True(t, !stat.IsHidden())
-		assert.True(t, !stat.IsSystem())
-		assert.True(t, stat.IsVolumeId())
 	})
 }
 
@@ -523,6 +552,21 @@ func TestRmdir(t *testing.T) {
 		err := fs.Rmdir("/dir")
 		assert.EqualError(t, err, "directory /dir is not empty")
 	})
+
+	t.Run("rmdir - remove from root dir", func(t *testing.T) {
+		err := fs.Mkdir("/rmdir_root")
+		assert.Nil(t, err)
+
+		entries, err := fs.ReadDir("/")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "RMDIR_~1"))
+		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.True(t, slices.Contains(longNames, "rmdir_root"))
+
+		err = fs.Rmdir("/rmdir_root")
+		assert.Nil(t, err)
+	})
 }
 
 func TestRename(t *testing.T) {
@@ -662,5 +706,22 @@ func TestRename(t *testing.T) {
 		// rename
 		err = fs.Rename("/write/r4", "/dir")
 		assert.EqualError(t, err, "cannot rename to directory /dir")
+	})
+
+	t.Run("rename - try volume id", func(t *testing.T) {
+		err := fs.Rename("/FAT16-TEST", "/NOPE")
+		assert.EqualError(t, err, "no such file or directory /FAT16-TEST")
+	})
+}
+
+func TestVolumeId(t *testing.T) {
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("get volume id", func(t *testing.T) {
+		id, err := fs.GetVolumeId()
+		assert.Nil(t, err)
+		assert.Equal(t, "FAT16-TEST", id)
 	})
 }

@@ -557,7 +557,33 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	return fs.removeEntryFromParent(srcEntry, srcParent.cluster)
 }
 
-// TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
+func (fs *FileSystem) GetVolumeId() (string, error) {
+	dirBytes, err := fs.getRootDirectoryBytes()
+	if err != nil {
+		return "", err
+	}
+
+	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+		// at the end, didn't find it
+		if dirBytes[i] == 0x00 {
+			break
+		}
+
+		// skip deleted or lfn entries
+		if dirBytes[i] == 0xE5 || dirBytes[i+11] == 0x0F {
+			continue
+		}
+
+		// find the volume id entry
+		if dirBytes[i+11]&0x08 == 0x08 {
+			entry := DirectoryEntry{fatDirectoryEntry: fatDirectoryEntryFromBytes(dirBytes[i:])}
+			return entry.ShortName(), nil
+		}
+	}
+
+	return "", os.ErrNotExist
+}
+
 // TODO: reformat fs
 // TODO: utils:
 //	- defragmentation operation (since renames and such will cause fragmentation with lfn support)

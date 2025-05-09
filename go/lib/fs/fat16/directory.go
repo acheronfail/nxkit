@@ -584,14 +584,21 @@ func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
 		longFileName = ""
 		longFileNameSum = nil
 
-		entries = append(entries, entry)
+		if !entry.IsVolumeId() {
+			entries = append(entries, entry)
+		}
 	}
 
 	return entries, nil
 }
 
-func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirCluster *uint16) (int, []byte, error) {
-	parentDirBytes, err := fs.getClusterChainBytes(*parentDirCluster)
+func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
+	if parentDirCluster == nil {
+		parentDirBytes, err = fs.getRootDirectoryBytes()
+	} else {
+		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
+	}
+
 	if err != nil {
 		return -1, nil, err
 	}
@@ -608,6 +615,11 @@ func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirClust
 
 		// check if this is the entry we are looking for
 		if bytes.Equal(parentDirBytes[i:i+11], ent.DIR_Name[:]) {
+			// check it's not an entry with the same name as the volume id
+			if parentDirBytes[i+11]&0x08 == 0x08 {
+				continue
+			}
+
 			return i, parentDirBytes, nil
 		}
 	}
