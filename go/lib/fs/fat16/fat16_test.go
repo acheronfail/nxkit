@@ -422,11 +422,46 @@ func TestUnlink(t *testing.T) {
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.False(t, slices.Contains(shortNames, "UNLINK"))
 
+		// TODO: test file not found
+		// TODO: test lfn entries properly deleted
 		// TODO: an internal test which checks the cluster chain is deleted
 	})
 
 	t.Run("unlink - dir", func(t *testing.T) {
 		err := fs.Unlink("/write")
 		assert.EqualError(t, err, "cannot unlink directory /write")
+	})
+}
+
+func TestRmdir(t *testing.T) {
+	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	assert.Nil(t, err)
+	defer fs.Close()
+
+	t.Run("rmdir - empty dir", func(t *testing.T) {
+		// create empty dir
+		err := fs.Mkdir("/write/rmdir/empty")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write/rmdir")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.True(t, slices.Contains(shortNames, "EMPTY"))
+
+		// rmdir
+		err = fs.Rmdir("/write/rmdir/empty")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err = fs.ReadDir("/write/rmdir")
+		assert.Nil(t, err)
+		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.False(t, slices.Contains(shortNames, "EMPTY"))
+	})
+
+	t.Run("rmdir - non-empty dir", func(t *testing.T) {
+		err := fs.Rmdir("/dir")
+		assert.EqualError(t, err, "directory /dir is not empty")
 	})
 }

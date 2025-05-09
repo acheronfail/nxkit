@@ -390,6 +390,37 @@ func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
 	return entry, nil
 }
 
+func (fs *FileSystem) removeEntryWithCluster(entry *DirectoryEntry, parentDirCluster *uint16) error {
+	index, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
+	if err != nil {
+		return err
+	}
+
+	// TODO: also delete lfn entries
+	// set first byte of entry to 0xE5 to mark as deleted
+	entry.fatDirectoryEntry.DIR_Name[0] = 0xE5
+
+	// write back to disk
+	err = fs.writeEntriesToParent(
+		[]to32Bytes{&entry.fatDirectoryEntry},
+		parentDirCluster,
+		parentDirBytes,
+		index,
+	)
+	if err != nil {
+		return err
+	}
+
+	// remove any allocated clusters from FATs
+	cluster := entry.clusterNumber()
+	if cluster == 0 {
+		return nil
+	}
+
+	err = fs.deleteClusterChain(cluster)
+	return err
+}
+
 func (fs *FileSystem) Unlink(path string) error {
 	entry, parent, found := fs.findEntry(path)
 	if !found {
@@ -402,37 +433,43 @@ func (fs *FileSystem) Unlink(path string) error {
 		return fmt.Errorf("cannot unlink read-only file %s", path)
 	}
 
-	// 1. delete the entry from the parent directory
-	index, parentDirBytes, err := fs.findIndexInParentBytes(entry, parent.cluster)
+	return fs.removeEntryWithCluster(entry, parent.cluster)
+}
+
+func (fs *FileSystem) Rmdir(path string) error {
+	entry, parent, found := fs.findEntry(path)
+	if !found {
+		return fmt.Errorf("no such file or directory %s", path)
+	}
+	if !entry.IsDir() {
+		return fmt.Errorf("cannot rmdir file %s", path)
+	}
+	if entry.IsReadOnly() {
+		return fmt.Errorf("cannot rmdir read-only directory %s", path)
+	}
+
+	// 1. check if directory is empty
+	entryBytes, err := fs.getClusterChainBytes(entry.clusterNumber())
 	if err != nil {
 		return err
 	}
 
-	// set first byte of entry to 0xE5 to mark as deleted
-	entry.fatDirectoryEntry.DIR_Name[0] = 0xE5
-
-	// write back to disk
-	err = fs.writeEntriesToParent(
-		[]to32Bytes{&entry.fatDirectoryEntry},
-		parent.cluster,
-		parentDirBytes,
-		index,
-	)
+	entries, err := fs.readDirectoryEntries(entryBytes)
 	if err != nil {
 		return err
 	}
 
-	// 2. remove any allocated clusters from FATs
-	cluster := entry.clusterNumber()
-	if cluster == 0 {
-		return nil
+	// 2 for . and ..
+	if len(entries) > 2 {
+		return fmt.Errorf("directory %s is not empty", path)
 	}
 
-	err = fs.deleteClusterChain(cluster)
-	return err
+	return fs.removeEntryWithCluster(entry, parent.cluster)
 }
 
 // TODO: rename
-// TODO: rm dir
 // TODO: rm -rf
+// TODO: unlink lfn
+// TODO: rmdir  lfn
 // TODO: reformat fs
+// TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
