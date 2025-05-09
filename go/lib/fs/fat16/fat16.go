@@ -362,11 +362,7 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 
 	t := asFatTime(time.Now())
 	baseName := filepath.Base(path)
-	newFileEntry, err := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
-	if err != nil {
-		return nil, err
-	}
-
+	newFileEntry := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
 	nRequired := fs.numDirectoryEntriesRequired(baseName)
 	startIndex, newParentDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, parent.cluster, parent.bytes)
 	if err != nil {
@@ -543,15 +539,13 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 		return err
 	}
 
-	newShortNameBytes, err := fs.createShortNameBytes(baseName, dstParent.entries)
-	if err != nil {
-		return err
-	}
+	newShortNameBytes, ntRes := fs.createShortNameBytes(baseName, dstParent.entries)
 
 	// create new entry from src, with new name and copy over cluster number
 	newEntry := srcEntry.clone()
 	copy(newEntry.DIR_Name[:], newShortNameBytes[:])
 	newEntry.setCluster(srcEntry.clusterNumber())
+	newEntry.DIR_NTRes = ntRes
 
 	err = fs.writeEntryWithLfnToParent(baseName, &newEntry, dstParent.cluster, newParentDirBytes, startIndex)
 	if err != nil {
@@ -564,7 +558,6 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 
 // TODO: lfn - always create if sfn is lossy (even due to casing, etc)
 // TODO: rm -rf
-// TODO: support NT_Res attributes
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
 // TODO: reformat fs
 // TODO: utils:

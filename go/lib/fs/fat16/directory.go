@@ -153,22 +153,22 @@ func (d *DirectoryEntry) ShortName() string {
 		return string(bytes.TrimRight(nameBytes[:11], " "))
 	}
 
-	sfnBytes := bytes.TrimRight(nameBytes[:8], " ")
-	extBytes := bytes.TrimRight(sfnBytes[8:11], " ")
+	bdyBytes := bytes.TrimRight(nameBytes[:8], " ")
+	extBytes := bytes.TrimRight(bdyBytes[8:11], " ")
 
 	if d.DIR_NTRes&0x08 == 0x08 {
-		sfnBytes = bytes.ToLower(sfnBytes)
+		bdyBytes = bytes.ToLower(bdyBytes)
 	}
 
 	if len(extBytes) == 0 {
-		return string(sfnBytes)
+		return string(bdyBytes)
 	}
 
 	if d.DIR_NTRes&0x10 == 0x10 {
 		extBytes = bytes.ToLower(extBytes)
 	}
 
-	return string(sfnBytes) + "." + string(extBytes)
+	return string(bdyBytes) + "." + string(extBytes)
 }
 
 func (d *DirectoryEntry) LongName() string {
@@ -335,7 +335,8 @@ func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) 
 }
 
 // http://elm-chan.org/docs/fat_e.html#name_conversion
-func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, [11]byte, error) {
+// returns (shortFileName, shortFileNameBytes, NTRes value)
+func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, [11]byte, uint8) {
 	lossy := false
 
 	// 1. convert to upper
@@ -436,7 +437,16 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 
 	existingNames := utils.MapSlice(siblingEntries, func(entry DirectoryEntry) string { return entry.ShortName() })
 	if !lossy && !slices.Contains(existingNames, finalName) {
-		return finalName, make83(body, ext), nil
+		parts := strings.SplitN(desiredName, ".", 2)
+		ntRes := uint8(0)
+		if parts[0] != strings.ToUpper(body) {
+			ntRes |= 0x08
+		}
+		if ext != "" && parts[1] != strings.ToUpper(ext) {
+			ntRes |= 0x10
+		}
+
+		return finalName, make83(body, ext), ntRes
 	}
 
 	var asBytes [11]byte
@@ -459,16 +469,12 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 		n++
 	}
 
-	return finalName, asBytes, nil
+	return finalName, asBytes, 0
 }
 
-func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []DirectoryEntry) ([11]byte, error) {
-	_, sfnBytes, err := fs.createShortName(desiredName, siblingEntries)
-	if err != nil {
-		return [11]byte{}, err
-	}
-
-	return sfnBytes, nil
+func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []DirectoryEntry) ([11]byte, uint8) {
+	_, sfnBytes, ntRes := fs.createShortName(desiredName, siblingEntries)
+	return sfnBytes, ntRes
 }
 
 func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
@@ -672,16 +678,12 @@ func (fs *FileSystem) createNewEntry(
 	newEntAttr uint8,
 	newEntCluster uint16,
 	parentDirEntries []DirectoryEntry,
-) (*DirectoryEntry, error) {
-	shortNameBytes, err := fs.createShortNameBytes(newEntName, parentDirEntries)
-	if err != nil {
-		return nil, err
-	}
-
+) *DirectoryEntry {
+	shortNameBytes, ntRes := fs.createShortNameBytes(newEntName, parentDirEntries)
 	newFatDirEntry := fatDirectoryEntry{
 		DIR_Name:         shortNameBytes,
 		DIR_Attr:         newEntAttr,
-		DIR_NTRes:        0x00,
+		DIR_NTRes:        ntRes,
 		DIR_CrtTimeTenth: newEntTime.tenth,
 		DIR_CrtTime:      newEntTime.time,
 		DIR_CrtDate:      newEntTime.date,
@@ -693,7 +695,7 @@ func (fs *FileSystem) createNewEntry(
 		DIR_FileSize:     0,
 	}
 
-	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}, nil
+	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}
 }
 
 func (fs *FileSystem) writeEntryWithLfnToParent(
@@ -757,12 +759,9 @@ func (fs *FileSystem) writeDirectoryEntry(
 	atParentByteIndex int,
 ) ([]byte, error) {
 	t := asFatTime(time.Now())
-	newDirEntry, err := fs.createNewEntry(newDirName, t, 0x10, newDirCluster, parentDirEntries)
-	if err != nil {
-		return nil, err
-	}
+	newDirEntry := fs.createNewEntry(newDirName, t, 0x10, newDirCluster, parentDirEntries)
 
-	err = fs.writeEntryWithLfnToParent(newDirName, newDirEntry, parentDirCluster, parentDirBytes, atParentByteIndex)
+	err := fs.writeEntryWithLfnToParent(newDirName, newDirEntry, parentDirCluster, parentDirBytes, atParentByteIndex)
 	if err != nil {
 		return nil, err
 	}

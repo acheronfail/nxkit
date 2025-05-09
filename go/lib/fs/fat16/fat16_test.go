@@ -78,19 +78,18 @@ func TestMkdir(t *testing.T) {
 	assert.Nil(t, err)
 	defer fs.Close()
 
-	// TODO: verify should this be uppercase?
 	testSingleMkdirWorked := func(fs *fat16.FileSystem) {
 		t.Helper()
 		entries, err := fs.ReadDir("/mkdir/single")
 		assert.Nil(t, err)
 		assert.Len(t, entries, 3)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.Equal(t, []string{".", "..", "NEW"}, shortNames)
+		assert.Equal(t, []string{".", "..", "new"}, shortNames)
 		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
-		assert.Equal(t, []string{".", "..", "NEW"}, longNames)
+		assert.Equal(t, []string{".", "..", "new"}, longNames)
 
 		assert.True(t, entries[2].IsDir())
-		assert.Equal(t, "NEW", entries[2].ShortName())
+		assert.Equal(t, "new", entries[2].ShortName())
 	}
 
 	t.Run("mkdir /mkdir/single/new", func(t *testing.T) {
@@ -258,7 +257,7 @@ func TestOpenFile(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "CREATED.TXT"))
+		assert.True(t, slices.Contains(shortNames, "created.txt"))
 	})
 
 	t.Run("write - not exist", func(t *testing.T) {
@@ -385,7 +384,7 @@ func TestUnlink(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "UNLINK"))
+		assert.True(t, slices.Contains(shortNames, "unlink"))
 
 		// unlink
 		err = fs.Unlink("/write/unlink")
@@ -395,7 +394,7 @@ func TestUnlink(t *testing.T) {
 		entries, err = fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "UNLINK"))
+		assert.False(t, slices.Contains(shortNames, "unlink"))
 	})
 
 	t.Run("unlink - non-empty file", func(t *testing.T) {
@@ -410,7 +409,7 @@ func TestUnlink(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "UNLINK"))
+		assert.True(t, slices.Contains(shortNames, "unlink"))
 
 		// unlink
 		err = fs.Unlink("/write/unlink")
@@ -420,7 +419,7 @@ func TestUnlink(t *testing.T) {
 		entries, err = fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "UNLINK"))
+		assert.False(t, slices.Contains(shortNames, "unlink"))
 
 		// TODO: internal test which test lfn entries properly deleted
 		// TODO: internal test which checks the cluster chain is deleted
@@ -473,7 +472,7 @@ func TestRmdir(t *testing.T) {
 		entries, err := fs.ReadDir("/write/rmdir")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "EMPTY"))
+		assert.True(t, slices.Contains(shortNames, "empty"))
 
 		// rmdir
 		err = fs.Rmdir("/write/rmdir/empty")
@@ -483,7 +482,7 @@ func TestRmdir(t *testing.T) {
 		entries, err = fs.ReadDir("/write/rmdir")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "EMPTY"))
+		assert.False(t, slices.Contains(shortNames, "empty"))
 	})
 
 	t.Run("rmdir - lfn", func(t *testing.T) {
@@ -532,7 +531,7 @@ func TestRename(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "RENAME2.FIL"))
+		assert.True(t, slices.Contains(shortNames, "rename2.fil"))
 
 		// rename back
 		err = fs.Rename("/write/rename2.fil", "/write/rename1.fil")
@@ -552,7 +551,7 @@ func TestRename(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "RENAME2.DIR"))
+		assert.True(t, slices.Contains(shortNames, "rename2.dir"))
 
 		// rename back
 		err = fs.Rename("/write/rename2.dir", "/write/rename1.dir")
@@ -575,12 +574,12 @@ func TestRename(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "R1"))
+		assert.False(t, slices.Contains(shortNames, "r1"))
 		// check exists in new parent
 		entries, err = fs.ReadDir("/write/rename")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "R1"))
+		assert.True(t, slices.Contains(shortNames, "r1"))
 
 		// rename back
 		err = fs.Rename("/write/rename/r1", "/write/r1")
@@ -603,12 +602,12 @@ func TestRename(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "R2"))
+		assert.False(t, slices.Contains(shortNames, "r2"))
 		// check exists in new parent dir
 		entries, err = fs.ReadDir("/write/rename")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "R2"))
+		assert.True(t, slices.Contains(shortNames, "r2"))
 
 		// rename back
 		err = fs.Rename("/write/rename/r2", "/write/r2")
@@ -626,8 +625,8 @@ func TestRename(t *testing.T) {
 		entries, err := fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "R3.1"))
-		assert.True(t, slices.Contains(shortNames, "R3.2"))
+		assert.True(t, slices.Contains(shortNames, "r3.1"))
+		assert.True(t, slices.Contains(shortNames, "r3.2"))
 
 		// rename
 		err = fs.Rename("/write/r3.1", "/write/r3.2")
@@ -637,8 +636,8 @@ func TestRename(t *testing.T) {
 		entries, err = fs.ReadDir("/write")
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
-		assert.False(t, slices.Contains(shortNames, "R3.1"))
-		assert.True(t, slices.Contains(shortNames, "R3.2"))
+		assert.False(t, slices.Contains(shortNames, "r3.1"))
+		assert.True(t, slices.Contains(shortNames, "r3.2"))
 
 		// TODO: internal test to check that the cluster chain is deleted from target file
 	})
