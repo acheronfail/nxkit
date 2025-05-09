@@ -5,8 +5,6 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"time"
 
 	"github.com/acheronfail/nxkit/lib/fs"
@@ -127,164 +125,9 @@ func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
 	return result.entries, nil
 }
 
-func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
-	return (fs.dataSectorStart + uint32(cluster-2)*fs.sectorsPerCluster)
-}
-
-func (fs *FileSystem) splitPath(path string) ([]string, error) {
-	parts := strings.Split(path, "/")
-	if len(parts) == 0 {
-		return nil, fmt.Errorf("invalid path: %s", path)
-	}
-
-	return parts, nil
-}
-
-type readDirResult struct {
-	entries []DirectoryEntry
-	bytes   []byte
-	cluster *uint16
-}
-
-func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
-	parts, err := fs.splitPath(path)
-	if err != nil {
-		return nil, err
-	}
-
-	var currentEntryCluster *uint16 = nil
-	currentBytes, err := fs.getRootDirectoryBytes()
-	if err != nil {
-		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
-	}
-
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-
-		currentEntries, err := readDirectoryEntries(currentBytes)
-		if err != nil {
-			return nil, fmt.Errorf("could not read directory entries: %w", err)
-		}
-
-		found := false
-		for _, entry := range currentEntries {
-			if !slices.ContainsFunc(entry.names(), func(name string) bool { return strings.EqualFold(name, part) }) {
-				continue
-			}
-
-			if entry.IsDir() {
-				clusterNumber := entry.clusterNumber()
-				currentBytes, err = fs.getClusterChainBytes(clusterNumber)
-				if err != nil {
-					return nil, fmt.Errorf("could not read directory bytes: %w", err)
-				}
-
-				currentEntryCluster = &clusterNumber
-				found = true
-				break
-			} else {
-				return nil, fmt.Errorf("%s is not a directory", path)
-			}
-		}
-
-		if !found {
-			if mkdir {
-				nRequired := fs.numDirectoryEntriesRequired(part)
-				freeIndex, newDirectoryBytes, err := fs.getAvailableDirectoryEntry(nRequired, currentEntryCluster, currentBytes)
-				if err != nil {
-					return nil, err
-				}
-
-				newDirectoryCluster, err := fs.allocateClusterChain(directoryEntrySize * 2)
-				if err != nil {
-					return nil, err
-				}
-
-				newDirectoryBytes, err = fs.writeDirectoryEntry(part, newDirectoryCluster, newDirectoryBytes, currentEntries, currentEntryCluster, freeIndex)
-				if err != nil {
-					return nil, fmt.Errorf("could not write directory entry: %w", err)
-				}
-
-				currentBytes = newDirectoryBytes
-				currentEntryCluster = &newDirectoryCluster
-			} else {
-				return nil, fmt.Errorf("no such file or directory %s", path)
-			}
-		}
-	}
-
-	entries, err := readDirectoryEntries(currentBytes)
-	if err != nil {
-		return nil, fmt.Errorf("could not read directory entries: %w", err)
-	}
-
-	return &readDirResult{
-		entries: entries,
-		bytes:   currentBytes,
-		cluster: currentEntryCluster,
-	}, nil
-}
-
-func (fs *FileSystem) getAvailableDirectoryEntry(
-	nRequired int,
-	parentDirCluster *uint16,
-	parentDirBytes []byte,
-) (int, []byte, error) {
-	freeIndex, ok := fs.findAvailableDirectoryEntry(parentDirBytes, nRequired)
-	if !ok {
-		// if we're in the root directory area we can't expand on fat16
-		if parentDirCluster == nil {
-			return 0, nil, fmt.Errorf("no available space for creating root directory entry")
-		}
-
-		// expand the current directory's cluster chain since we're out of space
-		extraCluster, err := fs.allocateClusterChain(int64(nRequired * directoryEntrySize))
-		if err != nil {
-			return 0, nil, err
-		}
-
-		err = fs.writeClusterToFats(*parentDirCluster, extraCluster)
-		if err != nil {
-			return 0, nil, err
-		}
-
-		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
-		if err != nil {
-			return 0, nil, fmt.Errorf("could not read directory bytes: %w", err)
-		}
-
-		// TODONICE: can optimise and return start of new cluster
-		freeIndex, ok = fs.findAvailableDirectoryEntry(parentDirBytes, nRequired)
-		if !ok {
-			return 0, nil, fmt.Errorf("no available space for creating directory entry")
-		}
-	}
-
-	return freeIndex, parentDirBytes, nil
-}
-
 func (fs *FileSystem) Mkdir(path string) error {
 	_, err := fs.readDir(path, true)
 	return err
-}
-
-func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, bool, error) {
-	dirPath := filepath.Dir(path)
-	baseName := filepath.Base(path)
-	parent, err := fs.readDir(dirPath, false)
-	if err != nil {
-		return nil, nil, false, err
-	}
-
-	for _, existing := range parent.entries {
-		if slices.ContainsFunc(existing.names(), func(name string) bool { return strings.EqualFold(name, baseName) }) {
-			return &existing, parent, true, nil
-		}
-	}
-
-	return nil, parent, false, nil
 }
 
 // use os.OpenFile flags
@@ -393,52 +236,6 @@ func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
 	}
 
 	return entry, nil
-}
-func (fs *FileSystem) removeEntryFromParent(entry *DirectoryEntry, parentDirCluster *uint16) error {
-	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
-	if err != nil {
-		return err
-	}
-
-	// find all associated lfn entries
-	sfnChecksum := calculateShortNameChecksum(entry.DIR_Name[:])
-	lfnIndex := entryIndex - directoryEntrySize
-	for lfnIndex >= 0 && parentDirBytes[lfnIndex+11] == 0x0F && parentDirBytes[lfnIndex+13] == sfnChecksum {
-		parentDirBytes[lfnIndex] = 0xE5
-		lfnIndex -= directoryEntrySize
-	}
-
-	// set first byte of entry to 0xE5 to mark as deleted
-	parentDirBytes[entryIndex] = 0xE5
-
-	// write back to disk
-	err = fs.writeEntriesToParent(
-		[]to32Bytes{},
-		parentDirCluster,
-		parentDirBytes,
-		entryIndex,
-	)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (fs *FileSystem) removeEntryFromParentWithCluster(entry *DirectoryEntry, parentDirCluster *uint16) error {
-	err := fs.removeEntryFromParent(entry, parentDirCluster)
-	if err != nil {
-		return err
-	}
-
-	// remove any allocated clusters from FATs
-	cluster := entry.clusterNumber()
-	if cluster == 0 {
-		return nil
-	}
-
-	err = fs.deleteClusterChain(cluster)
-	return err
 }
 
 func (fs *FileSystem) Unlink(path string) error {

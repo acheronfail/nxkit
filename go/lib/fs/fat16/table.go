@@ -51,6 +51,18 @@ func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
 	return bytes, nil
 }
 
+func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
+	start := fs.rootDirectorySectorStart * fs.bytesPerSector
+	rootDirSize := fs.bootSector.BPB_RootEntCnt * directoryEntrySize
+	b := make([]byte, rootDirSize)
+	_, err := fs.file.ReadAt(b, int64(start))
+	if err != nil {
+		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
+	}
+
+	return b, nil
+}
+
 func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
 	// set in memory cluster table
 	fs.table.clusters[cluster] = target
@@ -94,6 +106,50 @@ func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) 
 	}
 
 	return 0, fmt.Errorf("no available clusters")
+}
+
+func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
+	var clusters []uint16
+	currentCluster := startCluster
+	for {
+		clusters = append(clusters, currentCluster)
+		nextCluster := fs.table.clusters[currentCluster]
+
+		if nextCluster >= eoc {
+			break
+		}
+		if nextCluster < 2 {
+			return nil, fmt.Errorf("invalid cluster number: %d", nextCluster)
+		}
+		if nextCluster > fs.table.maxCluster {
+			return nil, fmt.Errorf("cluster number out of range: %d", nextCluster)
+		}
+
+		currentCluster = nextCluster
+	}
+
+	return clusters, nil
+}
+
+func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) {
+	clusterChain, err := fs.getClusterChain(startCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	var bytes []byte
+	for _, cluster := range clusterChain {
+		clusterBytes := make([]byte, fs.bytesPerCluster)
+		fileOffset := int64(fs.clusterToSector(cluster) * fs.bytesPerSector)
+		_, err := fs.file.ReadAt(clusterBytes, fileOffset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cluster data: %w", err)
+		}
+
+		bytes = append(bytes, clusterBytes...)
+	}
+
+	return bytes, nil
 }
 
 func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte) error {

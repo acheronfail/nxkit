@@ -8,7 +8,6 @@ import (
 	"slices"
 	"strings"
 	"time"
-	"unicode/utf16"
 
 	"github.com/acheronfail/nxkit/lib/utils"
 )
@@ -99,26 +98,6 @@ type fatDirectoryEntry struct {
 	DIR_FstClusLO uint16
 	// Size of the file in unit of byte. Not used when it is a directroy and the value must be always zero.
 	DIR_FileSize uint32
-}
-
-type fatLongFileName struct {
-	// Sequence number (1-20) to identify where this entry is in the sequence of LFN entries to compose an LFN.
-	// One indicates the top part of the LFN and any value with LAST_LONG_ENTRY flag (0x40) indicates the last part of the LFN.
-	LDIR_Ord uint8
-	// Part of LFN from 1st character to 5th character.
-	LDIR_Name1 [10]byte
-	// LFN attribute. Always ATTR_LONG_NAME and it indicates this is an LFN entry.
-	LDIR_Attr uint8
-	// Must be zero.
-	LDIR_Type uint8
-	// Checksum of the SFN entry associated with this entry.
-	LDIR_Chksum uint8
-	// Part of LFN from 6th character to 11th character.
-	LDIR_Name2 [12]byte
-	// Must be zero to avoid any wrong repair by old disk utility.
-	LDIR_FstClusLO uint16
-	// Part of LFN from 12th character to 13th character.
-	LDIR_Name3 [4]byte
 }
 
 type fatTime struct {
@@ -279,62 +258,6 @@ func (d *DirectoryEntry) setCluster(cluster uint16) {
 	d.DIR_FstClusLO = cluster
 }
 
-func (fs *FileSystem) getRootDirectoryBytes() ([]byte, error) {
-	start := fs.rootDirectorySectorStart * fs.bytesPerSector
-	rootDirSize := fs.bootSector.BPB_RootEntCnt * directoryEntrySize
-	b := make([]byte, rootDirSize)
-	_, err := fs.file.ReadAt(b, int64(start))
-	if err != nil {
-		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
-	}
-
-	return b, nil
-}
-
-func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
-	var clusters []uint16
-	currentCluster := startCluster
-	for {
-		clusters = append(clusters, currentCluster)
-		nextCluster := fs.table.clusters[currentCluster]
-
-		if nextCluster >= eoc {
-			break
-		}
-		if nextCluster < 2 {
-			return nil, fmt.Errorf("invalid cluster number: %d", nextCluster)
-		}
-		if nextCluster > fs.table.maxCluster {
-			return nil, fmt.Errorf("cluster number out of range: %d", nextCluster)
-		}
-
-		currentCluster = nextCluster
-	}
-
-	return clusters, nil
-}
-
-func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) {
-	clusterChain, err := fs.getClusterChain(startCluster)
-	if err != nil {
-		return nil, err
-	}
-
-	var bytes []byte
-	for _, cluster := range clusterChain {
-		clusterBytes := make([]byte, fs.bytesPerCluster)
-		fileOffset := int64(fs.clusterToSector(cluster) * fs.bytesPerSector)
-		_, err := fs.file.ReadAt(clusterBytes, fileOffset)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read cluster data: %w", err)
-		}
-
-		bytes = append(bytes, clusterBytes...)
-	}
-
-	return bytes, nil
-}
-
 // http://elm-chan.org/docs/fat_e.html#name_conversion
 // returns (shortFileName, shortFileNameBytes, NTRes value)
 func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, [11]byte, uint8) {
@@ -478,373 +401,89 @@ func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []
 	return sfnBytes, ntRes
 }
 
-// calculates the number of directory entries required, including the normal entry
-func (fs *FileSystem) numDirectoryEntriesRequired(name string) int {
-	// start with the normal directory entry
-	needed := 1
-
-	// http://elm-chan.org/docs/fat_e.html#lfn_suppression
-	sfn, _, ntRes := fs.createShortName(name, []DirectoryEntry{})
-
-	// if we set NTRes, then we've discovered a name that can be represented
-	// with a single entry + the NTRes flag
-	if ntRes != 0 {
-		return needed
-	}
-
-	// if NTRes isn't set, and name is the same, then we only need a single entry
-	if sfn == name {
-		return needed
-	}
-
-	// otherwise we need to create LFN entries for this name
-	runes := utf16.Encode([]rune(name))
-	lfnCount := (len(runes) + 12) / 13 // round up
-	needed += lfnCount
-
-	return needed
+type readDirResult struct {
+	entries []DirectoryEntry
+	bytes   []byte
+	cluster *uint16
 }
 
-// TODO: improve this - with tests - to:
-//
-//	(1) stop scanning when 0x00 is found, and
-//	(2) handle issues when near end of `dirBytes`
-func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries int) (int, bool) {
-	count := 0
-	for i := 0; i < len(dirBytes); i += directoryEntrySize {
-		// 0x00 == free, 0xE5 == deleted
-		if dirBytes[i] == 0x00 || dirBytes[i] == 0xE5 {
-			count++
-		} else {
-			count = 0
-		}
-
-		if count == numEntries {
-			return i - (numEntries-1)*directoryEntrySize, true
-		}
-	}
-
-	return 0, false
-}
-
-func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
-	entries := make([]DirectoryEntry, 0)
-
-	var longFileNameSum *uint8
-	longFileName := ""
-	for i := 0; i < len(dirBytes); i += directoryEntrySize {
-		if dirBytes[i] == 0x00 {
-			break
-		}
-
-		if dirBytes[i] == 0xE5 {
-			continue
-		}
-
-		if dirBytes[i+11] == 0x0F {
-			lfn := fatLongFileName{
-				LDIR_Ord:       dirBytes[i],
-				LDIR_Attr:      dirBytes[i+11],
-				LDIR_Type:      dirBytes[i+12],
-				LDIR_Chksum:    dirBytes[i+13],
-				LDIR_FstClusLO: binary.LittleEndian.Uint16(dirBytes[i+26 : i+28]),
-			}
-			copy(lfn.LDIR_Name1[:], dirBytes[i+1:i+11])
-			copy(lfn.LDIR_Name2[:], dirBytes[i+14:i+26])
-			copy(lfn.LDIR_Name3[:], dirBytes[i+28:i+32])
-
-			// Extract the actual name parts and prepend them (since LFN entries are stored in reverse order)
-			namePart := lfn.extractNamePart()
-
-			// this was the first lfn entry, reset lfn
-			if lfn.LDIR_Ord&0x40 != 0 {
-				longFileName = ""
-				longFileNameSum = nil
-			}
-
-			// if the checksums didn't match, then discard them
-			if longFileNameSum != nil && *longFileNameSum != lfn.LDIR_Chksum {
-				continue
-			}
-
-			longFileName = namePart + longFileName
-			longFileNameSum = &lfn.LDIR_Chksum
-			continue
-		}
-
-		fatEntry := fatDirectoryEntryFromBytes(dirBytes[i : i+32])
-		entry := DirectoryEntry{fatDirectoryEntry: fatEntry}
-
-		// check lfn checksum before applying it
-		if longFileNameSum != nil && calculateShortNameChecksum(fatEntry.DIR_Name[:]) == *longFileNameSum {
-			entry.longFileName = longFileName
-		}
-
-		// reset lfn
-		longFileName = ""
-		longFileNameSum = nil
-
-		if !entry.IsVolumeId() {
-			entries = append(entries, entry)
-		}
-	}
-
-	return entries, nil
-}
-
-func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
-	if parentDirCluster == nil {
-		parentDirBytes, err = fs.getRootDirectoryBytes()
-	} else {
-		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
-	}
-
-	if err != nil {
-		return -1, nil, err
-	}
-
-	for i := 0; i < len(parentDirBytes); i += directoryEntrySize {
-		if parentDirBytes[i] == 0x00 {
-			break
-		}
-
-		// skip deleted and lfn entries
-		if parentDirBytes[i] == 0xE5 || parentDirBytes[i+11] == 0x0F {
-			continue
-		}
-
-		// check if this is the entry we are looking for
-		if bytes.Equal(parentDirBytes[i:i+11], ent.DIR_Name[:]) {
-			// check it's not an entry with the same name as the volume id
-			if parentDirBytes[i+11]&0x08 == 0x08 {
-				continue
-			}
-
-			return i, parentDirBytes, nil
-		}
-	}
-
-	return -1, nil, fmt.Errorf("entry not found in parent directory")
-}
-
-func (lfn *fatLongFileName) extractNamePart() string {
-	var name strings.Builder
-
-	lfnBytes := make([]byte, longFileNameUtf16Length*2)
-	copy(lfnBytes[0:10], lfn.LDIR_Name1[:])
-	copy(lfnBytes[10:22], lfn.LDIR_Name2[:])
-	copy(lfnBytes[22:26], lfn.LDIR_Name3[:])
-
-	// Convert the UTF-16 bytes to runes
-	for i := 0; i < len(lfnBytes); i += 2 {
-		if lfnBytes[i] == 0x00 && lfnBytes[i+1] == 0x00 {
-			break
-		}
-		name.WriteRune(rune(binary.LittleEndian.Uint16(lfnBytes[i : i+2])))
-	}
-
-	return name.String()
-}
-
-func calculateShortNameChecksum(shortName []byte) uint8 {
-	var sum uint8 = 0
-	for i := range 11 {
-		sum = ((sum & 1) << 7) + (sum >> 1) + uint8(shortName[i])
-	}
-	return sum
-}
-
-func (fs *FileSystem) createLongFileNameEntries(longName string, checksum uint8) []fatLongFileName {
-	numLfnEntries := fs.numDirectoryEntriesRequired(longName) - 1
-	if numLfnEntries < 1 {
-		return nil
-	}
-
-	runes := utf16.Encode([]rune(longName))
-	lfnEntries := make([]fatLongFileName, numLfnEntries)
-	limit := numLfnEntries - 1
-	for i := limit; i >= 0; i-- {
-		start := i * longFileNameUtf16Length
-		end := min(start+longFileNameUtf16Length, len(runes))
-		chunk := runes[start:end]
-
-		// fill with 0xFFFF
-		var lfnBytes [26]byte
-		for j := 0; j < len(lfnBytes); j += 2 {
-			binary.LittleEndian.PutUint16(lfnBytes[j:j+2], 0xFFFF)
-		}
-
-		// copy in chunk
-		for j, r := range chunk {
-			binary.LittleEndian.PutUint16(lfnBytes[j*2:j*2+2], r)
-		}
-
-		// null terminate
-		chunkLen := len(chunk)
-		if chunkLen < longFileNameUtf16Length {
-			binary.LittleEndian.PutUint16(lfnBytes[chunkLen*2:], 0x0000)
-		}
-
-		// Calculate sequence number
-		seqNum := uint8(i + 1)
-		// Set the last entry flag for the last LFN entry
-		if i == limit {
-			seqNum |= 0x40
-		}
-
-		lfnEntry := fatLongFileName{
-			LDIR_Ord:       seqNum,
-			LDIR_Attr:      0x0F,
-			LDIR_Type:      0,
-			LDIR_Chksum:    checksum,
-			LDIR_FstClusLO: 0,
-		}
-		copy(lfnEntry.LDIR_Name1[:], lfnBytes[0:10])
-		copy(lfnEntry.LDIR_Name2[:], lfnBytes[10:22])
-		copy(lfnEntry.LDIR_Name3[:], lfnBytes[22:26])
-		lfnEntries[limit-i] = lfnEntry
-	}
-
-	return lfnEntries
-}
-
-func (fs *FileSystem) createNewEntry(
-	newEntName string,
-	newEntTime *fatTime,
-	newEntAttr uint8,
-	newEntCluster uint16,
-	parentDirEntries []DirectoryEntry,
-) *DirectoryEntry {
-	shortNameBytes, ntRes := fs.createShortNameBytes(newEntName, parentDirEntries)
-	newFatDirEntry := fatDirectoryEntry{
-		DIR_Name:         shortNameBytes,
-		DIR_Attr:         newEntAttr,
-		DIR_NTRes:        ntRes,
-		DIR_CrtTimeTenth: newEntTime.tenth,
-		DIR_CrtTime:      newEntTime.time,
-		DIR_CrtDate:      newEntTime.date,
-		DIR_LstAccDate:   newEntTime.date,
-		DIR_FstClusHI:    0,
-		DIR_WrtTime:      newEntTime.time,
-		DIR_WrtDate:      newEntTime.date,
-		DIR_FstClusLO:    newEntCluster,
-		DIR_FileSize:     0,
-	}
-
-	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}
-}
-
-func (fs *FileSystem) writeEntryWithLfnToParent(
-	entLongName string,
-	ent *DirectoryEntry,
-	parentDirCluster *uint16,
-	parentDirBytes []byte,
-	atParentByteIndex int,
-) error {
-	items := []to32Bytes{}
-	for _, lfnEntry := range fs.createLongFileNameEntries(entLongName, calculateShortNameChecksum(ent.fatDirectoryEntry.DIR_Name[:])) {
-		items = append(items, &lfnEntry)
-	}
-	items = append(items, &ent.fatDirectoryEntry)
-
-	return fs.writeEntriesToParent(items, parentDirCluster, parentDirBytes, atParentByteIndex)
-}
-
-type to32Bytes interface {
-	toBytes() [32]byte
-}
-
-func (fs *FileSystem) writeEntriesToParent(
-	items []to32Bytes,
-	parentDirCluster *uint16,
-	parentDirBytes []byte,
-	atParentByteIndex int,
-) error {
-	// write new directory into parent's directory bytes
-	for i, item := range items {
-		start := atParentByteIndex + (directoryEntrySize * i)
-		end := start + directoryEntrySize
-		bytesToWrite := item.toBytes()
-		copy(parentDirBytes[start:end], bytesToWrite[:])
-	}
-
-	// write back to disk
-	if parentDirCluster == nil {
-		// if root, just write it all back since it's in the dedicated root directory area
-		_, err := fs.file.WriteAt(parentDirBytes, int64(fs.rootDirectorySectorStart*fs.bytesPerSector))
-		if err != nil {
-			return err
-		}
-	} else {
-		// if not root, then write the entire parent directory back to disk, along its cluster chain
-		err := fs.writeClusterChain(*parentDirCluster, parentDirBytes)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-func (fs *FileSystem) writeDirectoryEntry(
-	newDirName string,
-	newDirCluster uint16,
-	parentDirBytes []byte,
-	parentDirEntries []DirectoryEntry,
-	parentDirCluster *uint16,
-	atParentByteIndex int,
-) ([]byte, error) {
-	t := asFatTime(time.Now())
-	newDirEntry := fs.createNewEntry(newDirName, t, 0x10, newDirCluster, parentDirEntries)
-
-	err := fs.writeEntryWithLfnToParent(newDirName, newDirEntry, parentDirCluster, parentDirBytes, atParentByteIndex)
+func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
+	parts, err := fs.splitPath(path)
 	if err != nil {
 		return nil, err
 	}
 
-	// create special directory entries
-	dotDirEntry := fatDirectoryEntry{
-		DIR_Name:         [11]byte{'.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
-		DIR_Attr:         0x10,
-		DIR_CrtTimeTenth: t.tenth,
-		DIR_CrtTime:      t.time,
-		DIR_CrtDate:      t.date,
-		DIR_LstAccDate:   t.date,
-		DIR_FstClusHI:    0,
-		DIR_WrtTime:      t.time,
-		DIR_WrtDate:      t.date,
-		DIR_FstClusLO:    newDirCluster,
-		DIR_FileSize:     0,
-	}
-	dotDotDirEntry := fatDirectoryEntry{
-		DIR_Name:         [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
-		DIR_Attr:         0x10,
-		DIR_CrtTimeTenth: t.tenth,
-		DIR_CrtTime:      t.time,
-		DIR_CrtDate:      t.date,
-		DIR_LstAccDate:   t.date,
-		DIR_FstClusHI:    0,
-		DIR_WrtTime:      t.time,
-		DIR_WrtDate:      t.date,
-		DIR_FstClusLO:    0,
-		DIR_FileSize:     0,
-	}
-	if parentDirCluster != nil {
-		dotDotDirEntry.DIR_FstClusLO = *parentDirCluster
-	}
-
-	// create directory bytes for the new directory
-	newDirectoryDataBytes := make([]byte, fs.bytesPerCluster)
-	dotBytes := dotDirEntry.toBytes()
-	dotDotBytes := dotDotDirEntry.toBytes()
-	copy(newDirectoryDataBytes[:directoryEntrySize], dotBytes[:])
-	copy(newDirectoryDataBytes[directoryEntrySize:], dotDotBytes[:])
-
-	// write . and .. into new cluster in data region
-	_, err = fs.file.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.bytesPerSector))
+	var currentEntryCluster *uint16 = nil
+	currentBytes, err := fs.getRootDirectoryBytes()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
 	}
 
-	return newDirectoryDataBytes, nil
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+
+		currentEntries, err := readDirectoryEntries(currentBytes)
+		if err != nil {
+			return nil, fmt.Errorf("could not read directory entries: %w", err)
+		}
+
+		found := false
+		for _, entry := range currentEntries {
+			if !slices.ContainsFunc(entry.names(), func(name string) bool { return strings.EqualFold(name, part) }) {
+				continue
+			}
+
+			if entry.IsDir() {
+				clusterNumber := entry.clusterNumber()
+				currentBytes, err = fs.getClusterChainBytes(clusterNumber)
+				if err != nil {
+					return nil, fmt.Errorf("could not read directory bytes: %w", err)
+				}
+
+				currentEntryCluster = &clusterNumber
+				found = true
+				break
+			} else {
+				return nil, fmt.Errorf("%s is not a directory", path)
+			}
+		}
+
+		if !found {
+			if mkdir {
+				nRequired := fs.numDirectoryEntriesRequired(part)
+				freeIndex, newDirectoryBytes, err := fs.getAvailableDirectoryEntry(nRequired, currentEntryCluster, currentBytes)
+				if err != nil {
+					return nil, err
+				}
+
+				newDirectoryCluster, err := fs.allocateClusterChain(directoryEntrySize * 2)
+				if err != nil {
+					return nil, err
+				}
+
+				newDirectoryBytes, err = fs.writeDirectoryEntry(part, newDirectoryCluster, newDirectoryBytes, currentEntries, currentEntryCluster, freeIndex)
+				if err != nil {
+					return nil, fmt.Errorf("could not write directory entry: %w", err)
+				}
+
+				currentBytes = newDirectoryBytes
+				currentEntryCluster = &newDirectoryCluster
+			} else {
+				return nil, fmt.Errorf("no such file or directory %s", path)
+			}
+		}
+	}
+
+	entries, err := readDirectoryEntries(currentBytes)
+	if err != nil {
+		return nil, fmt.Errorf("could not read directory entries: %w", err)
+	}
+
+	return &readDirResult{
+		entries: entries,
+		bytes:   currentBytes,
+		cluster: currentEntryCluster,
+	}, nil
 }
