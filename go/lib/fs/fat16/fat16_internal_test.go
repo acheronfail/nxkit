@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/acheronfail/nxkit/lib/fs/testutils"
+	"github.com/acheronfail/nxkit/lib/fs/testdata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -39,7 +39,7 @@ func mockDirEntry(names mockDirEntryNames) DirectoryEntry {
 }
 
 func TestReadShortFileName(t *testing.T) {
-	fs, err := NewFromPath(testutils.DiskImagePath)
+	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -53,7 +53,7 @@ func TestReadShortFileName(t *testing.T) {
 }
 
 func TestCreateShortFileName(t *testing.T) {
-	fs, err := NewFromPath(testutils.DiskImagePath)
+	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 

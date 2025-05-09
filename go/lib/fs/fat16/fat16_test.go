@@ -8,13 +8,13 @@ import (
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fs/fat16"
-	"github.com/acheronfail/nxkit/lib/fs/testutils"
+	"github.com/acheronfail/nxkit/lib/fs/testdata"
 	"github.com/acheronfail/nxkit/lib/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestReadDir(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -74,7 +74,7 @@ func TestReadDir(t *testing.T) {
 }
 
 func TestMkdir(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -99,7 +99,7 @@ func TestMkdir(t *testing.T) {
 
 		testSingleMkdirWorked(fs)
 
-		newFs, err := fat16.NewFromPath(testutils.DiskImagePath)
+		newFs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 		assert.Nil(t, err)
 		testSingleMkdirWorked(newFs)
 	})
@@ -135,7 +135,7 @@ func TestMkdir(t *testing.T) {
 }
 
 func TestOpenFile(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -332,7 +332,7 @@ func TestOpenFile(t *testing.T) {
 }
 
 func TestStat(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -372,7 +372,7 @@ func TestStat(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -460,7 +460,7 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestRmdir(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -515,7 +515,7 @@ func TestRmdir(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	fs, err := fat16.NewFromPath(testutils.DiskImagePath)
+	fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
