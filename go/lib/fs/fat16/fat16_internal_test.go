@@ -2,6 +2,7 @@ package fat16
 
 import (
 	"bytes"
+	"math/rand"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fs/testdata"
@@ -56,6 +57,13 @@ func TestCreateShortFileName(t *testing.T) {
 	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
+
+	// make the random number generator deterministic for the tests
+	rng := rand.New(rand.NewSource(0))
+	deterministicRand := func(n int) int {
+		return rng.Intn(n)
+	}
+	fs.randIntn = &deterministicRand
 
 	for _, tc := range mockNames {
 		t.Run(tc.longFileName, func(t *testing.T) {

@@ -31,7 +31,7 @@ type FileSystem struct {
 	rootDirectorySectorCount uint32
 	dataSectorStart          uint32
 	table                    table
-	rand                     *rand.Rand
+	randIntn                 *func(n int) int
 }
 
 func NewFromPath(path string) (*FileSystem, error) {
@@ -71,6 +71,7 @@ func NewFromPath(path string) (*FileSystem, error) {
 	rootDirectorySectorCount := uint32((32*bootSector.BPB_RootEntCnt + bootSector.BPB_BytsPerSec - 1) / bootSector.BPB_BytsPerSec)
 	dataSectorStart := rootDirectorySectorStart + rootDirectorySectorCount
 
+	randFunc := func(n int) int { return rand.Intn(n) }
 	fs := &FileSystem{
 		file:                     file,
 		bootSector:               *bootSector,
@@ -83,7 +84,7 @@ func NewFromPath(path string) (*FileSystem, error) {
 		rootDirectorySectorStart: rootDirectorySectorStart,
 		rootDirectorySectorCount: rootDirectorySectorCount,
 		dataSectorStart:          dataSectorStart,
-		rand:                     rand.New(rand.NewSource(0)),
+		randIntn:                 &randFunc,
 	}
 
 	// TODONICE: support more than 2 fats
@@ -561,6 +562,7 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	return fs.removeEntryFromParent(srcEntry, srcParent.cluster)
 }
 
+// TODO: lfn - always create if sfn is lossy (even due to casing, etc)
 // TODO: rm -rf
 // TODO: support NT_Res attributes
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)

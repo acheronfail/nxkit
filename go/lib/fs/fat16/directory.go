@@ -388,7 +388,7 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 		return r
 	}, name)
 	if len(name) == 0 || strings.HasPrefix(name, ".") {
-		name = fmt.Sprintf("%04X%s", fs.rand.Intn(0x10000), name)
+		name = fmt.Sprintf("%04X%s", (*fs.randIntn)(0x10000), name)
 	}
 
 	// 7. truncate body and extension to 8 and 3 bytes (if truncation occurs, set lossy)
