@@ -162,7 +162,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 			continue
 		}
 
-		currentEntries, err := fs.readDirectoryEntries(currentBytes)
+		currentEntries, err := readDirectoryEntries(currentBytes)
 		if err != nil {
 			return nil, fmt.Errorf("could not read directory entries: %w", err)
 		}
@@ -214,7 +214,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 		}
 	}
 
-	entries, err := fs.readDirectoryEntries(currentBytes)
+	entries, err := readDirectoryEntries(currentBytes)
 	if err != nil {
 		return nil, fmt.Errorf("could not read directory entries: %w", err)
 	}
@@ -398,22 +398,28 @@ func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
 	return entry, nil
 }
 func (fs *FileSystem) removeEntryFromParent(entry *DirectoryEntry, parentDirCluster *uint16) error {
-	index, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
+	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
 	if err != nil {
 		return err
 	}
 
-	// TODO: also delete lfn entries
+	// find all associated lfn entries
+	sfnChecksum := calculateShortNameChecksum(entry.DIR_Name[:])
+	lfnIndex := entryIndex - directoryEntrySize
+	for lfnIndex >= 0 && parentDirBytes[lfnIndex+11] == 0x0F && parentDirBytes[lfnIndex+13] == sfnChecksum {
+		parentDirBytes[lfnIndex] = 0xE5
+		lfnIndex -= directoryEntrySize
+	}
 
 	// set first byte of entry to 0xE5 to mark as deleted
-	entry.fatDirectoryEntry.DIR_Name[0] = 0xE5
+	parentDirBytes[entryIndex] = 0xE5
 
 	// write back to disk
 	err = fs.writeEntriesToParent(
-		[]to32Bytes{&entry.fatDirectoryEntry},
+		[]to32Bytes{},
 		parentDirCluster,
 		parentDirBytes,
-		index,
+		entryIndex,
 	)
 	if err != nil {
 		return err
@@ -479,7 +485,7 @@ func (fs *FileSystem) Rmdir(path string) error {
 		return err
 	}
 
-	entries, err := fs.readDirectoryEntries(entryBytes)
+	entries, err := readDirectoryEntries(entryBytes)
 	if err != nil {
 		return err
 	}
@@ -556,13 +562,10 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 }
 
 // TODO: rm -rf
-// TODO: complete lfn support:
-//	read entries  - ignore invalid lfn entries
-//	unlink, rmdir - also remove lfn entries
-// 	rename        - update lfn entries
-// 	operations    - clean up garbage lfn entries (when other systems without lfn use the disk)
 // TODO: support NT_Res attributes
-// TODO: reformat fs
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
-// TODO: defragmentation operation (since renames and such will cause fragmentation with lfn support)
-//	or, alternatively re-write the entire directory clusters in a de-fragmented state each time
+// TODO: reformat fs
+// TODO: utils:
+//	- defragmentation operation (since renames and such will cause fragmentation with lfn support)
+//		or, alternatively re-write the entire directory clusters in a de-fragmented state each time
+//	- clean up garbage lfn entries (when other systems without lfn use the disk)

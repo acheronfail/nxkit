@@ -501,9 +501,10 @@ func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries in
 	return 0, false
 }
 
-func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
+func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
 	entries := make([]DirectoryEntry, 0)
 
+	var longFileNameSum *uint8
 	longFileName := ""
 	for i := 0; i < len(dirBytes); i += directoryEntrySize {
 		if dirBytes[i] == 0x00 {
@@ -528,16 +529,36 @@ func (fs *FileSystem) readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, e
 
 			// Extract the actual name parts and prepend them (since LFN entries are stored in reverse order)
 			namePart := lfn.extractNamePart()
-			if lfn.LDIR_Ord&0x40 != 0 { // Last entry
+
+			// this was the first lfn entry, reset lfn
+			if lfn.LDIR_Ord&0x40 != 0 {
 				longFileName = ""
+				longFileNameSum = nil
 			}
+
+			// if the checksums didn't match, then discard them
+			if longFileNameSum != nil && *longFileNameSum != lfn.LDIR_Chksum {
+				continue
+			}
+
 			longFileName = namePart + longFileName
+			longFileNameSum = &lfn.LDIR_Chksum
 			continue
 		}
 
 		fatEntry := fatDirectoryEntryFromBytes(dirBytes[i : i+32])
-		entries = append(entries, DirectoryEntry{fatDirectoryEntry: fatEntry, longFileName: longFileName})
+		entry := DirectoryEntry{fatDirectoryEntry: fatEntry}
+
+		// check lfn checksum before applying it
+		if longFileNameSum != nil && calculateShortNameChecksum(fatEntry.DIR_Name[:]) == *longFileNameSum {
+			entry.longFileName = longFileName
+		}
+
+		// reset lfn
 		longFileName = ""
+		longFileNameSum = nil
+
+		entries = append(entries, entry)
 	}
 
 	return entries, nil

@@ -1,6 +1,7 @@
 package fat16
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fs/testutils"
@@ -73,4 +74,232 @@ func TestCreateShortFileName(t *testing.T) {
 			assert.Equal(t, tc.shortFileNameBytes, sfnBytes)
 		})
 	}
+}
+
+func TestReadDirectoryEntries(t *testing.T) {
+	entryBytes := []byte{
+		// DIR_Name: 11 bytes
+		0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, 0x49, 0x4a, 0x4b,
+		// DIR_Attr: 1 byte
+		0x00,
+		// DIR_NTRes: 1 byte
+		0x00,
+		// DIR_CrtTimeTenth: 1 byte
+		0x00,
+		// DIR_CrtTime: 2 bytes
+		0x00, 0x00,
+		// DIR_CrtDate: 2 bytes
+		0x00, 0x00,
+		// DIR_LstAccDate: 2 bytes
+		0x00, 0x00,
+		// DIR_FstClusHI: 2 bytes
+		0x00, 0x00,
+		// DIR_WrtTime: 2 bytes
+		0x00, 0x00,
+		// DIR_WrtDate: 2 bytes
+		0x00, 0x00,
+		// DIR_FstClusLO: 2 bytes
+		0x00, 0x00,
+		// DIR_FileSize: 4 bytes
+		0x00, 0x00, 0x00, 0x00,
+	}
+
+	entryChecksum := calculateShortNameChecksum(entryBytes[:])
+
+	assertEntry := func(t *testing.T, entry DirectoryEntry) {
+		assert.Equal(t, "ABCDEFGH.IJK", entry.ShortName())
+		assert.False(t, entry.IsDir())
+	}
+
+	t.Run("read single entry", func(t *testing.T) {
+		entries, err := readDirectoryEntries(entryBytes)
+		assert.Nil(t, err)
+		assert.Len(t, entries, 1)
+		assertEntry(t, entries[0])
+	})
+
+	t.Run("read entry with 1 lfn", func(t *testing.T) {
+		data := bytes.Join(
+			[][]byte{
+				{
+					// LDIR_Ord: 1 byte
+					0x41,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x30, 0x00, 0x31, 0x00, 0x32, 0x00, 0x33, 0x00, 0x34, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum,
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x35, 0x00, 0x36, 0x00, 0x37, 0x00, 0x38, 0x00, 0x39, 0x00, 0x41, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x42, 0x00, 0x43, 0x00,
+				},
+				entryBytes,
+			},
+			[]byte{},
+		)
+		entries, err := readDirectoryEntries(data)
+		assert.Nil(t, err)
+		assert.Len(t, entries, 1)
+		assertEntry(t, entries[0])
+		assert.Equal(t, "0123456789ABC", entries[0].longFileName)
+	})
+
+	t.Run("read entry with 3 lfns", func(t *testing.T) {
+		data := bytes.Join(
+			[][]byte{
+				{
+					// LDIR_Ord: 1 byte
+					0x43,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x51, 0x00, 0x52, 0x00, 0x53, 0x00, 0x54, 0x00, 0x55, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum,
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x56, 0x00, 0x57, 0x00, 0x58, 0x00, 0x59, 0x00, 0x5a, 0x00, 0x00, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0xff, 0xff, 0xff, 0xff,
+				},
+				{
+					// LDIR_Ord: 1 byte
+					0x02,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x44, 0x00, 0x45, 0x00, 0x46, 0x00, 0x47, 0x00, 0x48, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum,
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x49, 0x00, 0x4a, 0x00, 0x4b, 0x00, 0x4c, 0x00, 0x4d, 0x00, 0x4e, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x4f, 0x00, 0x50, 0x00,
+				},
+				{
+					// LDIR_Ord: 1 byte
+					0x01,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x30, 0x00, 0x31, 0x00, 0x32, 0x00, 0x33, 0x00, 0x34, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum,
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x35, 0x00, 0x36, 0x00, 0x37, 0x00, 0x38, 0x00, 0x39, 0x00, 0x41, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x42, 0x00, 0x43, 0x00,
+				},
+				entryBytes,
+			},
+			[]byte{},
+		)
+		entries, err := readDirectoryEntries(data)
+		assert.Nil(t, err)
+		assert.Len(t, entries, 1)
+		assertEntry(t, entries[0])
+		assert.Equal(t, "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ", entries[0].longFileName)
+	})
+
+	t.Run("read entry with bad lfn", func(t *testing.T) {
+		data := bytes.Join(
+			[][]byte{
+				{
+					// LDIR_Ord: 1 byte
+					0x41,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x41, 0x00, 0x42, 0x00, 0x43, 0x00, 0x44, 0x00, 0x45, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum + 1, // NOTE: incorrect checksum
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x46, 0x00, 0x47, 0x00, 0x48, 0x00, 0x49, 0x00, 0x4a, 0x00, 0x4b, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x4c, 0x00, 0x4d, 0x00,
+				},
+				entryBytes,
+			},
+			[]byte{},
+		)
+		entries, err := readDirectoryEntries(data)
+		assert.Nil(t, err)
+		assert.Len(t, entries, 1)
+		assertEntry(t, entries[0])
+		// should be empty, since checksum didn't match
+		assert.Equal(t, "", entries[0].longFileName)
+	})
+
+	t.Run("read entry with bad lfns", func(t *testing.T) {
+		data := bytes.Join(
+			[][]byte{
+				// invalid "BBBBBBBBBBBBB"
+				{
+					// LDIR_Ord: 1 byte
+					0x41,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x42, 0x00, 0x42, 0x00, 0x42, 0x00, 0x42, 0x00, 0x42, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum + 1, // NOTE: incorrect checksum
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x42, 0x00, 0x42, 0x00, 0x42, 0x00, 0x42, 0x00, 0x42, 0x00, 0x42, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x42, 0x00, 0x42, 0x00,
+				},
+				// valid "GGGGGGGGGGGG"
+				{
+					// LDIR_Ord: 1 byte
+					0x41,
+					// LDIR_Name1: 10 bytes (utf-16)
+					0x47, 0x00, 0x47, 0x00, 0x47, 0x00, 0x47, 0x00, 0x47, 0x00,
+					// LDIR_Attr: 1 byte
+					0x0F,
+					// LDIR_Type: 1 byte
+					0x00,
+					// LDIR_Chksum: 1 byte
+					entryChecksum,
+					// LDIR_Name2: 12 bytes (utf-16)
+					0x47, 0x00, 0x47, 0x00, 0x47, 0x00, 0x47, 0x00, 0x47, 0x00, 0x47, 0x00,
+					// LDIR_FstClusLO: 2 bytes
+					0x00, 0x00,
+					// LDIR_Name3: 4 bytes (utf-16)
+					0x47, 0x00, 0x47, 0x00,
+				},
+				entryBytes,
+			},
+			[]byte{},
+		)
+		entries, err := readDirectoryEntries(data)
+		assert.Nil(t, err)
+		assert.Len(t, entries, 1)
+		assertEntry(t, entries[0])
+		assert.Equal(t, "GGGGGGGGGGGGG", entries[0].longFileName)
+	})
 }

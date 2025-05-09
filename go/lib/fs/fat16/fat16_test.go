@@ -422,9 +422,35 @@ func TestUnlink(t *testing.T) {
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.False(t, slices.Contains(shortNames, "UNLINK"))
 
-		// TODO: test file not found
-		// TODO: test lfn entries properly deleted
-		// TODO: an internal test which checks the cluster chain is deleted
+		// TODO: internal test which test lfn entries properly deleted
+		// TODO: internal test which checks the cluster chain is deleted
+	})
+
+	t.Run("unlink - lfn", func(t *testing.T) {
+		// create empty file
+		_, err := fs.OpenFile("/write/a_file_with_a_long_name", os.O_WRONLY|os.O_CREATE)
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write")
+		assert.Nil(t, err)
+		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.True(t, slices.Contains(longNames, "a_file_with_a_long_name"))
+
+		// unlink
+		err = fs.Unlink("/write/a_file_with_a_long_name")
+		assert.Nil(t, err)
+
+		// check it doesn't exist in parent dir
+		entries, err = fs.ReadDir("/write")
+		assert.Nil(t, err)
+		longNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.False(t, slices.Contains(longNames, "a_file_with_a_long_name"))
+	})
+
+	t.Run("unlink - not found", func(t *testing.T) {
+		err := fs.Unlink("/not_here")
+		assert.EqualError(t, err, "no such file or directory /not_here")
 	})
 
 	t.Run("unlink - dir", func(t *testing.T) {
@@ -458,6 +484,28 @@ func TestRmdir(t *testing.T) {
 		assert.Nil(t, err)
 		shortNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.False(t, slices.Contains(shortNames, "EMPTY"))
+	})
+
+	t.Run("rmdir - lfn", func(t *testing.T) {
+		// create dir
+		err := fs.Mkdir("/write/rmdir/a_dir_with_a_long_name")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err := fs.ReadDir("/write/rmdir")
+		assert.Nil(t, err)
+		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.True(t, slices.Contains(longNames, "a_dir_with_a_long_name"))
+
+		// rmdir
+		err = fs.Rmdir("/write/rmdir/a_dir_with_a_long_name")
+		assert.Nil(t, err)
+
+		// check it exists in parent dir
+		entries, err = fs.ReadDir("/write/rmdir")
+		assert.Nil(t, err)
+		longNames = utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.False(t, slices.Contains(longNames, "a_dir_with_a_long_name"))
 	})
 
 	t.Run("rmdir - non-empty dir", func(t *testing.T) {
