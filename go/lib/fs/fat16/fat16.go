@@ -495,7 +495,8 @@ func (fs *FileSystem) Rmdir(path string) error {
 	return fs.removeEntryFromParentWithCluster(entry, parent.cluster)
 }
 
-// Rename renames (moves) oldpath to newpath. If newpath already exists and is not a directory, Rename replaces it.
+// Rename renames (moves) srcPath to dstPath.
+// If dstPath already exists and is not a directory, it is replaced.
 func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	// find source entry
 	srcEntry, srcParent, found, err := fs.findEntry(srcPath)
@@ -556,7 +557,6 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	return fs.removeEntryFromParent(srcEntry, srcParent.cluster)
 }
 
-// TODO: rm -rf
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
 // TODO: reformat fs
 // TODO: utils:
