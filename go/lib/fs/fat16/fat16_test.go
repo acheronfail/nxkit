@@ -120,11 +120,23 @@ func TestMkdir(t *testing.T) {
 		assert.Len(t, entryNames, int(i+2)) // +2 for . and ..
 	})
 
-	t.Run("mkdir with long name", func(t *testing.T) {
-		err := fs.Mkdir("/mkdir/long/a_directory_with_a_long_name")
+	t.Run("mkdir with 1 lfn", func(t *testing.T) {
+		err := fs.Mkdir("/mkdir/long1/aBcDe")
 		assert.Nil(t, err)
 
-		entries, err := fs.ReadDir("/mkdir/long")
+		entries, err := fs.ReadDir("/mkdir/long1")
+		assert.Nil(t, err)
+		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
+		assert.Equal(t, []string{".", "..", "ABCDE"}, shortNames)
+		longNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.LongName() })
+		assert.Equal(t, []string{".", "..", "aBcDe"}, longNames)
+	})
+
+	t.Run("mkdir with multiple lfns", func(t *testing.T) {
+		err := fs.Mkdir("/mkdir/long2/a_directory_with_a_long_name")
+		assert.Nil(t, err)
+
+		entries, err := fs.ReadDir("/mkdir/long2")
 		assert.Nil(t, err)
 		shortNames := utils.MapSlice(entries, func(entry fat16.DirectoryEntry) string { return entry.ShortName() })
 		assert.Equal(t, []string{".", "..", "A_DIRE~1"}, shortNames)

@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf16"
 
 	"github.com/acheronfail/nxkit/lib/utils"
 )
@@ -439,10 +440,10 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 	if !lossy && !slices.Contains(existingNames, finalName) {
 		parts := strings.SplitN(desiredName, ".", 2)
 		ntRes := uint8(0)
-		if parts[0] != strings.ToUpper(body) {
+		if parts[0] == strings.ToLower(body) {
 			ntRes |= 0x08
 		}
-		if ext != "" && parts[1] != strings.ToUpper(ext) {
+		if ext != "" && parts[1] == strings.ToLower(ext) {
 			ntRes |= 0x10
 		}
 
@@ -477,12 +478,31 @@ func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []
 	return sfnBytes, ntRes
 }
 
-func (fs *FileSystem) numDirectoryEntriesRequired(dirName string) int {
-	if len(dirName) <= 11 {
-		return 1
+// calculates the number of directory entries required, including the normal entry
+func (fs *FileSystem) numDirectoryEntriesRequired(name string) int {
+	// start with the normal directory entry
+	needed := 1
+
+	// http://elm-chan.org/docs/fat_e.html#lfn_suppression
+	sfn, _, ntRes := fs.createShortName(name, []DirectoryEntry{})
+
+	// if we set NTRes, then we've discovered a name that can be represented
+	// with a single entry + the NTRes flag
+	if ntRes != 0 {
+		return needed
 	}
 
-	return (len(dirName) / longFileNameUtf16Length) + 1
+	// if NTRes isn't set, and name is the same, then we only need a single entry
+	if sfn == name {
+		return needed
+	}
+
+	// otherwise we need to create LFN entries for this name
+	runes := utf16.Encode([]rune(name))
+	lfnCount := (len(runes) + 12) / 13 // round up
+	needed += lfnCount
+
+	return needed
 }
 
 // TODO: improve this - with tests - to:
@@ -623,50 +643,54 @@ func calculateShortNameChecksum(shortName []byte) uint8 {
 }
 
 func (fs *FileSystem) createLongFileNameEntries(longName string, checksum uint8) []fatLongFileName {
-	numEntries := fs.numDirectoryEntriesRequired(longName)
-	if numEntries <= 1 {
+	numLfnEntries := fs.numDirectoryEntriesRequired(longName) - 1
+	if numLfnEntries < 1 {
 		return nil
 	}
 
-	lfnEntries := make([]fatLongFileName, numEntries)
-	max := numEntries - 1
-	for i := max; i >= 0; i-- {
+	runes := utf16.Encode([]rune(longName))
+	lfnEntries := make([]fatLongFileName, numLfnEntries)
+	limit := numLfnEntries - 1
+	for i := limit; i >= 0; i-- {
 		start := i * longFileNameUtf16Length
-		end := min((i+1)*longFileNameUtf16Length, len(longName))
-		chunk := longName[start:end]
+		end := min(start+longFileNameUtf16Length, len(runes))
+		chunk := runes[start:end]
 
-		lfnBytes := make([]byte, longFileNameUtf16Length*2)
-		for j := range lfnBytes {
-			lfnBytes[j] = 0xFF
+		// fill with 0xFFFF
+		var lfnBytes [26]byte
+		for j := 0; j < len(lfnBytes); j += 2 {
+			binary.LittleEndian.PutUint16(lfnBytes[j:j+2], 0xFFFF)
 		}
 
-		for j, char := range chunk {
-			binary.LittleEndian.PutUint16(lfnBytes[j*2:j*2+2], uint16(char))
+		// copy in chunk
+		for j, r := range chunk {
+			binary.LittleEndian.PutUint16(lfnBytes[j*2:j*2+2], r)
 		}
 
 		// null terminate
 		chunkLen := len(chunk)
 		if chunkLen < longFileNameUtf16Length {
-			binary.LittleEndian.PutUint16(lfnBytes[chunkLen*2:chunkLen*2+2], 0x0000)
+			binary.LittleEndian.PutUint16(lfnBytes[chunkLen*2:], 0x0000)
 		}
 
 		// Calculate sequence number
 		seqNum := uint8(i + 1)
 		// Set the last entry flag for the last LFN entry
-		if i == max {
+		if i == limit {
 			seqNum |= 0x40
 		}
+
 		lfnEntry := fatLongFileName{
 			LDIR_Ord:       seqNum,
 			LDIR_Attr:      0x0F,
-			LDIR_Type:      0x00,
+			LDIR_Type:      0,
 			LDIR_Chksum:    checksum,
 			LDIR_FstClusLO: 0,
 		}
-		copy(lfnEntry.LDIR_Name1[:], lfnBytes[:10])
+		copy(lfnEntry.LDIR_Name1[:], lfnBytes[0:10])
 		copy(lfnEntry.LDIR_Name2[:], lfnBytes[10:22])
 		copy(lfnEntry.LDIR_Name3[:], lfnBytes[22:26])
-		lfnEntries[max-i] = lfnEntry
+		lfnEntries[limit-i] = lfnEntry
 	}
 
 	return lfnEntries

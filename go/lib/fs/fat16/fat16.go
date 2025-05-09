@@ -556,7 +556,6 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	return fs.removeEntryFromParent(srcEntry, srcParent.cluster)
 }
 
-// TODO: lfn - always create if sfn is lossy (even due to casing, etc)
 // TODO: rm -rf
 // TODO: prevent volume label collision with entries (http://elm-chan.org/docs/fat_e.html#fat_dir)
 // TODO: reformat fs
