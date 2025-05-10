@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"bytes"
@@ -16,48 +16,48 @@ const (
 	longFileNameUtf16Length = 13
 )
 
-type DirectoryEntry struct {
+type Entry struct {
 	fatDirectoryEntry
 	longFileName string
 }
 
 // IsArchive implements fs.Stat.
-func (d *DirectoryEntry) IsArchive() bool {
+func (d *Entry) IsArchive() bool {
 	return d.fatDirectoryEntry.IsArchive()
 }
 
 // IsDir implements fs.Stat.
-func (d *DirectoryEntry) IsDir() bool {
+func (d *Entry) IsDir() bool {
 	return d.fatDirectoryEntry.IsDir()
 }
 
 // IsFile implements fs.Stat.
-func (d *DirectoryEntry) IsFile() bool {
+func (d *Entry) IsFile() bool {
 	return !d.fatDirectoryEntry.IsDir()
 }
 
 // IsHidden implements fs.Stat.
-func (d *DirectoryEntry) IsHidden() bool {
+func (d *Entry) IsHidden() bool {
 	return d.fatDirectoryEntry.IsHidden()
 }
 
 // IsReadOnly implements fs.Stat.
-func (d *DirectoryEntry) IsReadOnly() bool {
+func (d *Entry) IsReadOnly() bool {
 	return d.fatDirectoryEntry.IsReadOnly()
 }
 
 // IsSystem implements fs.Stat.
-func (d *DirectoryEntry) IsSystem() bool {
+func (d *Entry) IsSystem() bool {
 	return d.fatDirectoryEntry.IsSystem()
 }
 
 // IsVolumeId implements fs.Stat.
-func (d *DirectoryEntry) IsVolumeId() bool {
+func (d *Entry) IsVolumeId() bool {
 	return d.fatDirectoryEntry.IsVolumeId()
 }
 
 // Size implements fs.Stat.
-func (d *DirectoryEntry) Size() int64 {
+func (d *Entry) Size() int64 {
 	return int64(d.fatDirectoryEntry.DIR_FileSize)
 }
 
@@ -117,7 +117,7 @@ func asFatTime(t time.Time) *fatTime {
 	}
 }
 
-func (d *DirectoryEntry) names() []string {
+func (d *Entry) names() []string {
 	names := []string{d.ShortName()}
 	if d.longFileName != "" {
 		names = append(names, d.longFileName)
@@ -126,7 +126,7 @@ func (d *DirectoryEntry) names() []string {
 	return names
 }
 
-func (d *DirectoryEntry) ShortName() string {
+func (d *Entry) ShortName() string {
 	nameBytes := bytes.Clone(d.DIR_Name[:])
 
 	if d.IsVolumeId() {
@@ -151,7 +151,7 @@ func (d *DirectoryEntry) ShortName() string {
 	return string(bdyBytes) + "." + string(extBytes)
 }
 
-func (d *DirectoryEntry) LongName() string {
+func (d *Entry) LongName() string {
 	if d.longFileName != "" {
 		return d.longFileName
 	}
@@ -242,25 +242,25 @@ func (d *fatDirectoryEntry) clone() fatDirectoryEntry {
 	return fatDirectoryEntryFromBytes(data[:])
 }
 
-func (d *DirectoryEntry) clone() DirectoryEntry {
-	return DirectoryEntry{
+func (d *Entry) clone() Entry {
+	return Entry{
 		fatDirectoryEntry: d.fatDirectoryEntry.clone(),
 		longFileName:      d.longFileName,
 	}
 }
 
-func (d *DirectoryEntry) clusterNumber() uint16 {
+func (d *Entry) clusterNumber() uint16 {
 	// d.DIR_FstClusHI unused in FAT16 and always zero
 	return d.DIR_FstClusLO
 }
 
-func (d *DirectoryEntry) setCluster(cluster uint16) {
+func (d *Entry) setCluster(cluster uint16) {
 	d.DIR_FstClusLO = cluster
 }
 
 // http://elm-chan.org/docs/fat_e.html#name_conversion
 // returns (shortFileName, shortFileNameBytes, NTRes value)
-func (fs *FileSystem) createShortName(desiredName string, siblingEntries []DirectoryEntry) (string, [11]byte, uint8) {
+func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Entry) (string, [11]byte, uint8) {
 	lossy := false
 
 	// 1. convert to upper
@@ -359,7 +359,7 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 		return value
 	}
 
-	existingNames := utils.MapSlice(siblingEntries, func(entry DirectoryEntry) string { return entry.ShortName() })
+	existingNames := utils.MapSlice(siblingEntries, func(entry Entry) string { return entry.ShortName() })
 	if !lossy && !slices.Contains(existingNames, finalName) {
 		parts := strings.SplitN(desiredName, ".", 2)
 		ntRes := uint8(0)
@@ -396,13 +396,13 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Direc
 	return finalName, asBytes, 0
 }
 
-func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []DirectoryEntry) ([11]byte, uint8) {
+func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []Entry) ([11]byte, uint8) {
 	_, sfnBytes, ntRes := fs.createShortName(desiredName, siblingEntries)
 	return sfnBytes, ntRes
 }
 
 type readDirResult struct {
-	entries []DirectoryEntry
+	entries []Entry
 	bytes   []byte
 	cluster *uint16
 }

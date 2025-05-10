@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 )
 
 type fatFile struct {
-	DirectoryEntry
+	Entry
 	parentDirCluster *uint16
 	// this value is the same as `os.OpenFile`'s flags ANDed with `0b11`
 	accessMode int
@@ -19,7 +19,7 @@ func (f *fatFile) Close() error {
 }
 
 func (f *fatFile) Size() int64 {
-	return int64(f.DirectoryEntry.DIR_FileSize)
+	return int64(f.Entry.DIR_FileSize)
 }
 
 func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
@@ -132,7 +132,7 @@ func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 }
 
 func (f *fatFile) writeEntryToParent() error {
-	index, parentDirBytes, err := f.fs.findIndexInParentBytes(&f.DirectoryEntry, f.parentDirCluster)
+	index, parentDirBytes, err := f.fs.findIndexInParentBytes(&f.Entry, f.parentDirCluster)
 	if err != nil {
 		return err
 	}

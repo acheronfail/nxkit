@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"fmt"
@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/acheronfail/nxkit/lib/fs"
-	"github.com/acheronfail/nxkit/lib/fs/boot_sector"
+	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 )
 
 const (
@@ -32,7 +32,7 @@ type FileSystem struct {
 	randIntn                 *func(n int) int
 }
 
-func NewFromPath(path string) (*FileSystem, error) {
+func NewFileSystemFromPath(path string) (*FileSystem, error) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
@@ -116,13 +116,17 @@ func (fs *FileSystem) Close() error {
 	return fs.file.Close()
 }
 
-func (fs *FileSystem) ReadDir(path string) ([]DirectoryEntry, error) {
+func (fs *FileSystem) ReadDir(path string) ([]fat.DirectoryEntry, error) {
 	result, err := fs.readDir(path, false)
 	if err != nil {
 		return nil, err
 	}
 
-	return result.entries, nil
+	entries := make([]fat.DirectoryEntry, len(result.entries))
+	for i, entry := range result.entries {
+		entries[i] = fat.DirectoryEntry(&entry)
+	}
+	return entries, nil
 }
 
 func (fs *FileSystem) Mkdir(path string) error {
@@ -132,7 +136,7 @@ func (fs *FileSystem) Mkdir(path string) error {
 
 // use os.OpenFile flags
 // currently supports O_RDONLY and O_CREATE
-func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
+func (fs *FileSystem) OpenFile(path string, flags int) (fat.File, error) {
 	canWrite := flags&os.O_WRONLY != 0 || flags&os.O_RDWR != 0
 
 	existing, parent, found, err := fs.findEntry(path)
@@ -184,7 +188,7 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 		}
 
 		return &fatFile{
-			DirectoryEntry:   *existing,
+			Entry:            *existing,
 			parentDirCluster: parent.cluster,
 			accessMode:       flags & 0b11,
 			fs:               fs,
@@ -205,7 +209,7 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 
 	t := asFatTime(time.Now())
 	baseName := filepath.Base(path)
-	newFileEntry := fs.createNewEntry(baseName, t, 0x00, 0, []DirectoryEntry{})
+	newFileEntry := fs.createNewEntry(baseName, t, 0x00, 0, []Entry{})
 	nRequired := fs.numDirectoryEntriesRequired(baseName)
 	startIndex, newParentDirBytes, err := fs.getAvailableDirectoryEntry(nRequired, parent.cluster, parent.bytes)
 	if err != nil {
@@ -218,14 +222,14 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fs.File, error) {
 	}
 
 	return &fatFile{
-		DirectoryEntry:   *newFileEntry,
+		Entry:            *newFileEntry,
 		parentDirCluster: parent.cluster,
 		accessMode:       flags & 0b11,
 		fs:               fs,
 	}, nil
 }
 
-func (fs *FileSystem) Stat(path string) (fs.Stat, error) {
+func (fs *FileSystem) Stat(path string) (fat.Stat, error) {
 	entry, _, found, err := fs.findEntry(path)
 	if err != nil {
 		return nil, err
@@ -373,7 +377,7 @@ func (fs *FileSystem) GetVolumeId() (string, error) {
 
 		// find the volume id entry
 		if dirBytes[i+11]&0x08 == 0x08 {
-			entry := DirectoryEntry{fatDirectoryEntry: fatDirectoryEntryFromBytes(dirBytes[i:])}
+			entry := Entry{fatDirectoryEntry: fatDirectoryEntryFromBytes(dirBytes[i:])}
 			return entry.ShortName(), nil
 		}
 	}

@@ -7,7 +7,7 @@ setup:
   just fixtures
 
 fixtures:
-  bash ./lib/fs/testdata/create.sh
+  bash ./lib/fat/testdata/create.sh
 
 test *args: fixtures
   go test github.com/acheronfail/nxkit/... {{args}}

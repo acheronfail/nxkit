@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"bytes"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/acheronfail/nxkit/lib/fs/testdata"
+	"github.com/acheronfail/nxkit/lib/fat/testdata"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -37,8 +37,8 @@ var (
 	}
 )
 
-func mockDirEntry(names mockDirEntryNames) DirectoryEntry {
-	return DirectoryEntry{
+func mockDirEntry(names mockDirEntryNames) Entry {
+	return Entry{
 		longFileName: names.longFileName,
 		fatDirectoryEntry: fatDirectoryEntry{
 			DIR_Name:  names.shortFileNameBytes,
@@ -49,7 +49,7 @@ func mockDirEntry(names mockDirEntryNames) DirectoryEntry {
 }
 
 func TestNumEntriesRequired(t *testing.T) {
-	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
+	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -62,7 +62,7 @@ func TestNumEntriesRequired(t *testing.T) {
 }
 
 func TestReadShortFileName(t *testing.T) {
-	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
+	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -76,7 +76,7 @@ func TestReadShortFileName(t *testing.T) {
 }
 
 func TestCreateShortFileName(t *testing.T) {
-	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
+	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -89,7 +89,7 @@ func TestCreateShortFileName(t *testing.T) {
 
 	for _, tc := range mockNames {
 		t.Run(tc.longFileName, func(t *testing.T) {
-			siblingEntries := []DirectoryEntry{}
+			siblingEntries := []Entry{}
 			for _, other := range mockNames {
 				if tc == other {
 					continue
@@ -107,7 +107,7 @@ func TestCreateShortFileName(t *testing.T) {
 }
 
 func TestCreateLongFileNameEntries(t *testing.T) {
-	fs, err := NewFromPath(testdata.Fat16DiskImagePath)
+	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
 	assert.Nil(t, err)
 	defer fs.Close()
 
@@ -165,7 +165,7 @@ func TestReadDirectoryEntries(t *testing.T) {
 
 	entryChecksum := calculateShortNameChecksum(entryBytes[:])
 
-	assertEntry := func(t *testing.T, entry DirectoryEntry) {
+	assertEntry := func(t *testing.T, entry Entry) {
 		assert.Equal(t, "ABCDEFGH.IJK", entry.ShortName())
 		assert.False(t, entry.IsDir())
 	}

@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"encoding/binary"
@@ -82,8 +82,6 @@ func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
 	return nil
 }
 
-// TODO: wherever this is called, if an error happens before writing to disk then handle appropriate
-// to prevent allocating unused clusters
 func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) {
 	nClustersAllocated := 0
 	nClustersRequired := max(1, bytesRequired/fs.bytesPerCluster)

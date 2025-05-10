@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"encoding/binary"

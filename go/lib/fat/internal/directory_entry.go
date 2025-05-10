@@ -1,4 +1,4 @@
-package fat16
+package internal
 
 import (
 	"bytes"
@@ -16,7 +16,7 @@ func (fs *FileSystem) numDirectoryEntriesRequired(name string) int {
 	needed := 1
 
 	// http://elm-chan.org/docs/fat_e.html#lfn_suppression
-	sfn, _, ntRes := fs.createShortName(name, []DirectoryEntry{})
+	sfn, _, ntRes := fs.createShortName(name, []Entry{})
 
 	// if we set NTRes, then we've discovered a name that can be represented
 	// with a single entry + the NTRes flag
@@ -59,8 +59,8 @@ func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries in
 	return 0, false
 }
 
-func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
-	entries := make([]DirectoryEntry, 0)
+func readDirectoryEntries(dirBytes []byte) ([]Entry, error) {
+	entries := make([]Entry, 0)
 
 	var longFileNameSum *uint8
 	longFileName := ""
@@ -96,7 +96,7 @@ func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
 		}
 
 		fatEntry := fatDirectoryEntryFromBytes(dirBytes[i : i+32])
-		entry := DirectoryEntry{fatDirectoryEntry: fatEntry}
+		entry := Entry{fatDirectoryEntry: fatEntry}
 
 		// check lfn checksum before applying it
 		if longFileNameSum != nil && calculateShortNameChecksum(fatEntry.DIR_Name[:]) == *longFileNameSum {
@@ -115,7 +115,7 @@ func readDirectoryEntries(dirBytes []byte) ([]DirectoryEntry, error) {
 	return entries, nil
 }
 
-func (fs *FileSystem) findIndexInParentBytes(ent *DirectoryEntry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
+func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
 	if parentDirCluster == nil {
 		parentDirBytes, err = fs.getRootDirectoryBytes()
 	} else {
@@ -155,8 +155,8 @@ func (fs *FileSystem) createNewEntry(
 	newEntTime *fatTime,
 	newEntAttr uint8,
 	newEntCluster uint16,
-	parentDirEntries []DirectoryEntry,
-) *DirectoryEntry {
+	parentDirEntries []Entry,
+) *Entry {
 	shortNameBytes, ntRes := fs.createShortNameBytes(newEntName, parentDirEntries)
 	newFatDirEntry := fatDirectoryEntry{
 		DIR_Name:         shortNameBytes,
@@ -173,12 +173,12 @@ func (fs *FileSystem) createNewEntry(
 		DIR_FileSize:     0,
 	}
 
-	return &DirectoryEntry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}
+	return &Entry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}
 }
 
 func (fs *FileSystem) writeEntryWithLfnToParent(
 	entLongName string,
-	ent *DirectoryEntry,
+	ent *Entry,
 	parentDirCluster *uint16,
 	parentDirBytes []byte,
 	atParentByteIndex int,
@@ -232,7 +232,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 	newDirName string,
 	newDirCluster uint16,
 	parentDirBytes []byte,
-	parentDirEntries []DirectoryEntry,
+	parentDirEntries []Entry,
 	parentDirCluster *uint16,
 	atParentByteIndex int,
 ) ([]byte, error) {
@@ -329,7 +329,7 @@ func (fs *FileSystem) getAvailableDirectoryEntry(
 	return freeIndex, parentDirBytes, nil
 }
 
-func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, bool, error) {
+func (fs *FileSystem) findEntry(path string) (*Entry, *readDirResult, bool, error) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
 	parent, err := fs.readDir(dirPath, false)
@@ -346,7 +346,7 @@ func (fs *FileSystem) findEntry(path string) (*DirectoryEntry, *readDirResult, b
 	return nil, parent, false, nil
 }
 
-func (fs *FileSystem) removeEntryFromParent(entry *DirectoryEntry, parentDirCluster *uint16) error {
+func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint16) error {
 	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
 	if err != nil {
 		return err
@@ -377,7 +377,7 @@ func (fs *FileSystem) removeEntryFromParent(entry *DirectoryEntry, parentDirClus
 	return nil
 }
 
-func (fs *FileSystem) removeEntryFromParentWithCluster(entry *DirectoryEntry, parentDirCluster *uint16) error {
+func (fs *FileSystem) removeEntryFromParentWithCluster(entry *Entry, parentDirCluster *uint16) error {
 	err := fs.removeEntryFromParent(entry, parentDirCluster)
 	if err != nil {
 		return err
