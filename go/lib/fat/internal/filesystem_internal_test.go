@@ -48,9 +48,32 @@ func mockDirEntry(names mockDirEntryNames) Entry {
 	}
 }
 
-func TestNumEntriesRequired(t *testing.T) {
-	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
+type mockFatTable struct{}
+
+func (m mockFatTable) GetClusterTarget(_ uint16) uint16                    { panic("unused") }
+func (m mockFatTable) IsEoc(_ uint16) bool                                 { panic("unused") }
+func (m mockFatTable) GetMaxCluster() uint16                               { panic("unused") }
+func (m mockFatTable) GetEoc() uint16                                      { panic("unused") }
+func (m mockFatTable) WriteClusterTarget(_ *FileSystem, _, _ uint16) error { panic("unused") }
+func mockParseFatTable(_ []byte) FatTable                                  { return mockFatTable{} }
+
+func mockGetRootDirectoryBytes(_ *FileSystem) ([]byte, error) { panic("unused") }
+
+func createFs(t *testing.T) *FileSystem {
+	t.Helper()
+
+	fs, err := NewFileSystemFromPath(
+		testdata.Fat16DiskImagePath,
+		mockParseFatTable,
+		mockGetRootDirectoryBytes,
+	)
+
 	assert.Nil(t, err)
+	return fs
+}
+
+func TestNumEntriesRequired(t *testing.T) {
+	fs := createFs(t)
 	defer fs.Close()
 
 	for _, tc := range mockNames {
@@ -62,8 +85,7 @@ func TestNumEntriesRequired(t *testing.T) {
 }
 
 func TestReadShortFileName(t *testing.T) {
-	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
-	assert.Nil(t, err)
+	fs := createFs(t)
 	defer fs.Close()
 
 	for _, tc := range mockNames {
@@ -76,16 +98,14 @@ func TestReadShortFileName(t *testing.T) {
 }
 
 func TestCreateShortFileName(t *testing.T) {
-	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
-	assert.Nil(t, err)
+	fs := createFs(t)
 	defer fs.Close()
 
 	// make the random number generator deterministic for the tests
 	rng := rand.New(rand.NewSource(0))
-	deterministicRand := func(n int) int {
+	fs.randIntn = func(n int) int {
 		return rng.Intn(n)
 	}
-	fs.randIntn = &deterministicRand
 
 	for _, tc := range mockNames {
 		t.Run(tc.longFileName, func(t *testing.T) {
@@ -107,8 +127,7 @@ func TestCreateShortFileName(t *testing.T) {
 }
 
 func TestCreateLongFileNameEntries(t *testing.T) {
-	fs, err := NewFileSystemFromPath(testdata.Fat16DiskImagePath)
-	assert.Nil(t, err)
+	fs := createFs(t)
 	defer fs.Close()
 
 	t.Run("lfn - 1 entry mixed case", func(t *testing.T) {

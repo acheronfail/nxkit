@@ -1,0 +1,152 @@
+package internal
+
+import (
+	"fmt"
+)
+
+func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
+	return fs.table.WriteClusterTarget(fs, cluster, target)
+}
+
+func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) {
+	nClustersAllocated := 0
+	nClustersRequired := max(1, bytesRequired/fs.BytesPerCluster)
+
+	prevCluster := fs.table.GetEoc()
+	for cluster := uint16(2); cluster < fs.table.GetMaxCluster(); cluster++ {
+		if fs.table.GetClusterTarget(cluster) == 0x0000 {
+			err := fs.writeClusterToFats(cluster, prevCluster)
+			if err != nil {
+				return 0, err
+			}
+
+			nClustersAllocated++
+			if nClustersAllocated == int(nClustersRequired) {
+				return cluster, nil
+			}
+
+			prevCluster = cluster
+		}
+	}
+
+	return 0, fmt.Errorf("no available clusters")
+}
+
+func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
+	var clusters []uint16
+	currentCluster := startCluster
+	for {
+		clusters = append(clusters, currentCluster)
+		nextCluster := fs.table.GetClusterTarget(currentCluster)
+
+		if fs.table.IsEoc(nextCluster) {
+			break
+		}
+		if nextCluster < 2 {
+			return nil, fmt.Errorf("invalid cluster number: %d", nextCluster)
+		}
+		if nextCluster > fs.table.GetMaxCluster() {
+			return nil, fmt.Errorf("cluster number out of range: %d", nextCluster)
+		}
+
+		currentCluster = nextCluster
+	}
+
+	return clusters, nil
+}
+
+func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) {
+	clusterChain, err := fs.getClusterChain(startCluster)
+	if err != nil {
+		return nil, err
+	}
+
+	var bytes []byte
+	for _, cluster := range clusterChain {
+		clusterBytes := make([]byte, fs.BytesPerCluster)
+		fileOffset := int64(fs.clusterToSector(cluster) * fs.BytesPerSector)
+		_, err := fs.Backend.ReadAt(clusterBytes, fileOffset)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read cluster data: %w", err)
+		}
+
+		bytes = append(bytes, clusterBytes...)
+	}
+
+	return bytes, nil
+}
+
+func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return err
+	}
+
+	for i, cluster := range clusterChain {
+		toWrite := make([]byte, fs.BytesPerCluster)
+		copy(toWrite, clusterBytes[int64(i)*fs.BytesPerCluster:int64(i+1)*fs.BytesPerCluster])
+		_, err := fs.Backend.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.BytesPerSector))
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) deleteClusterChain(clusterStart uint16) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return err
+	}
+
+	for _, cluster := range clusterChain {
+		err := fs.writeClusterToFats(cluster, 0x0000)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (fs *FileSystem) extendClusterChain(clusterStart uint16, totalBytesNeeded int64) error {
+	clusterChain, err := fs.getClusterChain(clusterStart)
+	if err != nil {
+		return nil
+	}
+
+	totalClustersNeeded := max(1, totalBytesNeeded/fs.BytesPerCluster)
+	if totalBytesNeeded%fs.BytesPerCluster > 0 {
+		totalClustersNeeded++
+	}
+
+	nClustersToAllocate := totalClustersNeeded - int64(len(clusterChain))
+
+	if nClustersToAllocate == 0 {
+		return nil
+	}
+
+	prevCluster := clusterChain[len(clusterChain)-1]
+	for cluster := uint16(2); cluster < fs.table.GetMaxCluster(); cluster++ {
+		if fs.table.GetClusterTarget(cluster) == 0x0000 {
+			err := fs.writeClusterToFats(prevCluster, cluster)
+			if err != nil {
+				return err
+			}
+			err = fs.writeClusterToFats(cluster, fs.table.GetEoc())
+			if err != nil {
+				return err
+			}
+
+			nClustersToAllocate--
+			prevCluster = cluster
+
+			if nClustersToAllocate == 0 {
+				break
+			}
+		}
+	}
+
+	return nil
+}

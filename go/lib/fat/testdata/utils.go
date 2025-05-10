@@ -6,7 +6,9 @@ import (
 )
 
 var (
+	Fat12DiskImagePath string
 	Fat16DiskImagePath string
+	Fat32DiskImagePath string
 )
 
 func init() {
@@ -16,5 +18,7 @@ func init() {
 	}
 
 	thisDir := filepath.Dir(filepath.Clean(filename))
+	Fat12DiskImagePath = filepath.Join(thisDir, "fat12", "disk.img")
 	Fat16DiskImagePath = filepath.Join(thisDir, "fat16", "disk.img")
+	Fat32DiskImagePath = filepath.Join(thisDir, "fat32", "disk.img")
 }

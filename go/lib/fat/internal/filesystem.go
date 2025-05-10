@@ -12,27 +12,40 @@ import (
 )
 
 const (
-	directoryEntrySize = 32
-	eoc                = 0xFFF8
+	FatDirectoryEntrySize = 32
 )
 
-type FileSystem struct {
-	file                     *os.File
-	bootSector               boot_sector.BootSector
-	bytesPerSector           uint32
-	bytesPerCluster          int64
-	sectorsPerCluster        uint32
-	fatSectorCount           uint32
-	fatsSectorStart          uint32
-	fatsSectorCount          uint32
-	rootDirectorySectorStart uint32
-	rootDirectorySectorCount uint32
-	dataSectorStart          uint32
-	table                    table
-	randIntn                 *func(n int) int
+type FatTable interface {
+	GetClusterTarget(cluster uint16) uint16
+	WriteClusterTarget(fs *FileSystem, cluster, target uint16) error
+	GetMaxCluster() uint16
+	GetEoc() uint16
+	IsEoc(cluster uint16) bool
 }
 
-func NewFileSystemFromPath(path string) (*FileSystem, error) {
+type FileSystem struct {
+	Backend                  *os.File
+	BootSector               boot_sector.BootSector
+	BytesPerSector           uint32
+	BytesPerCluster          int64
+	SectorsPerCluster        uint32
+	FatSectorCount           uint32
+	FatsSectorStart          uint32
+	FatsSectorCount          uint32
+	RootDirectorySectorStart uint32
+	RootDirectorySectorCount uint32
+	DataSectorStart          uint32
+
+	table                 FatTable
+	randIntn              func(n int) int
+	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error)
+}
+
+func NewFileSystemFromPath(
+	path string,
+	parseFatTable func(data []byte) FatTable,
+	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error),
+) (*FileSystem, error) {
 	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, err
@@ -71,18 +84,20 @@ func NewFileSystemFromPath(path string) (*FileSystem, error) {
 
 	randFunc := func(n int) int { return rand.Intn(n) }
 	fs := &FileSystem{
-		file:                     file,
-		bootSector:               *bootSector,
-		bytesPerSector:           bytesPerSector,
-		bytesPerCluster:          bytesPerCluster,
-		sectorsPerCluster:        sectorsPerCluster,
-		fatSectorCount:           fatSectorCount,
-		fatsSectorStart:          fatsSectorStart,
-		fatsSectorCount:          fatsSectorCount,
-		rootDirectorySectorStart: rootDirectorySectorStart,
-		rootDirectorySectorCount: rootDirectorySectorCount,
-		dataSectorStart:          dataSectorStart,
-		randIntn:                 &randFunc,
+		Backend:                  file,
+		BootSector:               *bootSector,
+		BytesPerSector:           bytesPerSector,
+		BytesPerCluster:          bytesPerCluster,
+		SectorsPerCluster:        sectorsPerCluster,
+		FatSectorCount:           fatSectorCount,
+		FatsSectorStart:          fatsSectorStart,
+		FatsSectorCount:          fatsSectorCount,
+		RootDirectorySectorStart: rootDirectorySectorStart,
+		RootDirectorySectorCount: rootDirectorySectorCount,
+		DataSectorStart:          dataSectorStart,
+		randIntn:                 randFunc,
+
+		getRootDirectoryBytes: getRootDirectoryBytes,
 	}
 
 	// TODONICE: support more than 2 fats
@@ -93,27 +108,26 @@ func NewFileSystemFromPath(path string) (*FileSystem, error) {
 	}
 
 	// TODONICE: validate both fats are identical
-	fs.table = parseFat16Table(fat1Bytes)
-
+	fs.table = parseFatTable(fat1Bytes)
 	return fs, nil
 }
 
 func (fs *FileSystem) Info() map[string]any {
 	return map[string]any{
-		"bootSector":               fs.bootSector,
-		"bytesPerSector":           fs.bytesPerSector,
-		"bytesPerCluster":          fs.bytesPerCluster,
-		"sectorsPerCluster":        fs.sectorsPerCluster,
-		"fatSectorCount":           fs.fatSectorCount,
-		"fatsSectorStart":          fs.fatsSectorStart,
-		"fatsSectorCount":          fs.fatsSectorCount,
-		"rootDirectorySectorStart": fs.rootDirectorySectorStart,
-		"rootDirectorySectorCount": fs.rootDirectorySectorCount,
+		"bootSector":               fs.BootSector,
+		"bytesPerSector":           fs.BytesPerSector,
+		"bytesPerCluster":          fs.BytesPerCluster,
+		"sectorsPerCluster":        fs.SectorsPerCluster,
+		"fatSectorCount":           fs.FatSectorCount,
+		"fatsSectorStart":          fs.FatsSectorStart,
+		"fatsSectorCount":          fs.FatsSectorCount,
+		"rootDirectorySectorStart": fs.RootDirectorySectorStart,
+		"rootDirectorySectorCount": fs.RootDirectorySectorCount,
 	}
 }
 
 func (fs *FileSystem) Close() error {
-	return fs.file.Close()
+	return fs.Backend.Close()
 }
 
 func (fs *FileSystem) ReadDir(path string) ([]fat.DirectoryEntry, error) {
@@ -359,12 +373,12 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 }
 
 func (fs *FileSystem) GetVolumeId() (string, error) {
-	dirBytes, err := fs.getRootDirectoryBytes()
+	dirBytes, err := fs.getRootDirectoryBytes(fs)
 	if err != nil {
 		return "", err
 	}
 
-	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+	for i := 0; i < len(dirBytes); i += FatDirectoryEntrySize {
 		// at the end, didn't find it
 		if dirBytes[i] == 0x00 {
 			break

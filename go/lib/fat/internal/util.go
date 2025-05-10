@@ -6,7 +6,7 @@ import (
 )
 
 func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
-	return (fs.dataSectorStart + uint32(cluster-2)*fs.sectorsPerCluster)
+	return (fs.DataSectorStart + uint32(cluster-2)*fs.SectorsPerCluster)
 }
 
 func (fs *FileSystem) splitPath(path string) ([]string, error) {
@@ -16,4 +16,18 @@ func (fs *FileSystem) splitPath(path string) ([]string, error) {
 	}
 
 	return parts, nil
+}
+
+func (fs *FileSystem) GetFatSectorOffset(fatIndex uint32) int64 {
+	return int64((fs.FatsSectorStart + (fatIndex * fs.FatSectorCount)) * fs.BytesPerSector)
+}
+
+func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
+	bytes := make([]byte, int64(fs.FatSectorCount*fs.BytesPerSector))
+	_, err := fs.Backend.ReadAt(bytes, fs.GetFatSectorOffset(fatIndex))
+	if err != nil {
+		return nil, err
+	}
+
+	return bytes, nil
 }

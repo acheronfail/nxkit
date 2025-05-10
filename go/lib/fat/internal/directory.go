@@ -313,7 +313,7 @@ func (fs *FileSystem) createShortName(desiredName string, siblingEntries []Entry
 		return r
 	}, name)
 	if len(name) == 0 || strings.HasPrefix(name, ".") {
-		name = fmt.Sprintf("%04X%s", (*fs.randIntn)(0x10000), name)
+		name = fmt.Sprintf("%04X%s", fs.randIntn(0x10000), name)
 	}
 
 	// 7. truncate body and extension to 8 and 3 bytes (if truncation occurs, set lossy)
@@ -414,7 +414,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 	}
 
 	var currentEntryCluster *uint16 = nil
-	currentBytes, err := fs.getRootDirectoryBytes()
+	currentBytes, err := fs.getRootDirectoryBytes(fs)
 	if err != nil {
 		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
 	}
@@ -458,7 +458,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 					return nil, err
 				}
 
-				newDirectoryCluster, err := fs.allocateClusterChain(directoryEntrySize * 2)
+				newDirectoryCluster, err := fs.allocateClusterChain(FatDirectoryEntrySize * 2)
 				if err != nil {
 					return nil, err
 				}

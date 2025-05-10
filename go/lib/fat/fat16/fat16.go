@@ -1,6 +1,9 @@
 package fat16
 
 import (
+	"encoding/binary"
+	"fmt"
+
 	"github.com/acheronfail/nxkit/lib/fat"
 	"github.com/acheronfail/nxkit/lib/fat/internal"
 )
@@ -59,16 +62,87 @@ func (f *FS) Unlink(path string) error {
 	return f.fs.Unlink(path)
 }
 
-func NewFromPath(path string) (fat.FileSystem, error) {
-	// TODO: require when creating internal to pass wrappers for things that are different?
-	//	`getRootDirectoryBytes`
-	//	eoc handling
-	//	FAT table parsing (to and from bytes)
+func getRootDirectoryBytes(fs *internal.FileSystem) ([]byte, error) {
+	start := fs.RootDirectorySectorStart * fs.BytesPerSector
+	rootDirSize := fs.BootSector.BPB_RootEntCnt * internal.FatDirectoryEntrySize
+	b := make([]byte, rootDirSize)
+	_, err := fs.Backend.ReadAt(b, int64(start))
+	if err != nil {
+		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
+	}
 
-	fs, err := internal.NewFileSystemFromPath(path)
+	return b, nil
+}
+
+func NewFromPath(path string) (fat.FileSystem, error) {
+	fs, err := internal.NewFileSystemFromPath(path, parseFat16Table, getRootDirectoryBytes)
 	if err != nil {
 		return nil, err
 	}
 
 	return &FS{fs}, nil
+}
+
+const (
+	fatEntrySize = uint16(2)
+	eoc          = uint16(0xfff8)
+)
+
+type fat16Table struct {
+	fatId      uint16
+	eoc        uint16
+	clusters   []uint16
+	maxCluster uint16
+}
+
+func parseFat16Table(fatBytes []byte) internal.FatTable {
+	maxCluster := uint16(len(fatBytes)) / fatEntrySize
+	fatTable := fat16Table{
+		fatId:      binary.LittleEndian.Uint16(fatBytes[0:fatEntrySize]),
+		eoc:        binary.LittleEndian.Uint16(fatBytes[fatEntrySize : fatEntrySize*2]),
+		clusters:   make([]uint16, maxCluster+1),
+		maxCluster: maxCluster,
+	}
+
+	for cluster := uint16(2); cluster < maxCluster; cluster++ {
+		start := cluster * fatEntrySize
+		end := start + fatEntrySize
+		val := binary.LittleEndian.Uint16(fatBytes[start:end])
+		if val != 0 {
+			fatTable.clusters[cluster] = val
+		}
+	}
+
+	return &fatTable
+}
+
+func (t *fat16Table) IsEoc(cluster uint16) bool {
+	return cluster >= eoc
+}
+func (t *fat16Table) GetClusterTarget(cluster uint16) uint16 {
+	return t.clusters[cluster]
+}
+func (t *fat16Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint16) error {
+	// set in memory cluster table
+	t.clusters[cluster] = target
+
+	// also write back to all FATs
+	for i := range uint32(fs.BootSector.BPB_NumFATs) {
+		offset := fs.GetFatSectorOffset(i)
+		clusterOffset := offset + int64(cluster*fatEntrySize)
+		toWrite := make([]byte, 2)
+		binary.LittleEndian.PutUint16(toWrite, target)
+		_, err := fs.Backend.WriteAt(toWrite, clusterOffset)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+func (t *fat16Table) GetMaxCluster() uint16 {
+	return t.maxCluster
+}
+func (t *fat16Table) GetEoc() uint16 {
+	return 0xfff8
 }

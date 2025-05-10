@@ -43,7 +43,7 @@ func (fs *FileSystem) numDirectoryEntriesRequired(name string) int {
 //	(2) handle issues when near end of `dirBytes`
 func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries int) (int, bool) {
 	count := 0
-	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+	for i := 0; i < len(dirBytes); i += FatDirectoryEntrySize {
 		// 0x00 == free, 0xE5 == deleted
 		if dirBytes[i] == 0x00 || dirBytes[i] == 0xE5 {
 			count++
@@ -52,7 +52,7 @@ func (fs *FileSystem) findAvailableDirectoryEntry(dirBytes []byte, numEntries in
 		}
 
 		if count == numEntries {
-			return i - (numEntries-1)*directoryEntrySize, true
+			return i - (numEntries-1)*FatDirectoryEntrySize, true
 		}
 	}
 
@@ -64,7 +64,7 @@ func readDirectoryEntries(dirBytes []byte) ([]Entry, error) {
 
 	var longFileNameSum *uint8
 	longFileName := ""
-	for i := 0; i < len(dirBytes); i += directoryEntrySize {
+	for i := 0; i < len(dirBytes); i += FatDirectoryEntrySize {
 		if dirBytes[i] == 0x00 {
 			break
 		}
@@ -117,7 +117,7 @@ func readDirectoryEntries(dirBytes []byte) ([]Entry, error) {
 
 func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
 	if parentDirCluster == nil {
-		parentDirBytes, err = fs.getRootDirectoryBytes()
+		parentDirBytes, err = fs.getRootDirectoryBytes(fs)
 	} else {
 		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
 	}
@@ -126,7 +126,7 @@ func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint1
 		return -1, nil, err
 	}
 
-	for i := 0; i < len(parentDirBytes); i += directoryEntrySize {
+	for i := 0; i < len(parentDirBytes); i += FatDirectoryEntrySize {
 		if parentDirBytes[i] == 0x00 {
 			break
 		}
@@ -204,8 +204,8 @@ func (fs *FileSystem) writeEntriesToParent(
 ) error {
 	// write new directory into parent's directory bytes
 	for i, item := range items {
-		start := atParentByteIndex + (directoryEntrySize * i)
-		end := start + directoryEntrySize
+		start := atParentByteIndex + (FatDirectoryEntrySize * i)
+		end := start + FatDirectoryEntrySize
 		bytesToWrite := item.toBytes()
 		copy(parentDirBytes[start:end], bytesToWrite[:])
 	}
@@ -213,7 +213,7 @@ func (fs *FileSystem) writeEntriesToParent(
 	// write back to disk
 	if parentDirCluster == nil {
 		// if root, just write it all back since it's in the dedicated root directory area
-		_, err := fs.file.WriteAt(parentDirBytes, int64(fs.rootDirectorySectorStart*fs.bytesPerSector))
+		_, err := fs.Backend.WriteAt(parentDirBytes, int64(fs.RootDirectorySectorStart*fs.BytesPerSector))
 		if err != nil {
 			return err
 		}
@@ -276,14 +276,14 @@ func (fs *FileSystem) writeDirectoryEntry(
 	}
 
 	// create directory bytes for the new directory
-	newDirectoryDataBytes := make([]byte, fs.bytesPerCluster)
+	newDirectoryDataBytes := make([]byte, fs.BytesPerCluster)
 	dotBytes := dotDirEntry.toBytes()
 	dotDotBytes := dotDotDirEntry.toBytes()
-	copy(newDirectoryDataBytes[:directoryEntrySize], dotBytes[:])
-	copy(newDirectoryDataBytes[directoryEntrySize:], dotDotBytes[:])
+	copy(newDirectoryDataBytes[:FatDirectoryEntrySize], dotBytes[:])
+	copy(newDirectoryDataBytes[FatDirectoryEntrySize:], dotDotBytes[:])
 
 	// write . and .. into new cluster in data region
-	_, err = fs.file.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.bytesPerSector))
+	_, err = fs.Backend.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.BytesPerSector))
 	if err != nil {
 		return nil, err
 	}
@@ -304,7 +304,7 @@ func (fs *FileSystem) getAvailableDirectoryEntry(
 		}
 
 		// expand the current directory's cluster chain since we're out of space
-		extraCluster, err := fs.allocateClusterChain(int64(nRequired * directoryEntrySize))
+		extraCluster, err := fs.allocateClusterChain(int64(nRequired * FatDirectoryEntrySize))
 		if err != nil {
 			return 0, nil, err
 		}
@@ -354,10 +354,10 @@ func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint
 
 	// find all associated lfn entries
 	sfnChecksum := calculateShortNameChecksum(entry.DIR_Name[:])
-	lfnIndex := entryIndex - directoryEntrySize
+	lfnIndex := entryIndex - FatDirectoryEntrySize
 	for lfnIndex >= 0 && parentDirBytes[lfnIndex+11] == 0x0F && parentDirBytes[lfnIndex+13] == sfnChecksum {
 		parentDirBytes[lfnIndex] = 0xE5
-		lfnIndex -= directoryEntrySize
+		lfnIndex -= FatDirectoryEntrySize
 	}
 
 	// set first byte of entry to 0xE5 to mark as deleted
