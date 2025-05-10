@@ -31,3 +31,15 @@ func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
 
 	return bytes, nil
 }
+
+func GetRootDirectoryBytesDedicatedArea(fs *FileSystem) ([]byte, error) {
+	start := fs.RootDirectorySectorStart * fs.BytesPerSector
+	rootDirSize := fs.BootSector.BPB_RootEntCnt * FatDirectoryEntrySize
+	b := make([]byte, rootDirSize)
+	_, err := fs.Backend.ReadAt(b, int64(start))
+	if err != nil {
+		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
+	}
+
+	return b, nil
+}

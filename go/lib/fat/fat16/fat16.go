@@ -2,7 +2,6 @@ package fat16
 
 import (
 	"encoding/binary"
-	"fmt"
 
 	"github.com/acheronfail/nxkit/lib/fat"
 	"github.com/acheronfail/nxkit/lib/fat/internal"
@@ -62,20 +61,8 @@ func (f *FS) Unlink(path string) error {
 	return f.fs.Unlink(path)
 }
 
-func getRootDirectoryBytes(fs *internal.FileSystem) ([]byte, error) {
-	start := fs.RootDirectorySectorStart * fs.BytesPerSector
-	rootDirSize := fs.BootSector.BPB_RootEntCnt * internal.FatDirectoryEntrySize
-	b := make([]byte, rootDirSize)
-	_, err := fs.Backend.ReadAt(b, int64(start))
-	if err != nil {
-		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
-	}
-
-	return b, nil
-}
-
 func NewFromPath(path string) (fat.FileSystem, error) {
-	fs, err := internal.NewFileSystemFromPath(path, parseFat16Table, getRootDirectoryBytes)
+	fs, err := internal.NewFileSystemFromPath(path, parseFat16Table, internal.GetRootDirectoryBytesDedicatedArea)
 	if err != nil {
 		return nil, err
 	}
