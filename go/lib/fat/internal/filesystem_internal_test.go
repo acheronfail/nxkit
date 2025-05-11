@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 	"github.com/acheronfail/nxkit/lib/fat/testdata"
 	"github.com/stretchr/testify/assert"
 )
@@ -64,6 +65,7 @@ func createFs(t *testing.T) *FileSystem {
 
 	fs, err := NewFileSystemFromPath(
 		testdata.Fat16DiskImagePath,
+		boot_sector.Fat16,
 		mockParseFatTable,
 		mockGetRootDirectoryBytes,
 	)

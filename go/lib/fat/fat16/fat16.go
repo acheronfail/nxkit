@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 	"github.com/acheronfail/nxkit/lib/fat/internal"
 )
 
@@ -62,7 +63,12 @@ func (f *FS) Unlink(path string) error {
 }
 
 func NewFromPath(path string) (fat.FileSystem, error) {
-	fs, err := internal.NewFileSystemFromPath(path, parseFat16Table, internal.GetRootDirectoryBytesDedicatedArea)
+	fs, err := internal.NewFileSystemFromPath(
+		path,
+		boot_sector.Fat16,
+		parseFat16Table,
+		internal.GetRootDirectoryBytesDedicatedArea,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +83,6 @@ const (
 
 type fat16Table struct {
 	fatId      uint16
-	eoc        uint16
 	clusters   []uint16
 	maxCluster uint16
 }
@@ -86,7 +91,6 @@ func parseFat16Table(fatBytes []byte) internal.FatTable {
 	maxCluster := uint16(len(fatBytes)) / fatEntrySize
 	fatTable := fat16Table{
 		fatId:      binary.LittleEndian.Uint16(fatBytes[0:fatEntrySize]),
-		eoc:        binary.LittleEndian.Uint16(fatBytes[fatEntrySize : fatEntrySize*2]),
 		clusters:   make([]uint16, maxCluster+1),
 		maxCluster: maxCluster,
 	}
@@ -103,12 +107,10 @@ func parseFat16Table(fatBytes []byte) internal.FatTable {
 	return &fatTable
 }
 
-func (t *fat16Table) IsEoc(cluster uint16) bool {
-	return cluster >= eoc
-}
-func (t *fat16Table) GetClusterTarget(cluster uint16) uint16 {
-	return t.clusters[cluster]
-}
+func (t *fat16Table) IsEoc(cluster uint16) bool              { return cluster >= eoc }
+func (t *fat16Table) GetEoc() uint16                         { return eoc }
+func (t *fat16Table) GetMaxCluster() uint16                  { return t.maxCluster }
+func (t *fat16Table) GetClusterTarget(cluster uint16) uint16 { return t.clusters[cluster] }
 func (t *fat16Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint16) error {
 	// set in memory cluster table
 	t.clusters[cluster] = target
@@ -126,10 +128,4 @@ func (t *fat16Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target
 	}
 
 	return nil
-}
-func (t *fat16Table) GetMaxCluster() uint16 {
-	return t.maxCluster
-}
-func (t *fat16Table) GetEoc() uint16 {
-	return 0xfff8
 }

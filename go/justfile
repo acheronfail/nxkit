@@ -9,12 +9,12 @@ setup:
 fixtures:
   bash ./lib/fat/testdata/create.sh
 
-test *args: fixtures
-  go test github.com/acheronfail/nxkit/... {{args}}
-  go test github.com/acheronfail/nxkit/... {{args}}
+test n *args: fixtures
+  FAT={{n}} go test github.com/acheronfail/nxkit/... {{args}}
+  FAT={{n}} go test github.com/acheronfail/nxkit/... {{args}}
 
-testw *args:
-  reflex -d none -sr '\.go$' -- just test {{args}}
+testw n *args:
+  reflex -d none -sr '\.go$' -- just test {{n}} {{args}}
 
 bench:
   go test -bench=. github.com/acheronfail/nxkit/...

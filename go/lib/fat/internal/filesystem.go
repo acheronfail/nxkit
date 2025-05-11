@@ -43,6 +43,7 @@ type FileSystem struct {
 
 func NewFileSystemFromPath(
 	path string,
+	expectedFatType boot_sector.FatType,
 	parseFatTable func(data []byte) FatTable,
 	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error),
 ) (*FileSystem, error) {
@@ -64,9 +65,9 @@ func NewFileSystemFromPath(
 		return nil, err
 	}
 
-	if bootSector.FatType() != boot_sector.Fat16 {
+	if bootSector.FatType() != expectedFatType {
 		file.Close()
-		return nil, fmt.Errorf("not a FAT16 filesystem, got FAT%d", bootSector.FatType())
+		return nil, fmt.Errorf("not a FAT%d filesystem, got FAT%d", expectedFatType, bootSector.FatType())
 	}
 
 	// Calculate the start of the FAT tables
