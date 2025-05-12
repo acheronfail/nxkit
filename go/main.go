@@ -44,14 +44,16 @@ func createNsp() {
 	launcherNacp := nacp.NewNacp(nil)
 	launcherNacp.SetTitle("Test Title")
 	launcherNacp.SetAuthor("Test Author")
-	err = nacp.Process(launcherNacp, int64(titleId))
+	err = nacp.Process(launcherNacp, titleId)
 	if err != nil {
 		panic(err)
 	}
 
-	// TODO: create nca files
-
-	// TODO: create nsp
+	// TODO: nca_create_program
+	// TODO: nca_create_control
+	// TODO: nca_create_manual_htmldoc
+	// TODO: nca_create_manual_legalinfo
+	// TODO: nca_create_meta
 }
 
 func openNand(path string) {

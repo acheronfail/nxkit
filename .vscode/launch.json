@@ -20,7 +20,7 @@
       "program": "${workspaceFolder}/go/main.go",
       "cwd": "${workspaceFolder}/go",
       "console": "integratedTerminal",
-      "args": ["--nand"]
+      "args": ["--nsp"]
     }
   ]
 }

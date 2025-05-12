@@ -4,7 +4,7 @@ import (
 	"fmt"
 )
 
-func Process(nacp *Nacp, titleId int64) error {
+func Process(nacp *Nacp, titleId uint64) error {
 	// TODO: these are required
 	if nacp.GetTitle() == "" {
 		return fmt.Errorf("invalid title name in control.nacp")
