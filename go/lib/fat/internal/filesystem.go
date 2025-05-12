@@ -404,12 +404,15 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 			entry.setCluster(*dstParent.cluster)
 		}
 
-		fs.writeEntriesToParent(
+		err = fs.writeEntriesToParent(
 			[]to32Bytes{&entry},
 			&cluster,
 			dirBytes,
 			index,
 		)
+		if err != nil {
+			return err
+		}
 	}
 
 	// remove source entry from source parent directory
