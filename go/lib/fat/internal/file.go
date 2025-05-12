@@ -7,7 +7,7 @@ import (
 
 type fatFile struct {
 	Entry
-	parentDirCluster *uint16
+	parentDirCluster *uint32
 	// this value is the same as `os.OpenFile`'s flags ANDed with `0b11`
 	accessMode int
 	fs         *FileSystem
@@ -44,7 +44,7 @@ func (f *fatFile) ReadAt(p []byte, off int64) (n int, err error) {
 	}
 
 	// if size non-zero, then find cluster chain and read from it
-	bytes, err := f.fs.getClusterChainBytes(f.clusterNumber())
+	bytes, err := f.fs.GetClusterChainBytes(f.clusterNumber())
 	if err != nil {
 		return 0, err
 	}
@@ -92,7 +92,7 @@ func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 	}
 
 	cluster := f.clusterNumber()
-	clusterBytes, err := f.fs.getClusterChainBytes(cluster)
+	clusterBytes, err := f.fs.GetClusterChainBytes(cluster)
 	if err != nil {
 		return 0, err
 	}
@@ -104,7 +104,7 @@ func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 			return 0, err
 		}
 
-		clusterBytes, err = f.fs.getClusterChainBytes(cluster)
+		clusterBytes, err = f.fs.GetClusterChainBytes(cluster)
 		if err != nil {
 			return 0, err
 		}

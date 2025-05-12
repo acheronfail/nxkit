@@ -115,11 +115,11 @@ func readDirectoryEntries(dirBytes []byte) ([]Entry, error) {
 	return entries, nil
 }
 
-func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint16) (i int, parentDirBytes []byte, err error) {
+func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint32) (i int, parentDirBytes []byte, err error) {
 	if parentDirCluster == nil {
 		parentDirBytes, err = fs.getRootDirectoryBytes(fs)
 	} else {
-		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
+		parentDirBytes, err = fs.GetClusterChainBytes(*parentDirCluster)
 	}
 
 	if err != nil {
@@ -154,7 +154,7 @@ func (fs *FileSystem) createNewEntry(
 	newEntName string,
 	newEntTime *fatTime,
 	newEntAttr uint8,
-	newEntCluster uint16,
+	newEntCluster uint32,
 	parentDirEntries []Entry,
 ) *Entry {
 	shortNameBytes, ntRes := fs.createShortNameBytes(newEntName, parentDirEntries)
@@ -166,12 +166,11 @@ func (fs *FileSystem) createNewEntry(
 		DIR_CrtTime:      newEntTime.time,
 		DIR_CrtDate:      newEntTime.date,
 		DIR_LstAccDate:   newEntTime.date,
-		DIR_FstClusHI:    0,
 		DIR_WrtTime:      newEntTime.time,
 		DIR_WrtDate:      newEntTime.date,
-		DIR_FstClusLO:    newEntCluster,
 		DIR_FileSize:     0,
 	}
+	newFatDirEntry.setCluster(newEntCluster)
 
 	return &Entry{fatDirectoryEntry: newFatDirEntry, longFileName: newEntName}
 }
@@ -179,7 +178,7 @@ func (fs *FileSystem) createNewEntry(
 func (fs *FileSystem) writeEntryWithLfnToParent(
 	entLongName string,
 	ent *Entry,
-	parentDirCluster *uint16,
+	parentDirCluster *uint32,
 	parentDirBytes []byte,
 	atParentByteIndex int,
 ) error {
@@ -198,7 +197,7 @@ type to32Bytes interface {
 
 func (fs *FileSystem) writeEntriesToParent(
 	items []to32Bytes,
-	parentDirCluster *uint16,
+	parentDirCluster *uint32,
 	parentDirBytes []byte,
 	atParentByteIndex int,
 ) error {
@@ -230,10 +229,10 @@ func (fs *FileSystem) writeEntriesToParent(
 
 func (fs *FileSystem) writeDirectoryEntry(
 	newDirName string,
-	newDirCluster uint16,
+	newDirCluster uint32,
 	parentDirBytes []byte,
 	parentDirEntries []Entry,
-	parentDirCluster *uint16,
+	parentDirCluster *uint32,
 	atParentByteIndex int,
 ) ([]byte, error) {
 	t := asFatTime(time.Now())
@@ -252,12 +251,12 @@ func (fs *FileSystem) writeDirectoryEntry(
 		DIR_CrtTime:      t.time,
 		DIR_CrtDate:      t.date,
 		DIR_LstAccDate:   t.date,
-		DIR_FstClusHI:    0,
 		DIR_WrtTime:      t.time,
 		DIR_WrtDate:      t.date,
-		DIR_FstClusLO:    newDirCluster,
 		DIR_FileSize:     0,
 	}
+	dotDirEntry.setCluster(newDirCluster)
+
 	dotDotDirEntry := fatDirectoryEntry{
 		DIR_Name:         [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
 		DIR_Attr:         0x10,
@@ -265,14 +264,12 @@ func (fs *FileSystem) writeDirectoryEntry(
 		DIR_CrtTime:      t.time,
 		DIR_CrtDate:      t.date,
 		DIR_LstAccDate:   t.date,
-		DIR_FstClusHI:    0,
 		DIR_WrtTime:      t.time,
 		DIR_WrtDate:      t.date,
-		DIR_FstClusLO:    0,
 		DIR_FileSize:     0,
 	}
 	if parentDirCluster != nil {
-		dotDotDirEntry.DIR_FstClusLO = *parentDirCluster
+		dotDotDirEntry.setCluster(*parentDirCluster)
 	}
 
 	// create directory bytes for the new directory
@@ -293,7 +290,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 
 func (fs *FileSystem) getAvailableDirectoryEntry(
 	nRequired int,
-	parentDirCluster *uint16,
+	parentDirCluster *uint32,
 	parentDirBytes []byte,
 ) (int, []byte, error) {
 	freeIndex, ok := fs.findAvailableDirectoryEntry(parentDirBytes, nRequired)
@@ -314,7 +311,7 @@ func (fs *FileSystem) getAvailableDirectoryEntry(
 			return 0, nil, err
 		}
 
-		parentDirBytes, err = fs.getClusterChainBytes(*parentDirCluster)
+		parentDirBytes, err = fs.GetClusterChainBytes(*parentDirCluster)
 		if err != nil {
 			return 0, nil, fmt.Errorf("could not read directory bytes: %w", err)
 		}
@@ -346,7 +343,7 @@ func (fs *FileSystem) findEntry(path string) (*Entry, *readDirResult, bool, erro
 	return nil, parent, false, nil
 }
 
-func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint16) error {
+func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint32) error {
 	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
 	if err != nil {
 		return err
@@ -377,7 +374,7 @@ func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint
 	return nil
 }
 
-func (fs *FileSystem) removeEntryFromParentWithCluster(entry *Entry, parentDirCluster *uint16) error {
+func (fs *FileSystem) removeEntryFromParentWithCluster(entry *Entry, parentDirCluster *uint32) error {
 	err := fs.removeEntryFromParent(entry, parentDirCluster)
 	if err != nil {
 		return err

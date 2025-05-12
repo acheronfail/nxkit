@@ -16,11 +16,11 @@ const (
 )
 
 type FatTable interface {
-	GetClusterTarget(cluster uint16) uint16
-	WriteClusterTarget(fs *FileSystem, cluster, target uint16) error
-	GetMaxCluster() uint16
-	GetEoc() uint16
-	IsEoc(cluster uint16) bool
+	GetClusterTarget(cluster uint32) uint32
+	WriteClusterTarget(fs *FileSystem, cluster, target uint32) error
+	GetMaxCluster() uint32
+	GetEoc() uint32
+	IsEoc(cluster uint32) bool
 }
 
 type FileSystem struct {
@@ -293,7 +293,7 @@ func (fs *FileSystem) Rmdir(path string) error {
 	}
 
 	// check if directory is empty
-	entryBytes, err := fs.getClusterChainBytes(entry.clusterNumber())
+	entryBytes, err := fs.GetClusterChainBytes(entry.clusterNumber())
 	if err != nil {
 		return err
 	}

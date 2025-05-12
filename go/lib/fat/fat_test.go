@@ -9,14 +9,12 @@ import (
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fat"
-	"github.com/acheronfail/nxkit/lib/fat/fat12"
 	"github.com/acheronfail/nxkit/lib/fat/fat16"
+	"github.com/acheronfail/nxkit/lib/fat/fat32"
 	"github.com/acheronfail/nxkit/lib/fat/testdata"
 	"github.com/acheronfail/nxkit/lib/utils"
 	"github.com/stretchr/testify/assert"
 )
-
-// TODO: have this suite run for fat12, fat16 and fat32
 
 func getFs(t *testing.T) fat.FileSystem {
 	fatTypeString, ok := os.LookupEnv("FAT")
@@ -25,12 +23,12 @@ func getFs(t *testing.T) fat.FileSystem {
 	n, err := strconv.Atoi(fatTypeString)
 	assert.Nil(t, err)
 	switch n {
-	case 12:
-		fs, err := fat12.NewFromPath(testdata.Fat12DiskImagePath)
-		assert.Nil(t, err)
-		return fs
 	case 16:
 		fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
+		assert.Nil(t, err)
+		return fs
+	case 32:
+		fs, err := fat32.NewFromPath(testdata.Fat32DiskImagePath)
 		assert.Nil(t, err)
 		return fs
 	default:

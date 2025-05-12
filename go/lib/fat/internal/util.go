@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-func (fs *FileSystem) clusterToSector(cluster uint16) uint32 {
-	return (fs.DataSectorStart + uint32(cluster-2)*fs.SectorsPerCluster)
+func (fs *FileSystem) clusterToSector(cluster uint32) uint32 {
+	return (fs.DataSectorStart + (cluster-2)*fs.SectorsPerCluster)
 }
 
 func (fs *FileSystem) splitPath(path string) ([]string, error) {

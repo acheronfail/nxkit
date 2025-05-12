@@ -4,16 +4,16 @@ import (
 	"fmt"
 )
 
-func (fs *FileSystem) writeClusterToFats(cluster, target uint16) error {
+func (fs *FileSystem) writeClusterToFats(cluster, target uint32) error {
 	return fs.table.WriteClusterTarget(fs, cluster, target)
 }
 
-func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) {
+func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint32, error) {
 	nClustersAllocated := 0
 	nClustersRequired := max(1, bytesRequired/fs.BytesPerCluster)
 
 	prevCluster := fs.table.GetEoc()
-	for cluster := uint16(2); cluster < fs.table.GetMaxCluster(); cluster++ {
+	for cluster := uint32(2); cluster < fs.table.GetMaxCluster(); cluster++ {
 		if fs.table.GetClusterTarget(cluster) == 0x0000 {
 			err := fs.writeClusterToFats(cluster, prevCluster)
 			if err != nil {
@@ -32,8 +32,8 @@ func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint16, error) 
 	return 0, fmt.Errorf("no available clusters")
 }
 
-func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
-	var clusters []uint16
+func (fs *FileSystem) getClusterChain(startCluster uint32) ([]uint32, error) {
+	var clusters []uint32
 	currentCluster := startCluster
 	for {
 		clusters = append(clusters, currentCluster)
@@ -55,7 +55,7 @@ func (fs *FileSystem) getClusterChain(startCluster uint16) ([]uint16, error) {
 	return clusters, nil
 }
 
-func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) {
+func (fs *FileSystem) GetClusterChainBytes(startCluster uint32) ([]byte, error) {
 	clusterChain, err := fs.getClusterChain(startCluster)
 	if err != nil {
 		return nil, err
@@ -76,7 +76,7 @@ func (fs *FileSystem) getClusterChainBytes(startCluster uint16) ([]byte, error) 
 	return bytes, nil
 }
 
-func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte) error {
+func (fs *FileSystem) writeClusterChain(clusterStart uint32, clusterBytes []byte) error {
 	clusterChain, err := fs.getClusterChain(clusterStart)
 	if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (fs *FileSystem) writeClusterChain(clusterStart uint16, clusterBytes []byte
 	return nil
 }
 
-func (fs *FileSystem) deleteClusterChain(clusterStart uint16) error {
+func (fs *FileSystem) deleteClusterChain(clusterStart uint32) error {
 	clusterChain, err := fs.getClusterChain(clusterStart)
 	if err != nil {
 		return err
@@ -110,7 +110,7 @@ func (fs *FileSystem) deleteClusterChain(clusterStart uint16) error {
 	return nil
 }
 
-func (fs *FileSystem) extendClusterChain(clusterStart uint16, totalBytesNeeded int64) error {
+func (fs *FileSystem) extendClusterChain(clusterStart uint32, totalBytesNeeded int64) error {
 	clusterChain, err := fs.getClusterChain(clusterStart)
 	if err != nil {
 		return nil
@@ -128,7 +128,7 @@ func (fs *FileSystem) extendClusterChain(clusterStart uint16, totalBytesNeeded i
 	}
 
 	prevCluster := clusterChain[len(clusterChain)-1]
-	for cluster := uint16(2); cluster < fs.table.GetMaxCluster(); cluster++ {
+	for cluster := uint32(2); cluster < fs.table.GetMaxCluster(); cluster++ {
 		if fs.table.GetClusterTarget(cluster) == 0x0000 {
 			err := fs.writeClusterToFats(prevCluster, cluster)
 			if err != nil {

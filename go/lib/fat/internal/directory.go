@@ -249,13 +249,13 @@ func (d *Entry) clone() Entry {
 	}
 }
 
-func (d *Entry) clusterNumber() uint16 {
-	// d.DIR_FstClusHI unused in FAT16 and always zero
-	return d.DIR_FstClusLO
+func (d *Entry) clusterNumber() uint32 {
+	return (uint32(d.DIR_FstClusHI) << 16) | uint32(d.DIR_FstClusLO)
 }
 
-func (d *Entry) setCluster(cluster uint16) {
-	d.DIR_FstClusLO = cluster
+func (d *fatDirectoryEntry) setCluster(cluster uint32) {
+	d.DIR_FstClusHI = uint16(cluster >> 16)
+	d.DIR_FstClusLO = uint16(cluster & 0xFFFF)
 }
 
 // http://elm-chan.org/docs/fat_e.html#name_conversion
@@ -404,7 +404,7 @@ func (fs *FileSystem) createShortNameBytes(desiredName string, siblingEntries []
 type readDirResult struct {
 	entries []Entry
 	bytes   []byte
-	cluster *uint16
+	cluster *uint32
 }
 
 func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
@@ -413,7 +413,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 		return nil, err
 	}
 
-	var currentEntryCluster *uint16 = nil
+	var currentEntryCluster *uint32 = nil
 	currentBytes, err := fs.getRootDirectoryBytes(fs)
 	if err != nil {
 		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
@@ -437,7 +437,7 @@ func (fs *FileSystem) readDir(path string, mkdir bool) (*readDirResult, error) {
 
 			if entry.IsDir() {
 				clusterNumber := entry.clusterNumber()
-				currentBytes, err = fs.getClusterChainBytes(clusterNumber)
+				currentBytes, err = fs.GetClusterChainBytes(clusterNumber)
 				if err != nil {
 					return nil, fmt.Errorf("could not read directory bytes: %w", err)
 				}
