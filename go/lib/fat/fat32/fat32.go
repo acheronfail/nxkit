@@ -4,12 +4,18 @@ import (
 	"encoding/binary"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 	"github.com/acheronfail/nxkit/lib/fat/internal"
 )
 
 type FS struct {
 	fs *internal.FileSystem
+}
+
+// GetType implements fat.FileSystem.
+func (f *FS) GetType() boot_sector.FatType {
+	return boot_sector.Fat32
 }
 
 // Close implements fs.FileSystem.
@@ -62,9 +68,10 @@ func (f *FS) Unlink(path string) error {
 	return f.fs.Unlink(path)
 }
 
-func NewFromPath(path string) (fat.FileSystem, error) {
+func Open(backend backend.Storage, offset int64) (fat.FileSystem, error) {
 	fs, err := internal.NewFileSystemFromPath(
-		path,
+		backend,
+		offset,
 		boot_sector.Fat32,
 		parseFat32Table,
 		func(fs *internal.FileSystem) ([]byte, error) {
@@ -101,7 +108,7 @@ func parseFat32Table(fatBytes []byte) internal.FatTable {
 			clusterOffset := offset + int64(cluster*fatEntrySize)
 			toWrite := make([]byte, 4)
 			binary.LittleEndian.PutUint32(toWrite, target)
-			_, err := fs.Backend.WriteAt(toWrite, clusterOffset)
+			_, err := (*fs.BackendWriter).WriteAt(toWrite, clusterOffset)
 			if err != nil {
 				return err
 			}

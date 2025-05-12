@@ -4,12 +4,18 @@ import (
 	"encoding/binary"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 	"github.com/acheronfail/nxkit/lib/fat/internal"
 )
 
 type FS struct {
 	fs *internal.FileSystem
+}
+
+// GetType implements fat.FileSystem.
+func (f *FS) GetType() boot_sector.FatType {
+	return boot_sector.Fat12
 }
 
 // Close implements fs.FileSystem.
@@ -62,9 +68,10 @@ func (f *FS) Unlink(path string) error {
 	return f.fs.Unlink(path)
 }
 
-func NewFromPath(path string) (fat.FileSystem, error) {
+func Open(backend backend.Storage, offset int64) (fat.FileSystem, error) {
 	fs, err := internal.NewFileSystemFromPath(
-		path,
+		backend,
+		offset,
 		boot_sector.Fat12,
 		parseFat12Table,
 		internal.GetRootDirectoryBytesDedicatedArea,
@@ -118,7 +125,7 @@ func parseFat12Table(fatBytes []byte) internal.FatTable {
 				val := clusterValue16 & 0xF000
 				val |= uint16(target & 0x0FFF)
 				binary.LittleEndian.PutUint16(toWrite[:2], val)
-				_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				_, err := (*fs.BackendWriter).WriteAt(toWrite[:2], offset+int64(clusterOffset))
 				if err != nil {
 					return err
 				}
@@ -127,7 +134,7 @@ func parseFat12Table(fatBytes []byte) internal.FatTable {
 				val := clusterValue16 & 0x000F
 				val |= uint16((target & 0x0FFF) << 4)
 				binary.LittleEndian.PutUint16(toWrite[:2], val)
-				_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				_, err := (*fs.BackendWriter).WriteAt(toWrite[:2], offset+int64(clusterOffset))
 				if err != nil {
 					return err
 				}

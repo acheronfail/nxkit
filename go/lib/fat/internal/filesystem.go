@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 )
 
@@ -49,7 +50,10 @@ func NewFatTable(
 }
 
 type FileSystem struct {
-	Backend                  *os.File
+	Backend       backend.Storage
+	BackendWriter *backend.WritableFile
+	BackendOffset int64
+
 	BootSector               boot_sector.BootSector
 	BytesPerSector           uint32
 	BytesPerCluster          int64
@@ -66,32 +70,40 @@ type FileSystem struct {
 	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error)
 }
 
-func NewFileSystemFromPath(
-	path string,
-	expectedFatType boot_sector.FatType,
-	parseFatTable func(data []byte) FatTable,
-	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error),
-) (*FileSystem, error) {
-	file, err := os.OpenFile(path, os.O_RDWR, 0o600)
-	if err != nil {
-		return nil, err
-	}
-
+func ReadBootSector(
+	disk backend.Storage,
+	backendOffset int64,
+) (*boot_sector.BootSector, error) {
 	bootSectorBytes := make([]byte, 512)
-	_, err = file.ReadAt(bootSectorBytes, 0)
+	_, err := disk.ReadAt(bootSectorBytes, backendOffset)
 	if err != nil {
-		file.Close()
+		disk.Close()
 		return nil, err
 	}
 
 	bootSector, err := boot_sector.NewBootSector(bootSectorBytes)
 	if err != nil {
-		file.Close()
+		disk.Close()
+		return nil, err
+	}
+
+	return bootSector, nil
+}
+
+func NewFileSystemFromPath(
+	disk backend.Storage,
+	backendOffset int64,
+	expectedFatType boot_sector.FatType,
+	parseFatTable func(data []byte) FatTable,
+	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error),
+) (*FileSystem, error) {
+	bootSector, err := ReadBootSector(disk, backendOffset)
+	if err != nil {
 		return nil, err
 	}
 
 	if bootSector.FatType() != expectedFatType {
-		file.Close()
+		disk.Close()
 		return nil, fmt.Errorf("not a FAT%d filesystem, got FAT%d", expectedFatType, bootSector.FatType())
 	}
 
@@ -108,9 +120,19 @@ func NewFileSystemFromPath(
 	rootDirectorySectorCount := uint32((32*bootSector.BPB_RootEntCnt + bootSector.BPB_BytsPerSec - 1) / bootSector.BPB_BytsPerSec)
 	dataSectorStart := rootDirectorySectorStart + rootDirectorySectorCount
 
+	// TODONICE: open in readonly mode
+	diskWriter, err := disk.Writable()
+	if err != nil {
+		disk.Close()
+		return nil, err
+	}
+
 	randFunc := func(n int) int { return rand.Intn(n) }
 	fs := &FileSystem{
-		Backend:                  file,
+		Backend:       disk,
+		BackendWriter: &diskWriter,
+		BackendOffset: backendOffset,
+
 		BootSector:               *bootSector,
 		BytesPerSector:           bytesPerSector,
 		BytesPerCluster:          bytesPerCluster,
@@ -129,7 +151,7 @@ func NewFileSystemFromPath(
 	// TODONICE: support more than 2 fats
 	fat1Bytes, err := fs.getFatSectorBytes(1)
 	if err != nil {
-		file.Close()
+		disk.Close()
 		return nil, err
 	}
 

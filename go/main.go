@@ -6,13 +6,13 @@ import (
 	"slices"
 
 	"github.com/acheronfail/nxkit/gui"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
+	"github.com/acheronfail/nxkit/lib/fat/fat_auto"
 	"github.com/acheronfail/nxkit/lib/inject"
 	"github.com/acheronfail/nxkit/lib/nacp"
 	"github.com/acheronfail/nxkit/lib/nand"
 	"github.com/acheronfail/nxkit/lib/npdm"
 	"github.com/acheronfail/nxkit/lib/xtsn"
-	"github.com/diskfs/go-diskfs/backend"
-	"github.com/diskfs/go-diskfs/filesystem/fat32"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/jpillora/sizestr"
 )
@@ -21,7 +21,7 @@ import (
 // - [x] port XTSN to golang
 // - [x] support reading split dumps
 // - [x] support injecting payloads (port web injector)
-// - [ ] add FAT12/16 support (own filesystem driver?)
+// - [x] add FAT12/16 support (own filesystem driver?)
 // - [-] port hacbrewpack to golang (or compile it and then spawn it?)
 //     - [x] nacp
 //     - [x] npdm
@@ -69,28 +69,28 @@ func openNand(path string) {
 	}
 
 	var userPartition *gpt.Partition
-	// var prodInfoFPartition *gpt.Partition
+	var prodInfoFPartition *gpt.Partition
 	for i, part := range gptTable.Partitions {
 		if part.Name == "USER" {
 			userPartition = gptTable.Partitions[i]
 		}
-		// if part.Name == "PRODINFOF" {
-		// 	prodInfoFPartition = gptTable.Partitions[i]
-		// }
+		if part.Name == "PRODINFOF" {
+			prodInfoFPartition = gptTable.Partitions[i]
+		}
 	}
 
-	// if prodInfoFPartition == nil {
-	// 	panic("PRODINFOF partition not found")
-	// }
+	if prodInfoFPartition == nil {
+		panic("PRODINFOF partition not found")
+	}
 	if userPartition == nil {
 		panic("USER partition not found")
 	}
 
-	listPartition(dumpBackend, userPartition, true)
-	// listPartition(dumpBackend, prodInfoFPartition, false)
+	listPartition(dumpBackend, userPartition)
+	listPartition(dumpBackend, prodInfoFPartition)
 }
 
-func listPartition(dumpBackend backend.Storage, partition *gpt.Partition, isFat32 bool) {
+func listPartition(dumpBackend backend.Storage, partition *gpt.Partition) {
 	fmt.Printf("Found %s partition, start=%d end=%d size=%s\n", partition.Name, partition.Start, partition.End, sizestr.ToString(int64(partition.Size)))
 
 	// setup nand backend
@@ -105,22 +105,25 @@ func listPartition(dumpBackend backend.Storage, partition *gpt.Partition, isFat3
 	}
 	partBackend.SetCrypto(crypto)
 
-	fs, err := fat32.Read(partBackend, int64(partition.Size), int64(partition.Start)*fsSectorSize, fsSectorSize)
+	fs, err := fat_auto.Open(partBackend, int64(partition.Start)*fsSectorSize)
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("Opened partition %s, detected fs type: %d\n", partition.Name, fs.GetType())
+
 	entries, err := fs.ReadDir("/")
 	if err != nil {
 		panic(err)
 	}
 	for _, entry := range entries {
-		fmt.Printf("Entry: %s\n", entry.Name())
+		fmt.Printf("Entry: %s\n", entry.LongName())
 	}
 }
 
 func main() {
 	if slices.Contains(os.Args, "--nand") {
-		openNand("../.data/rawnand.bin.00")
+		openNand("../.data/rawnand.bin")
 	} else if slices.Contains(os.Args, "--inject") {
 		inject.Inject("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
 	} else if slices.Contains(os.Args, "--nsp") {

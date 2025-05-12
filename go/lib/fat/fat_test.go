@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	"github.com/acheronfail/nxkit/lib/fat/backend/file"
 	"github.com/acheronfail/nxkit/lib/fat/fat12"
 	"github.com/acheronfail/nxkit/lib/fat/fat16"
 	"github.com/acheronfail/nxkit/lib/fat/fat32"
@@ -17,15 +18,17 @@ import (
 )
 
 func GetFatDiskFs(t *testing.T) fat.FileSystem {
+	backend, err := file.OpenFromPath(testdata.GetFatDiskImagePath(), false)
+	assert.Nil(t, err)
+
 	var fs fat.FileSystem
-	var err error
 	switch testdata.TestFatType {
 	case 12:
-		fs, err = fat12.NewFromPath(testdata.GetFatDiskImagePath())
+		fs, err = fat12.Open(backend, 0)
 	case 16:
-		fs, err = fat16.NewFromPath(testdata.GetFatDiskImagePath())
+		fs, err = fat16.Open(backend, 0)
 	case 32:
-		fs, err = fat32.NewFromPath(testdata.GetFatDiskImagePath())
+		fs, err = fat32.Open(backend, 0)
 	}
 	assert.Nil(t, err)
 

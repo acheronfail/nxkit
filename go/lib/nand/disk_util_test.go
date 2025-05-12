@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/diskfs/go-diskfs/backend"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
 )
 
 var (

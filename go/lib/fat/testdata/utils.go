@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	TestFatType   int
+	TestFatType   boot_sector.FatType
 	diskImagePath string
 )
 
@@ -31,7 +31,7 @@ func init() {
 		panic(fmt.Sprintf("Invalid FAT type: %s", fatTypeString))
 	}
 
-	TestFatType = n
+	TestFatType = boot_sector.FatType(n)
 	fixturesDirectory := filepath.Dir(filepath.Clean(filename))
 	diskImagePath = filepath.Join(fixturesDirectory, fmt.Sprintf("fat%d", n), "disk.img")
 }
@@ -45,5 +45,5 @@ func GetFatDiskImagePath() string {
 }
 
 func GetFatType() boot_sector.FatType {
-	return boot_sector.FatType(TestFatType)
+	return TestFatType
 }

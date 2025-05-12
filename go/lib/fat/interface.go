@@ -1,8 +1,11 @@
 package fat
 
+import "github.com/acheronfail/nxkit/lib/fat/boot_sector"
+
 type FileSystem interface {
 	Close() error
 	GetVolumeId() (string, error)
+	GetType() boot_sector.FatType
 	Info() map[string]any
 	Mkdir(path string) error
 	OpenFile(path string, flags int) (File, error)

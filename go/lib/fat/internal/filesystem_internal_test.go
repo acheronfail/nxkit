@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/acheronfail/nxkit/lib/fat/backend/file"
 	"github.com/acheronfail/nxkit/lib/fat/testdata"
 	"github.com/stretchr/testify/assert"
 )
@@ -51,8 +52,12 @@ func mockDirEntry(names mockDirEntryNames) Entry {
 func createFs(t *testing.T) *FileSystem {
 	t.Helper()
 
+	backend, err := file.OpenFromPath(testdata.GetFatDiskImagePath(), false)
+	assert.Nil(t, err)
+
 	fs, err := NewFileSystemFromPath(
-		testdata.GetFatDiskImagePath(),
+		backend,
+		0,
 		testdata.GetFatType(),
 		func(data []byte) FatTable { return FatTable{} },
 		func(_ *FileSystem) ([]byte, error) { panic("unused") },

@@ -19,7 +19,7 @@ func (fs *FileSystem) splitPath(path string) ([]string, error) {
 }
 
 func (fs *FileSystem) GetFatSectorOffset(fatIndex uint32) int64 {
-	return int64((fs.FatsSectorStart + (fatIndex * fs.FatSectorCount)) * fs.BytesPerSector)
+	return fs.BackendOffset + int64((fs.FatsSectorStart+(fatIndex*fs.FatSectorCount))*fs.BytesPerSector)
 }
 
 func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
@@ -33,10 +33,10 @@ func (fs *FileSystem) getFatSectorBytes(fatIndex uint32) ([]byte, error) {
 }
 
 func GetRootDirectoryBytesDedicatedArea(fs *FileSystem) ([]byte, error) {
-	start := fs.RootDirectorySectorStart * fs.BytesPerSector
+	start := fs.BackendOffset + int64(fs.RootDirectorySectorStart*fs.BytesPerSector)
 	rootDirSize := fs.BootSector.BPB_RootEntCnt * FatDirectoryEntrySize
 	b := make([]byte, rootDirSize)
-	_, err := fs.Backend.ReadAt(b, int64(start))
+	_, err := fs.Backend.ReadAt(b, start)
 	if err != nil {
 		return nil, fmt.Errorf("could not read root directory bytes: %w", err)
 	}

@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/diskfs/go-diskfs/backend"
-	"github.com/diskfs/go-diskfs/backend/file"
+	"github.com/acheronfail/nxkit/lib/fat/backend"
+	"github.com/acheronfail/nxkit/lib/fat/backend/file"
 )
 
 func NewDumpBackend(path string, readOnly bool) (backend.Storage, error) {

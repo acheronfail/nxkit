@@ -6,8 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/xtsn"
-	"github.com/diskfs/go-diskfs/backend"
 )
 
 // TODO: use int64/uint64 where appropriate
