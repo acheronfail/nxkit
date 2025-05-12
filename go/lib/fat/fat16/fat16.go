@@ -77,48 +77,48 @@ func NewFromPath(path string) (fat.FileSystem, error) {
 }
 
 const (
-	fatEntrySize = uint32(2)
-	eoc          = uint32(0xfff8)
+	fatEntrySize = uint16(2)
+	eoc          = uint16(0xfff8)
 )
 
 type fat16Table struct {
-	fatId      uint32
-	clusters   []uint32
-	maxCluster uint32
+	fatId      uint16
+	clusters   []uint16
+	maxCluster uint16
 }
 
 func parseFat16Table(fatBytes []byte) internal.FatTable {
-	maxCluster := uint32(len(fatBytes)) / fatEntrySize
+	maxCluster := uint16(len(fatBytes)) / fatEntrySize
 	fatTable := fat16Table{
-		fatId:      uint32(binary.LittleEndian.Uint16(fatBytes[0:fatEntrySize])),
-		clusters:   make([]uint32, maxCluster+1),
+		fatId:      binary.LittleEndian.Uint16(fatBytes[0:fatEntrySize]),
+		clusters:   make([]uint16, maxCluster+1),
 		maxCluster: maxCluster,
 	}
 
-	for cluster := uint32(2); cluster < maxCluster; cluster++ {
+	for cluster := uint16(2); cluster < maxCluster; cluster++ {
 		start := cluster * fatEntrySize
 		end := start + fatEntrySize
 		val := binary.LittleEndian.Uint16(fatBytes[start:end])
 		if val != 0 {
-			fatTable.clusters[cluster] = uint32(val)
+			fatTable.clusters[cluster] = val
 		}
 	}
 
 	return &fatTable
 }
 
-func (t *fat16Table) IsEoc(cluster uint32) bool              { return cluster >= eoc }
-func (t *fat16Table) GetEoc() uint32                         { return eoc }
-func (t *fat16Table) GetMaxCluster() uint32                  { return t.maxCluster }
-func (t *fat16Table) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
+func (t *fat16Table) IsEoc(cluster uint32) bool              { return uint16(cluster) >= eoc }
+func (t *fat16Table) GetEoc() uint32                         { return uint32(eoc) }
+func (t *fat16Table) GetMaxCluster() uint32                  { return uint32(t.maxCluster) }
+func (t *fat16Table) GetClusterTarget(cluster uint32) uint32 { return uint32(t.clusters[cluster]) }
 func (t *fat16Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint32) error {
 	// set in memory cluster table
-	t.clusters[cluster] = target
+	t.clusters[cluster] = uint16(target)
 
 	// also write back to all FATs
 	for i := range uint32(fs.BootSector.BPB_NumFATs) {
 		offset := fs.GetFatSectorOffset(i)
-		clusterOffset := offset + int64(cluster*fatEntrySize)
+		clusterOffset := offset + int64(uint16(cluster)*fatEntrySize)
 		toWrite := make([]byte, 2)
 		binary.LittleEndian.PutUint16(toWrite, uint16(target))
 		_, err := fs.Backend.WriteAt(toWrite, clusterOffset)

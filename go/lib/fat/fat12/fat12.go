@@ -77,46 +77,49 @@ func NewFromPath(path string) (fat.FileSystem, error) {
 }
 
 const (
-	eoc = uint32(0xff8)
+	eoc = uint16(0xff8)
 )
 
 type fat12Table struct {
-	fatId      uint32
-	clusters   []uint32
-	maxCluster uint32
+	fatId      uint16
+	clusters   []uint16
+	maxCluster uint16
 }
 
 func parseFat12Table(fatBytes []byte) internal.FatTable {
 	// calculate max clusters based on 12-bit entries
-	maxCluster := uint32(len(fatBytes)*8) / 12
+	maxCluster := uint16((len(fatBytes) * 8) / 12)
 
 	fatTable := fat12Table{
-		fatId:      uint32(binary.LittleEndian.Uint16(fatBytes[0:2])),
-		clusters:   make([]uint32, maxCluster+1),
+		fatId:      binary.LittleEndian.Uint16(fatBytes[0:2]),
+		clusters:   make([]uint16, maxCluster+1),
 		maxCluster: maxCluster,
 	}
 
-	for cluster := uint32(2); cluster < maxCluster; cluster++ {
+	for cluster := uint16(2); cluster < maxCluster; cluster++ {
 		entryOffset := cluster + (cluster / 2)
 		if cluster%2 == 0 {
 			// Even cluster: lower 12 bits of the 16-bit value
 			val := binary.LittleEndian.Uint16(fatBytes[entryOffset:entryOffset+2]) & 0x0FFF
-			fatTable.clusters[cluster] = uint32(val)
+			fatTable.clusters[cluster] = val
 		} else {
 			// Odd cluster: upper 12 bits of the 16-bit value
 			val := binary.LittleEndian.Uint16(fatBytes[entryOffset:entryOffset+2]) >> 4
-			fatTable.clusters[cluster] = uint32(val)
+			fatTable.clusters[cluster] = val
 		}
 	}
 
 	return &fatTable
 }
 
-func (t *fat12Table) IsEoc(cluster uint32) bool              { return cluster >= eoc }
-func (t *fat12Table) GetEoc() uint32                         { return eoc }
-func (t *fat12Table) GetMaxCluster() uint32                  { return t.maxCluster }
-func (t *fat12Table) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
-func (t *fat12Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint32) error {
+func (t *fat12Table) IsEoc(cluster uint32) bool              { return uint16(cluster) >= eoc }
+func (t *fat12Table) GetEoc() uint32                         { return uint32(eoc) }
+func (t *fat12Table) GetMaxCluster() uint32                  { return uint32(t.maxCluster) }
+func (t *fat12Table) GetClusterTarget(cluster uint32) uint32 { return uint32(t.clusters[cluster]) }
+func (t *fat12Table) WriteClusterTarget(fs *internal.FileSystem, cluster32, target32 uint32) error {
+	cluster := uint16(cluster32)
+	target := uint16(target32)
+
 	// set in memory cluster table
 	t.clusters[cluster] = target
 
