@@ -43,3 +43,9 @@ func GetRootDirectoryBytesDedicatedArea(fs *FileSystem) ([]byte, error) {
 
 	return b, nil
 }
+
+func GetRootDirectoryBytesFromCluster(cluster uint32) func(fs *FileSystem) ([]byte, error) {
+	return func(fs *FileSystem) ([]byte, error) {
+		return fs.GetClusterChainBytes(cluster)
+	}
+}

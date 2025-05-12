@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fat/backend/file"
+	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 	"github.com/acheronfail/nxkit/lib/fat/testdata"
 	"github.com/stretchr/testify/assert"
 )
@@ -55,14 +56,21 @@ func createFs(t *testing.T) *FileSystem {
 	backend, err := file.OpenFromPath(testdata.GetFatDiskImagePath(), false)
 	assert.Nil(t, err)
 
-	fs, err := NewFileSystem(
-		backend,
-		0,
-		testdata.GetFatType(),
-		func(data []byte) FatTable { return FatTable{} },
-		func(_ *FileSystem) ([]byte, error) { panic("unused") },
-	)
+	var fnTable func([]byte) FatTable
+	var fnBytes func(*FileSystem) ([]byte, error)
+	switch testdata.GetFatType() {
+	case boot_sector.Fat32:
+		fnTable = NewFat32Table
+		fnBytes = GetRootDirectoryBytesFromCluster(2)
+	case boot_sector.Fat16:
+		fnTable = NewFat16Table
+		fnBytes = GetRootDirectoryBytesDedicatedArea
+	case boot_sector.Fat12:
+		fnTable = NewFat16Table
+		fnBytes = GetRootDirectoryBytesDedicatedArea
+	}
 
+	fs, err := NewFileSystem(backend, 0, testdata.GetFatType(), fnTable, fnBytes)
 	assert.Nil(t, err)
 	return fs
 }
@@ -374,5 +382,68 @@ func TestReadDirectoryEntries(t *testing.T) {
 		assert.Len(t, entries, 1)
 		assertEntry(t, entries[0])
 		assert.Equal(t, "GGGGGGGGGGGGG", entries[0].longFileName)
+	})
+}
+
+func getCluster(t *testing.T, fs *FileSystem, path string) uint32 {
+	s, err := fs.Stat(path)
+	assert.Nil(t, err)
+
+	inner, ok := s.(*stat)
+	assert.True(t, ok)
+
+	return inner.entry.clusterNumber()
+}
+
+func TestRename(t *testing.T) {
+	fs := createFs(t)
+	defer fs.Close()
+
+	t.Run("test rename changes ..'s cluster - root", func(t *testing.T) {
+		// create dir to rename
+		err := fs.Mkdir("/write/internal_rename")
+		assert.Nil(t, err)
+
+		// save parent clusters
+		rootDirCluster := getCluster(t, fs, "/")
+		writeDirCluster := getCluster(t, fs, "/write")
+		assert.Equal(t, writeDirCluster, getCluster(t, fs, "/write/internal_rename/.."))
+
+		// perform rename
+		err = fs.Rename("/write/internal_rename", "/internal_rename")
+		assert.Nil(t, err)
+
+		// check cluster is pointing to new parent
+		assert.Equal(t, rootDirCluster, getCluster(t, fs, "/internal_rename/.."))
+
+		// clean up
+		err = fs.Rmdir("/internal_rename")
+		assert.Nil(t, err)
+	})
+
+	t.Run("test rename changes ..'s cluster", func(t *testing.T) {
+		// create dest dir
+		err := fs.Mkdir("/write/internal")
+		assert.Nil(t, err)
+
+		// create dir to rename
+		err = fs.Mkdir("/write/internal_rename")
+		assert.Nil(t, err)
+
+		// save parent clusters
+		writeDirCluster := getCluster(t, fs, "/write")
+		internalDirCluster := getCluster(t, fs, "/write/internal")
+		assert.Equal(t, writeDirCluster, getCluster(t, fs, "/write/internal_rename/.."))
+
+		// perform rename
+		err = fs.Rename("/write/internal_rename", "/write/internal/rename")
+		assert.Nil(t, err)
+
+		// check cluster is pointing to new parent
+		assert.Equal(t, internalDirCluster, getCluster(t, fs, "/write/internal/rename/.."))
+
+		// clean up
+		err = fs.Rmdir("/write/internal/rename")
+		assert.Nil(t, err)
 	})
 }

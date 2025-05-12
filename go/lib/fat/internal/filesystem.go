@@ -155,7 +155,10 @@ func (fs *FileSystem) ReadDir(path string) ([]fat.DirectoryEntry, error) {
 
 	entries := make([]fat.DirectoryEntry, len(result.entries))
 	for i, entry := range result.entries {
-		entries[i] = fat.DirectoryEntry(&entry)
+		entries[i] = fat.DirectoryEntry(&stat{
+			entry: entry,
+			path:  filepath.Join(path, entry.LongName()),
+		})
 	}
 	return entries, nil
 }
@@ -186,7 +189,7 @@ func (fs *FileSystem) OpenFile(path string, flags int) (fat.File, error) {
 				return nil, os.ErrPermission
 			}
 
-			index, parentDirBytes, err := fs.findIndexInParentBytes(existing, parent.cluster)
+			index, parentDirBytes, err := fs.findIndexInParentBytes(existing.DIR_Name, parent.cluster)
 			if err != nil {
 				return nil, err
 			}
@@ -270,7 +273,7 @@ func (fs *FileSystem) Stat(path string) (fat.Stat, error) {
 		return nil, fmt.Errorf("no such file or directory %s", path)
 	}
 
-	return entry, nil
+	return &stat{entry: *entry, path: path}, nil
 }
 
 func (fs *FileSystem) Unlink(path string) error {
@@ -383,6 +386,30 @@ func (fs *FileSystem) Rename(srcPath, dstPath string) error {
 	err = fs.writeEntryWithLfnToParent(baseName, &newEntry, dstParent.cluster, newParentDirBytes, startIndex)
 	if err != nil {
 		return err
+	}
+
+	// if dir, update ".." to point to new parent
+	if newEntry.IsDir() {
+		cluster := newEntry.clusterNumber()
+		_, dotDot := getDotNames()
+		index, dirBytes, err := fs.findIndexInParentBytes(dotDot, &cluster)
+		if err != nil {
+			return err
+		}
+
+		entry := fatDirectoryEntryFromBytes(dirBytes[index : index+FatDirectoryEntrySize])
+		if dstParent.cluster == nil {
+			entry.setCluster(0)
+		} else {
+			entry.setCluster(*dstParent.cluster)
+		}
+
+		fs.writeEntriesToParent(
+			[]to32Bytes{&entry},
+			&cluster,
+			dirBytes,
+			index,
+		)
 	}
 
 	// remove source entry from source parent directory

@@ -30,6 +30,7 @@ type File interface {
 }
 
 type Stat interface {
+	Path() string
 	Size() int64
 	IsReadOnly() bool
 	IsHidden() bool

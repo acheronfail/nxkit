@@ -132,7 +132,7 @@ func (f *fatFile) WriteAt(p []byte, off int64) (n int, err error) {
 }
 
 func (f *fatFile) writeEntryToParent() error {
-	index, parentDirBytes, err := f.fs.findIndexInParentBytes(&f.Entry, f.parentDirCluster)
+	index, parentDirBytes, err := f.fs.findIndexInParentBytes(f.Entry.DIR_Name, f.parentDirCluster)
 	if err != nil {
 		return err
 	}

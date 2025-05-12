@@ -115,7 +115,7 @@ func readDirectoryEntries(dirBytes []byte) ([]Entry, error) {
 	return entries, nil
 }
 
-func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint32) (i int, parentDirBytes []byte, err error) {
+func (fs *FileSystem) findIndexInParentBytes(sfnBytes [11]byte, parentDirCluster *uint32) (i int, parentDirBytes []byte, err error) {
 	if parentDirCluster == nil {
 		parentDirBytes, err = fs.getRootDirectoryBytes(fs)
 	} else {
@@ -137,7 +137,7 @@ func (fs *FileSystem) findIndexInParentBytes(ent *Entry, parentDirCluster *uint3
 		}
 
 		// check if this is the entry we are looking for
-		if bytes.Equal(parentDirBytes[i:i+11], ent.DIR_Name[:]) {
+		if bytes.Equal(parentDirBytes[i:i+11], sfnBytes[:]) {
 			// check it's not an entry with the same name as the volume id
 			if parentDirBytes[i+11]&0x08 == 0x08 {
 				continue
@@ -227,6 +227,13 @@ func (fs *FileSystem) writeEntriesToParent(
 	return nil
 }
 
+func getDotNames() ([11]byte, [11]byte) {
+	dot := [11]byte{'.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20}
+	dotDot := [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20}
+	return dot, dotDot
+
+}
+
 func (fs *FileSystem) writeDirectoryEntry(
 	newDirName string,
 	newDirCluster uint32,
@@ -244,8 +251,9 @@ func (fs *FileSystem) writeDirectoryEntry(
 	}
 
 	// create special directory entries
+	dot, dotDot := getDotNames()
 	dotDirEntry := fatDirectoryEntry{
-		DIR_Name:         [11]byte{'.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
+		DIR_Name:         dot,
 		DIR_Attr:         0x10,
 		DIR_CrtTimeTenth: t.tenth,
 		DIR_CrtTime:      t.time,
@@ -258,7 +266,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 	dotDirEntry.setCluster(newDirCluster)
 
 	dotDotDirEntry := fatDirectoryEntry{
-		DIR_Name:         [11]byte{'.', '.', 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20, 0x20},
+		DIR_Name:         dotDot,
 		DIR_Attr:         0x10,
 		DIR_CrtTimeTenth: t.tenth,
 		DIR_CrtTime:      t.time,
@@ -329,6 +337,19 @@ func (fs *FileSystem) getAvailableDirectoryEntry(
 func (fs *FileSystem) findEntry(path string) (*Entry, *readDirResult, bool, error) {
 	dirPath := filepath.Dir(path)
 	baseName := filepath.Base(path)
+
+	// if looking for root
+	if baseName == "/" {
+		rootEntry := fs.createNewEntry(
+			"<root>",
+			asFatTime(time.Unix(0, 0)),
+			0,
+			0,
+			[]Entry{},
+		)
+		return rootEntry, nil, true, nil
+	}
+
 	parent, err := fs.readDir(dirPath, false)
 	if err != nil {
 		return nil, nil, false, err
@@ -344,7 +365,7 @@ func (fs *FileSystem) findEntry(path string) (*Entry, *readDirResult, bool, erro
 }
 
 func (fs *FileSystem) removeEntryFromParent(entry *Entry, parentDirCluster *uint32) error {
-	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry, parentDirCluster)
+	entryIndex, parentDirBytes, err := fs.findIndexInParentBytes(entry.DIR_Name, parentDirCluster)
 	if err != nil {
 		return err
 	}
