@@ -5,7 +5,6 @@ import (
 	"io"
 	"os"
 	"slices"
-	"strconv"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fat"
@@ -16,28 +15,24 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func getFs(t *testing.T) fat.FileSystem {
-	fatTypeString, ok := os.LookupEnv("FAT")
-	assert.True(t, ok, "Please provide FAT=XX environment variable")
-
-	n, err := strconv.Atoi(fatTypeString)
-	assert.Nil(t, err)
-	switch n {
+func GetFatDiskFs(t *testing.T) fat.FileSystem {
+	var fs fat.FileSystem
+	var err error
+	switch testdata.TestFatType {
+	case 12:
+		panic("unimplemented")
 	case 16:
-		fs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
-		assert.Nil(t, err)
-		return fs
+		fs, err = fat16.NewFromPath(testdata.GetFatDiskImagePath())
 	case 32:
-		fs, err := fat32.NewFromPath(testdata.Fat32DiskImagePath)
-		assert.Nil(t, err)
-		return fs
-	default:
-		panic(fmt.Sprintf("unsupported fat type: %d", n))
+		fs, err = fat32.NewFromPath(testdata.GetFatDiskImagePath())
 	}
+	assert.Nil(t, err)
+
+	return fs
 }
 
 func TestReadDir(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("path:/", func(t *testing.T) {
@@ -95,7 +90,7 @@ func TestReadDir(t *testing.T) {
 }
 
 func TestMkdir(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	testSingleMkdirWorked := func(fs fat.FileSystem) {
@@ -118,8 +113,7 @@ func TestMkdir(t *testing.T) {
 
 		testSingleMkdirWorked(fs)
 
-		newFs, err := fat16.NewFromPath(testdata.Fat16DiskImagePath)
-		assert.Nil(t, err)
+		newFs := GetFatDiskFs(t)
 		testSingleMkdirWorked(newFs)
 	})
 
@@ -165,24 +159,26 @@ func TestMkdir(t *testing.T) {
 	})
 
 	t.Run("mkdir same as volume id", func(t *testing.T) {
-		err := fs.Mkdir("/FAT16-TEST")
+		p := fmt.Sprintf("/%s", testdata.GetFatDiskVolumeId())
+
+		err := fs.Mkdir(p)
 		assert.Nil(t, err)
 
 		entries, err := fs.ReadDir("/")
 		assert.Nil(t, err)
 		assert.Len(t, entries, 9)
 		shortNames := utils.MapSlice(entries, func(entry fat.DirectoryEntry) string { return entry.ShortName() })
-		assert.True(t, slices.Contains(shortNames, "FAT16-~1"))
+		assert.True(t, slices.Contains(shortNames, fmt.Sprintf("FAT%d-~1", testdata.TestFatType)))
 		longNames := utils.MapSlice(entries, func(entry fat.DirectoryEntry) string { return entry.LongName() })
-		assert.True(t, slices.Contains(longNames, "FAT16-TEST"))
+		assert.True(t, slices.Contains(longNames, testdata.GetFatDiskVolumeId()))
 
-		err = fs.Rmdir("/FAT16-TEST")
+		err = fs.Rmdir(p)
 		assert.Nil(t, err)
 	})
 }
 
 func TestOpenFile(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("read - sfn", func(t *testing.T) {
@@ -308,27 +304,29 @@ func TestOpenFile(t *testing.T) {
 	})
 
 	t.Run("open - try volume id", func(t *testing.T) {
+		p := fmt.Sprintf("/%s", testdata.GetFatDiskVolumeId())
+
 		// try opening it
-		_, err := fs.OpenFile("/FAT16-TEST", os.O_RDONLY)
-		assert.EqualError(t, err, "no such file or directory /FAT16-TEST")
+		_, err := fs.OpenFile(p, os.O_RDONLY)
+		assert.EqualError(t, err, fmt.Sprintf("no such file or directory /%s", testdata.GetFatDiskVolumeId()))
 
 		// create a file with the same name
-		_, err = fs.OpenFile("/FAT16-TEST", os.O_WRONLY|os.O_CREATE)
+		_, err = fs.OpenFile(p, os.O_WRONLY|os.O_CREATE)
 		assert.Nil(t, err)
 
 		// check vol id is good
 		id, err := fs.GetVolumeId()
 		assert.Nil(t, err)
-		assert.Equal(t, "FAT16-TEST", id)
+		assert.Equal(t, testdata.GetFatDiskVolumeId(), id)
 
 		// now remove for other tests
-		err = fs.Unlink("/FAT16-TEST")
+		err = fs.Unlink(p)
 		assert.Nil(t, err)
 
 		// check vol id is still good
 		id, err = fs.GetVolumeId()
 		assert.Nil(t, err)
-		assert.Equal(t, "FAT16-TEST", id)
+		assert.Equal(t, testdata.GetFatDiskVolumeId(), id)
 	})
 
 	t.Run("write - not exist", func(t *testing.T) {
@@ -402,7 +400,7 @@ func TestOpenFile(t *testing.T) {
 }
 
 func TestStat(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("stat - file", func(t *testing.T) {
@@ -429,7 +427,7 @@ func TestStat(t *testing.T) {
 }
 
 func TestUnlink(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("unlink - empty file", func(t *testing.T) {
@@ -516,7 +514,7 @@ func TestUnlink(t *testing.T) {
 }
 
 func TestRmdir(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("rmdir - empty dir", func(t *testing.T) {
@@ -585,7 +583,7 @@ func TestRmdir(t *testing.T) {
 }
 
 func TestRename(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("rename - file - same parent", func(t *testing.T) {
@@ -723,18 +721,18 @@ func TestRename(t *testing.T) {
 	})
 
 	t.Run("rename - try volume id", func(t *testing.T) {
-		err := fs.Rename("/FAT16-TEST", "/NOPE")
-		assert.EqualError(t, err, "no such file or directory /FAT16-TEST")
+		err := fs.Rename(fmt.Sprintf("/%s", testdata.GetFatDiskVolumeId()), "/NOPE")
+		assert.EqualError(t, err, fmt.Sprintf("no such file or directory /%s", testdata.GetFatDiskVolumeId()))
 	})
 }
 
 func TestVolumeId(t *testing.T) {
-	fs := getFs(t)
+	fs := GetFatDiskFs(t)
 	defer fs.Close()
 
 	t.Run("get volume id", func(t *testing.T) {
 		id, err := fs.GetVolumeId()
 		assert.Nil(t, err)
-		assert.Equal(t, "FAT16-TEST", id)
+		assert.Equal(t, testdata.GetFatDiskVolumeId(), id)
 	})
 }

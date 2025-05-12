@@ -1,14 +1,18 @@
 package testdata
 
 import (
+	"fmt"
+	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
+
+	"github.com/acheronfail/nxkit/lib/fat/boot_sector"
 )
 
 var (
-	Fat12DiskImagePath string
-	Fat16DiskImagePath string
-	Fat32DiskImagePath string
+	TestFatType   int
+	diskImagePath string
 )
 
 func init() {
@@ -17,8 +21,29 @@ func init() {
 		panic("Could not get current file info")
 	}
 
-	thisDir := filepath.Dir(filepath.Clean(filename))
-	Fat12DiskImagePath = filepath.Join(thisDir, "fat12", "disk.img")
-	Fat16DiskImagePath = filepath.Join(thisDir, "fat16", "disk.img")
-	Fat32DiskImagePath = filepath.Join(thisDir, "fat32", "disk.img")
+	fatTypeString, ok := os.LookupEnv("FAT")
+	if !ok {
+		panic("Please provide FAT=XX environment variable")
+	}
+
+	n, err := strconv.Atoi(fatTypeString)
+	if err != nil {
+		panic(fmt.Sprintf("Invalid FAT type: %s", fatTypeString))
+	}
+
+	TestFatType = n
+	fixturesDirectory := filepath.Dir(filepath.Clean(filename))
+	diskImagePath = filepath.Join(fixturesDirectory, fmt.Sprintf("fat%d", n), "disk.img")
+}
+
+func GetFatDiskVolumeId() string {
+	return fmt.Sprintf("FAT%d-TEST", TestFatType)
+}
+
+func GetFatDiskImagePath() string {
+	return diskImagePath
+}
+
+func GetFatType() boot_sector.FatType {
+	return boot_sector.FatType(TestFatType)
 }
