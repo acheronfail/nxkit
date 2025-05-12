@@ -16,42 +16,9 @@ const (
 	FatDirectoryEntrySize = 32
 )
 
-type FatTable struct {
-	fatId              uint32
-	eoc                uint32
-	clusters           []uint32
-	maxCluster         uint32
-	writeClusterTarget func(fs *FileSystem, cluster, target uint32) error
-}
-
-func (t *FatTable) IsEoc(cluster uint32) bool              { return cluster >= t.eoc }
-func (t *FatTable) GetEoc() uint32                         { return t.eoc }
-func (t *FatTable) GetMaxCluster() uint32                  { return t.maxCluster }
-func (t *FatTable) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
-func (t *FatTable) SetClusterTarget(fs *FileSystem, cluster, target uint32) error {
-	t.clusters[cluster] = target
-	return t.writeClusterTarget(fs, cluster, target)
-}
-
-func NewFatTable(
-	fatId,
-	eoc,
-	maxCluster uint32,
-	clusters []uint32,
-	writeClusterTarget func(fs *FileSystem, cluster, target uint32) error,
-) FatTable {
-	return FatTable{
-		fatId:              fatId,
-		eoc:                eoc,
-		clusters:           clusters,
-		maxCluster:         maxCluster,
-		writeClusterTarget: writeClusterTarget,
-	}
-}
-
 type FileSystem struct {
 	Backend       backend.Storage
-	BackendWriter *backend.WritableFile
+	BackendWriter backend.WritableFile
 	BackendOffset int64
 
 	BootSector               boot_sector.BootSector
@@ -90,7 +57,7 @@ func ReadBootSector(
 	return bootSector, nil
 }
 
-func NewFileSystemFromPath(
+func NewFileSystem(
 	disk backend.Storage,
 	backendOffset int64,
 	expectedFatType boot_sector.FatType,
@@ -120,17 +87,19 @@ func NewFileSystemFromPath(
 	rootDirectorySectorCount := uint32((32*bootSector.BPB_RootEntCnt + bootSector.BPB_BytsPerSec - 1) / bootSector.BPB_BytsPerSec)
 	dataSectorStart := rootDirectorySectorStart + rootDirectorySectorCount
 
-	// TODONICE: open in readonly mode
+	// request write privileges, but don't fail if we don't get them
 	diskWriter, err := disk.Writable()
 	if err != nil {
-		disk.Close()
-		return nil, err
+		diskWriter = readonlyBackend{
+			inner:          disk,
+			writePermError: err,
+		}
 	}
 
 	randFunc := func(n int) int { return rand.Intn(n) }
 	fs := &FileSystem{
 		Backend:       disk,
-		BackendWriter: &diskWriter,
+		BackendWriter: diskWriter,
 		BackendOffset: backendOffset,
 
 		BootSector:               *bootSector,

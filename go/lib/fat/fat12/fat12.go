@@ -69,7 +69,7 @@ func (f *FS) Unlink(path string) error {
 }
 
 func Open(backend backend.Storage, offset int64) (fat.FileSystem, error) {
-	fs, err := internal.NewFileSystemFromPath(
+	fs, err := internal.NewFileSystem(
 		backend,
 		offset,
 		boot_sector.Fat12,
@@ -125,7 +125,7 @@ func parseFat12Table(fatBytes []byte) internal.FatTable {
 				val := clusterValue16 & 0xF000
 				val |= uint16(target & 0x0FFF)
 				binary.LittleEndian.PutUint16(toWrite[:2], val)
-				_, err := (*fs.BackendWriter).WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				_, err := fs.BackendWriter.WriteAt(toWrite[:2], offset+int64(clusterOffset))
 				if err != nil {
 					return err
 				}
@@ -134,7 +134,7 @@ func parseFat12Table(fatBytes []byte) internal.FatTable {
 				val := clusterValue16 & 0x000F
 				val |= uint16((target & 0x0FFF) << 4)
 				binary.LittleEndian.PutUint16(toWrite[:2], val)
-				_, err := (*fs.BackendWriter).WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				_, err := fs.BackendWriter.WriteAt(toWrite[:2], offset+int64(clusterOffset))
 				if err != nil {
 					return err
 				}

@@ -55,7 +55,7 @@ func createFs(t *testing.T) *FileSystem {
 	backend, err := file.OpenFromPath(testdata.GetFatDiskImagePath(), false)
 	assert.Nil(t, err)
 
-	fs, err := NewFileSystemFromPath(
+	fs, err := NewFileSystem(
 		backend,
 		0,
 		testdata.GetFatType(),
