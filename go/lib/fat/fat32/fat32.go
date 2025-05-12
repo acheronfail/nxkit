@@ -78,56 +78,35 @@ func NewFromPath(path string) (fat.FileSystem, error) {
 	return &FS{fs}, nil
 }
 
-const (
-	fatEntrySize = uint32(4)
-	eoc          = uint32(0xffffff8)
-)
-
-type fat32Table struct {
-	fatId      uint32
-	clusters   []uint32
-	maxCluster uint32
-}
-
 func parseFat32Table(fatBytes []byte) internal.FatTable {
+	eoc := uint32(0xffffff8)
+	fatEntrySize := uint32(4)
+
 	maxCluster := uint32(len(fatBytes)) / fatEntrySize
-	fatTable := fat32Table{
-		fatId:      binary.LittleEndian.Uint32(fatBytes[0:fatEntrySize]),
-		clusters:   make([]uint32, maxCluster+1),
-		maxCluster: maxCluster,
-	}
+	fatId := binary.LittleEndian.Uint32(fatBytes[0:fatEntrySize])
+	clusters := make([]uint32, maxCluster+1)
 
 	for cluster := uint32(2); cluster < maxCluster; cluster++ {
 		start := cluster * fatEntrySize
 		end := start + fatEntrySize
 		val := binary.LittleEndian.Uint32(fatBytes[start:end])
 		if val != 0 {
-			fatTable.clusters[cluster] = val
+			clusters[cluster] = val
 		}
 	}
 
-	return &fatTable
-}
-
-func (t *fat32Table) IsEoc(cluster uint32) bool              { return cluster >= eoc }
-func (t *fat32Table) GetEoc() uint32                         { return eoc }
-func (t *fat32Table) GetMaxCluster() uint32                  { return t.maxCluster }
-func (t *fat32Table) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
-func (t *fat32Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint32) error {
-	// set in memory cluster table
-	t.clusters[cluster] = target
-
-	// also write back to all FATs
-	for i := range uint32(fs.BootSector.BPB_NumFATs) {
-		offset := fs.GetFatSectorOffset(i)
-		clusterOffset := offset + int64(cluster*fatEntrySize)
-		toWrite := make([]byte, 4)
-		binary.LittleEndian.PutUint32(toWrite, target)
-		_, err := fs.Backend.WriteAt(toWrite, clusterOffset)
-		if err != nil {
-			return err
+	return internal.NewFatTable(fatId, eoc, maxCluster, clusters, func(fs *internal.FileSystem, cluster, target uint32) error {
+		for i := range uint32(fs.BootSector.BPB_NumFATs) {
+			offset := fs.GetFatSectorOffset(i)
+			clusterOffset := offset + int64(cluster*fatEntrySize)
+			toWrite := make([]byte, 4)
+			binary.LittleEndian.PutUint32(toWrite, target)
+			_, err := fs.Backend.WriteAt(toWrite, clusterOffset)
+			if err != nil {
+				return err
+			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }

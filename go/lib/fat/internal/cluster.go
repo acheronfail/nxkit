@@ -5,16 +5,16 @@ import (
 )
 
 func (fs *FileSystem) writeClusterToFats(cluster, target uint32) error {
-	return fs.table.WriteClusterTarget(fs, cluster, target)
+	return fs.Table.SetClusterTarget(fs, cluster, target)
 }
 
 func (fs *FileSystem) allocateClusterChain(bytesRequired int64) (uint32, error) {
 	nClustersAllocated := 0
 	nClustersRequired := max(1, bytesRequired/fs.BytesPerCluster)
 
-	prevCluster := fs.table.GetEoc()
-	for cluster := uint32(2); cluster < fs.table.GetMaxCluster(); cluster++ {
-		if fs.table.GetClusterTarget(cluster) == 0x0000 {
+	prevCluster := fs.Table.GetEoc()
+	for cluster := uint32(2); cluster < fs.Table.GetMaxCluster(); cluster++ {
+		if fs.Table.GetClusterTarget(cluster) == 0x0000 {
 			err := fs.writeClusterToFats(cluster, prevCluster)
 			if err != nil {
 				return 0, err
@@ -37,15 +37,15 @@ func (fs *FileSystem) getClusterChain(startCluster uint32) ([]uint32, error) {
 	currentCluster := startCluster
 	for {
 		clusters = append(clusters, currentCluster)
-		nextCluster := fs.table.GetClusterTarget(currentCluster)
+		nextCluster := fs.Table.GetClusterTarget(currentCluster)
 
-		if fs.table.IsEoc(nextCluster) {
+		if fs.Table.IsEoc(nextCluster) {
 			break
 		}
 		if nextCluster < 2 {
 			return nil, fmt.Errorf("invalid cluster number: %d", nextCluster)
 		}
-		if nextCluster > fs.table.GetMaxCluster() {
+		if nextCluster > fs.Table.GetMaxCluster() {
 			return nil, fmt.Errorf("cluster number out of range: %d", nextCluster)
 		}
 
@@ -128,13 +128,13 @@ func (fs *FileSystem) extendClusterChain(clusterStart uint32, totalBytesNeeded i
 	}
 
 	prevCluster := clusterChain[len(clusterChain)-1]
-	for cluster := uint32(2); cluster < fs.table.GetMaxCluster(); cluster++ {
-		if fs.table.GetClusterTarget(cluster) == 0x0000 {
+	for cluster := uint32(2); cluster < fs.Table.GetMaxCluster(); cluster++ {
+		if fs.Table.GetClusterTarget(cluster) == 0x0000 {
 			err := fs.writeClusterToFats(prevCluster, cluster)
 			if err != nil {
 				return err
 			}
-			err = fs.writeClusterToFats(cluster, fs.table.GetEoc())
+			err = fs.writeClusterToFats(cluster, fs.Table.GetEoc())
 			if err != nil {
 				return err
 			}

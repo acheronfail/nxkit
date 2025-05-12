@@ -48,25 +48,14 @@ func mockDirEntry(names mockDirEntryNames) Entry {
 	}
 }
 
-type mockFatTable struct{}
-
-func (m mockFatTable) GetClusterTarget(_ uint32) uint32                    { panic("unused") }
-func (m mockFatTable) IsEoc(_ uint32) bool                                 { panic("unused") }
-func (m mockFatTable) GetMaxCluster() uint32                               { panic("unused") }
-func (m mockFatTable) GetEoc() uint32                                      { panic("unused") }
-func (m mockFatTable) WriteClusterTarget(_ *FileSystem, _, _ uint32) error { panic("unused") }
-func mockParseFatTable(_ []byte) FatTable                                  { return mockFatTable{} }
-
-func mockGetRootDirectoryBytes(_ *FileSystem) ([]byte, error) { panic("unused") }
-
 func createFs(t *testing.T) *FileSystem {
 	t.Helper()
 
 	fs, err := NewFileSystemFromPath(
 		testdata.GetFatDiskImagePath(),
 		testdata.GetFatType(),
-		mockParseFatTable,
-		mockGetRootDirectoryBytes,
+		func(data []byte) FatTable { return FatTable{} },
+		func(_ *FileSystem) ([]byte, error) { panic("unused") },
 	)
 
 	assert.Nil(t, err)

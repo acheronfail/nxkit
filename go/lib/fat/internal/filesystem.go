@@ -15,12 +15,37 @@ const (
 	FatDirectoryEntrySize = 32
 )
 
-type FatTable interface {
-	GetClusterTarget(cluster uint32) uint32
-	WriteClusterTarget(fs *FileSystem, cluster, target uint32) error
-	GetMaxCluster() uint32
-	GetEoc() uint32
-	IsEoc(cluster uint32) bool
+type FatTable struct {
+	fatId              uint32
+	eoc                uint32
+	clusters           []uint32
+	maxCluster         uint32
+	writeClusterTarget func(fs *FileSystem, cluster, target uint32) error
+}
+
+func (t *FatTable) IsEoc(cluster uint32) bool              { return cluster >= t.eoc }
+func (t *FatTable) GetEoc() uint32                         { return t.eoc }
+func (t *FatTable) GetMaxCluster() uint32                  { return t.maxCluster }
+func (t *FatTable) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
+func (t *FatTable) SetClusterTarget(fs *FileSystem, cluster, target uint32) error {
+	t.clusters[cluster] = target
+	return t.writeClusterTarget(fs, cluster, target)
+}
+
+func NewFatTable(
+	fatId,
+	eoc,
+	maxCluster uint32,
+	clusters []uint32,
+	writeClusterTarget func(fs *FileSystem, cluster, target uint32) error,
+) FatTable {
+	return FatTable{
+		fatId:              fatId,
+		eoc:                eoc,
+		clusters:           clusters,
+		maxCluster:         maxCluster,
+		writeClusterTarget: writeClusterTarget,
+	}
 }
 
 type FileSystem struct {
@@ -36,7 +61,7 @@ type FileSystem struct {
 	RootDirectorySectorCount uint32
 	DataSectorStart          uint32
 
-	table                 FatTable
+	Table                 FatTable
 	randIntn              func(n int) int
 	getRootDirectoryBytes func(fs *FileSystem) ([]byte, error)
 }
@@ -109,7 +134,7 @@ func NewFileSystemFromPath(
 	}
 
 	// TODONICE: validate both fats are identical
-	fs.table = parseFatTable(fat1Bytes)
+	fs.Table = parseFatTable(fat1Bytes)
 	return fs, nil
 }
 

@@ -76,85 +76,64 @@ func NewFromPath(path string) (fat.FileSystem, error) {
 	return &FS{fs}, nil
 }
 
-const (
-	eoc = uint32(0xff8)
-)
-
-type fat12Table struct {
-	fatId      uint32
-	clusters   []uint32
-	maxCluster uint32
-}
-
 func parseFat12Table(fatBytes []byte) internal.FatTable {
+	eoc := uint32(0xff8)
+
 	// calculate max clusters based on 12-bit entries
 	maxCluster := uint32(len(fatBytes)*8) / 12
 
-	fatTable := fat12Table{
-		fatId:      uint32(binary.LittleEndian.Uint16(fatBytes[0:2])),
-		clusters:   make([]uint32, maxCluster+1),
-		maxCluster: maxCluster,
-	}
+	fatId := uint32(binary.LittleEndian.Uint16(fatBytes[0:2]))
+	clusters := make([]uint32, maxCluster+1)
 
 	for cluster := uint32(2); cluster < maxCluster; cluster++ {
 		entryOffset := cluster + (cluster / 2)
 		if cluster%2 == 0 {
 			// Even cluster: lower 12 bits of the 16-bit value
 			val := binary.LittleEndian.Uint16(fatBytes[entryOffset:entryOffset+2]) & 0x0FFF
-			fatTable.clusters[cluster] = uint32(val)
+			clusters[cluster] = uint32(val)
 		} else {
 			// Odd cluster: upper 12 bits of the 16-bit value
 			val := binary.LittleEndian.Uint16(fatBytes[entryOffset:entryOffset+2]) >> 4
-			fatTable.clusters[cluster] = uint32(val)
+			clusters[cluster] = uint32(val)
 		}
 	}
 
-	return &fatTable
-}
+	return internal.NewFatTable(fatId, eoc, maxCluster, clusters, func(fs *internal.FileSystem, cluster, target uint32) error {
+		for i := range uint32(fs.BootSector.BPB_NumFATs) {
+			offset := fs.GetFatSectorOffset(i)
+			clusterOffset := cluster + (cluster / 2)
+			toWrite := make([]byte, 3)
 
-func (t *fat12Table) IsEoc(cluster uint32) bool              { return cluster >= eoc }
-func (t *fat12Table) GetEoc() uint32                         { return eoc }
-func (t *fat12Table) GetMaxCluster() uint32                  { return t.maxCluster }
-func (t *fat12Table) GetClusterTarget(cluster uint32) uint32 { return t.clusters[cluster] }
-func (t *fat12Table) WriteClusterTarget(fs *internal.FileSystem, cluster, target uint32) error {
-	// set in memory cluster table
-	t.clusters[cluster] = target
-
-	// also write back to all FATs
-	for i := range uint32(fs.BootSector.BPB_NumFATs) {
-		offset := fs.GetFatSectorOffset(i)
-		clusterOffset := cluster + (cluster / 2)
-		toWrite := make([]byte, 3)
-
-		// read the existing 16-bit space where the cluster is stored
-		clusterBytes16 := make([]byte, 2)
-		_, err := fs.Backend.ReadAt(clusterBytes16, offset+int64(clusterOffset))
-		if err != nil {
-			return err
-		}
-
-		// this is a 16-bit value, but we only care about 12 bits of it
-		clusterValue16 := binary.LittleEndian.Uint16(clusterBytes16)
-		if cluster%2 == 0 {
-			// Even cluster: write lower 12 bits of the target
-			val := clusterValue16 & 0xF000
-			val |= uint16(target & 0x0FFF)
-			binary.LittleEndian.PutUint16(toWrite[:2], val)
-			_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
+			// read the existing 16-bit space where the cluster is stored
+			clusterBytes16 := make([]byte, 2)
+			_, err := fs.Backend.ReadAt(clusterBytes16, offset+int64(clusterOffset))
 			if err != nil {
 				return err
 			}
-		} else {
-			// Odd cluster: write upper 12 bits of the target
-			val := clusterValue16 & 0x000F
-			val |= uint16((target & 0x0FFF) << 4)
-			binary.LittleEndian.PutUint16(toWrite[:2], val)
-			_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
-			if err != nil {
-				return err
+
+			// this is a 16-bit value, but we only care about 12 bits of it
+			clusterValue16 := binary.LittleEndian.Uint16(clusterBytes16)
+			if cluster%2 == 0 {
+				// Even cluster: write lower 12 bits of the target
+				val := clusterValue16 & 0xF000
+				val |= uint16(target & 0x0FFF)
+				binary.LittleEndian.PutUint16(toWrite[:2], val)
+				_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				if err != nil {
+					return err
+				}
+			} else {
+				// Odd cluster: write upper 12 bits of the target
+				val := clusterValue16 & 0x000F
+				val |= uint16((target & 0x0FFF) << 4)
+				binary.LittleEndian.PutUint16(toWrite[:2], val)
+				_, err := fs.Backend.WriteAt(toWrite[:2], offset+int64(clusterOffset))
+				if err != nil {
+					return err
+				}
 			}
 		}
-	}
 
-	return nil
+		return nil
+	})
 }
