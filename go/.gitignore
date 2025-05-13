@@ -1,3 +1,5 @@
+*.keys
 *.nacp
 *.npdm
+*.nsp
 staging/
