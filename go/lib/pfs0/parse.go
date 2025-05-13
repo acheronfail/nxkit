@@ -41,7 +41,7 @@ func (entry *Pfs0Entry) Open() (io.ReadCloser, error) {
 	}
 
 	e := entry.fs.entries[entry.index]
-	section := io.NewSectionReader(entry.fs.file, int64(e.offset), int64(e.size))
+	section := io.NewSectionReader(entry.fs.file, entry.fs.dataOffset+int64(e.offset), int64(e.size))
 	return io.NopCloser(section), nil
 }
 
@@ -58,6 +58,7 @@ type Pfs0Fs struct {
 	header      pfs0Header
 	entries     []pfs0EntryListing
 	stringTable []string
+	dataOffset  int64
 }
 
 func (fs *Pfs0Fs) Close() error {
@@ -95,14 +96,14 @@ func OpenPfs0(path string) (*Pfs0Fs, error) {
 		return nil, err
 	}
 
-	fileEntrySize := int(entryListSize * header.numFiles)
-	fileEntryBytes := make([]byte, fileEntrySize)
-	_, err = file.Read(fileEntryBytes)
+	entryListingSize := int(entryListSize * header.numFiles)
+	entryListingBytes := make([]byte, entryListingSize)
+	_, err = file.Read(entryListingBytes)
 	if err != nil {
 		return nil, err
 	}
 
-	entries, err := parseEntryList(fileEntryBytes)
+	entries, err := parseEntryList(entryListingBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -123,6 +124,7 @@ func OpenPfs0(path string) (*Pfs0Fs, error) {
 		header:      *header,
 		entries:     entries,
 		stringTable: stringTable,
+		dataOffset:  int64(len(headerBytes) + len(entryListingBytes) + len(stringTableBytes)),
 	}, nil
 }
 
