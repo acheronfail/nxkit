@@ -137,7 +137,7 @@ func parseHeader(data []byte) (*pfs0Header, error) {
 	}
 
 	if header.magic != Psf0Magic {
-		return nil, fmt.Errorf("unrecognised magic bytes")
+		return nil, fmt.Errorf("unrecognised magic value; expected %x got %x", Psf0Magic, header.magic)
 	}
 
 	return &header, nil
