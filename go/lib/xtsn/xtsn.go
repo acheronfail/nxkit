@@ -57,7 +57,6 @@ func (x *XtsnCipher) Decrypt(input []byte, byteOffset uint64) {
 }
 
 func (x *XtsnCipher) run(input []byte, sectorOffset, skippedBytes uint64, encrypt bool) {
-
 	var update func([]byte, []byte)
 	if encrypt {
 		update = x.cryptoCipher.Encrypt

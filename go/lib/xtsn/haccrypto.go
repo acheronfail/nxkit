@@ -21,7 +21,7 @@ func NewHcCompatibleCipher(tweakKey, cryptoKey []byte) (*HcCompatibleCipher, err
 }
 
 func (h *HcCompatibleCipher) EncryptHC(input []byte, sectorOffset, sectorSize, skippedBytes uint64) ([]byte, error) {
-	cipher, err := NewXtsnCipher(h.cryptoKey, h.tweakKey, sectorSize)
+	cipher, err := NewXtsnCipher(h.tweakKey, h.cryptoKey, sectorSize)
 	if err != nil {
 		return nil, err
 	}

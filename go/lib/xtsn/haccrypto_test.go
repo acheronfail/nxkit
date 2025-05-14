@@ -17,82 +17,89 @@ var testCases = []testCase{
 		sectorOffset: 0,
 		sectorSize:   16384,
 		skippedBytes: 0,
-		expected:     "917cf69ebd68b2ec9b9fe9a3eadda692cd43d2f59598ed858c02c2652fbf922e",
+		expected:     "06ffb48a716e78b3c5414d1476aa600aabe471682b86c522f66ad898fef1fcfd",
 	},
 	{
 		sectorOffset: 1,
 		sectorSize:   16384,
 		skippedBytes: 0,
-		expected:     "1a8bbf023c9ea34d53b178e2f78a311f7885eda2505a642d84915d8d0eaa4943",
+		expected:     "61a5b6b142d725c396dce2f467f157ddbe487056842c286945953a62f03eff91",
 	},
 	{
 		sectorOffset: 2,
 		sectorSize:   16384,
 		skippedBytes: 0,
-		expected:     "8c7777fa01ad48beb8703abe8562a167faad9ae6a5b9d829774ca00ba81b1c6b",
+		expected:     "e8a5243e513f312d5e8ae4e563afe3d5a8d049436c837c0628e8a30488396744",
 	},
 	{
 		sectorOffset: 3,
 		sectorSize:   16384,
 		skippedBytes: 0,
-		expected:     "7e3227727e7525a944a3c40dd64cee473a686d319ccf94da000f1dc7c3e8774a",
+		expected:     "c6a82e79bf15f7601ec9b032db42e791e5e7c3c41f5c770c214d7c296b5bcf2f",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   16384,
 		skippedBytes: 16,
-		expected:     "cd43d2f59598ed858c02c2652fbf922e734867fd279b516a094b9713c18e7729",
+		expected:     "abe471682b86c522f66ad898fef1fcfdfe7952e2abfbea8c5830bfabed22aa6b",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   16384,
 		skippedBytes: 64,
-		expected:     "4d8ebc0275bacb9e8680f1dfbce7f457e38eef2d13e6ac22bf8d24c7ea94e9ff",
+		expected:     "3084c04bf5e7b4de2e9fce845225c3ddfb56bda7c775003efeb8ddbfe5babd23",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   16384,
 		skippedBytes: 128,
-		expected:     "8fb544486005c349bd303154f975016f51e78fd464536f4eb511a406173bae90",
+		expected:     "a75e804d817917e00987928bad99587886a753bd35149e3068b9d7404d7d4ab6",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   512,
 		skippedBytes: 0,
-		expected:     "917cf69ebd68b2ec9b9fe9a3eadda692cd43d2f59598ed858c02c2652fbf922e",
+		expected:     "06ffb48a716e78b3c5414d1476aa600aabe471682b86c522f66ad898fef1fcfd",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   512,
 		skippedBytes: 512,
-		expected:     "1a8bbf023c9ea34d53b178e2f78a311f7885eda2505a642d84915d8d0eaa4943",
+		expected:     "61a5b6b142d725c396dce2f467f157ddbe487056842c286945953a62f03eff91",
 	},
 	{
 		sectorOffset: 0,
 		sectorSize:   512,
 		skippedBytes: 256,
-		expected:     "688f867c72098ed3f0b437fa240b6e77285421b75f810f9fd5d6183345644b3d",
+		expected:     "6eefef4835a0d4789ec5336475564e3a0d20547d9b053f59201f7101d05e39e5",
 	},
 	{
 		sectorOffset: 16,
 		sectorSize:   512,
 		skippedBytes: 256,
-		expected:     "27a36c24e6933e7ac266d6004a818d56eb7a29e9dd2810fcc3f02aa3cca3cd61",
+		expected:     "d8c7ecaf0de20be3e7f616096be5b57262a6a164a3a4ab472e590d44eeb87ca4",
 	},
 }
 
-func buf(size int) []byte {
-	return make([]byte, size)
+func buf(size int, fill byte) []byte {
+	b := make([]byte, size)
+	if fill != 0 {
+		for i := range size {
+			b[i] = fill
+		}
+	}
+
+	return b
 }
 
 func TestHcCompatibleCipher(t *testing.T) {
-	cipher, err := NewHcCompatibleCipher(buf(16), buf(16))
+	cipher, err := NewHcCompatibleCipher(buf(16, 0), buf(16, 1))
 	if err != nil {
 		t.Fatalf("Failed to create cipher: %v", err)
 	}
 
 	for i, tc := range testCases {
-		data := buf(32)
+		data := buf(32, 0)
 		result, err := cipher.EncryptHC(data, tc.sectorOffset, tc.sectorSize, tc.skippedBytes)
 		if err != nil {
 			t.Fatalf("Case %d: Failed to run cipher: %v", i, err)
