@@ -76,14 +76,12 @@ func (*XorCrypto) xorWithClusterOffset(input []byte, byteOffset uint64) []byte {
 	return data
 }
 
-func (x *XorCrypto) Decrypt(input []byte, byteOffset uint64) ([]byte, error) {
-	data := x.xorWithClusterOffset(input, byteOffset)
-	return data, nil
+func (x *XorCrypto) Decrypt(input []byte, byteOffset uint64) {
+	copy(input, x.xorWithClusterOffset(input, byteOffset))
 }
 
-func (x *XorCrypto) Encrypt(input []byte, byteOffset uint64) ([]byte, error) {
-	data := x.xorWithClusterOffset(input, byteOffset)
-	return data, nil
+func (x *XorCrypto) Encrypt(input []byte, byteOffset uint64) {
+	copy(input, x.xorWithClusterOffset(input, byteOffset))
 }
 
 func NewXorCrypto() *XorCrypto {

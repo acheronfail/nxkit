@@ -136,7 +136,6 @@ func (n Nca) String() string {
 	return sb.String()
 }
 
-// TODO: make keys struct so I can select which one
 func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 	encrypted := binary.LittleEndian.Uint32(data[0x200:0x204]) != magicNCA3
 
@@ -151,10 +150,7 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 			return nil, err
 		}
 
-		_, err = c.Decrypt(plain[0x000:0xc00], 0)
-		if err != nil {
-			return nil, err
-		}
+		c.Decrypt(plain[0x000:0xc00], 0)
 
 		if binary.LittleEndian.Uint32(plain[0x200:0x204]) != magicNCA3 {
 			return nil, fmt.Errorf("failed to decrypt NCA header")
@@ -216,6 +212,7 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 	}, nil
 }
 
+// TODO: move this somewhere more relevant
 func aesEcbDecrypt(key, data []byte) error {
 	if len(data)%aes.BlockSize != 0 {
 		return fmt.Errorf("invalid ECB input length")

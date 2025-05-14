@@ -12,10 +12,7 @@ func BenchmarkXtsnCipher(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := xtsn.Encrypt(input, 0)
-		if err != nil {
-			b.Fatalf("Failed to encrypt: %v", err)
-		}
+		xtsn.Encrypt(input, 0)
 	}
 	b.StopTimer()
 }

@@ -127,7 +127,7 @@ func main() {
 	if slices.Contains(os.Args, "--nand") {
 		openNand("../.data/rawnand.bin")
 	} else if slices.Contains(os.Args, "--inject") {
-		inject.Inject("/Users/cosmotherly/.switch/payloads/hekate_ctcaer_6.2.2.bin")
+		inject.Inject("/home/acheronfail/.switch/payloads/hekate_ctcaer_6.2.2.bin")
 	} else if slices.Contains(os.Args, "--nsp") {
 		createNsp()
 	} else {

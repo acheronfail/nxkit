@@ -84,12 +84,8 @@ func (l *NxPartBackend) ReadAt(p []byte, diskOffset int64) (n int, err error) {
 		return 0, fmt.Errorf("read %d bytes, expected %d", n, readSize)
 	}
 
-	decrypted, err := l.crypto.Decrypt(buf, uint64(partByteOffset))
-	if err != nil {
-		return 0, err
-	}
-
-	copy(p, decrypted[before:before+size])
+	l.crypto.Decrypt(buf, uint64(partByteOffset))
+	copy(p, buf[before:before+size])
 	return int(size), nil
 }
 
@@ -154,10 +150,7 @@ func (l *NxPartBackend) WriteAt(p []byte, diskOffset int64) (n int, err error) {
 	}
 
 	// Encrypt the entire buffer
-	enc, err := l.crypto.Encrypt(chunks, uint64(partByteOffset))
-	if err != nil {
-		return 0, err
-	}
+	l.crypto.Encrypt(chunks, uint64(partByteOffset))
 
 	// Get the writable backend and write the encrypted data
 	writable, err := l.rawnand.Writable()
@@ -165,7 +158,7 @@ func (l *NxPartBackend) WriteAt(p []byte, diskOffset int64) (n int, err error) {
 		return 0, err
 	}
 
-	n, err = writable.WriteAt(enc, alignedDiskOffset)
+	n, err = writable.WriteAt(chunks, alignedDiskOffset)
 	if err != nil {
 		return 0, err
 	}

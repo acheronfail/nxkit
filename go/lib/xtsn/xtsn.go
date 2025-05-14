@@ -12,8 +12,8 @@ import (
 )
 
 type Crypto interface {
-	Encrypt(input []byte, byteOffset uint64) ([]byte, error)
-	Decrypt(input []byte, byteOffset uint64) ([]byte, error)
+	Encrypt(input []byte, byteOffset uint64)
+	Decrypt(input []byte, byteOffset uint64)
 }
 
 type XtsnCipher struct {
@@ -44,27 +44,19 @@ func NewXtsnCipher(tweakKey, cryptoKey []byte, sectorSize uint64) (*XtsnCipher, 
 	}, nil
 }
 
-func (x *XtsnCipher) Encrypt(input []byte, byteOffset uint64) ([]byte, error) {
+func (x *XtsnCipher) Encrypt(input []byte, byteOffset uint64) {
 	sectorOffset := byteOffset / x.sectorSize
 	skippedBytes := byteOffset % x.sectorSize
-	err := x.run(input, sectorOffset, skippedBytes, true)
-	if err != nil {
-		return nil, err
-	}
-	return input, nil
+	x.run(input, sectorOffset, skippedBytes, true)
 }
 
-func (x *XtsnCipher) Decrypt(input []byte, byteOffset uint64) ([]byte, error) {
+func (x *XtsnCipher) Decrypt(input []byte, byteOffset uint64) {
 	sectorOffset := byteOffset / x.sectorSize
 	skippedBytes := byteOffset % x.sectorSize
-	err := x.run(input, sectorOffset, skippedBytes, false)
-	if err != nil {
-		return nil, err
-	}
-	return input, nil
+	x.run(input, sectorOffset, skippedBytes, false)
 }
 
-func (x *XtsnCipher) run(input []byte, sectorOffset, skippedBytes uint64, encrypt bool) error {
+func (x *XtsnCipher) run(input []byte, sectorOffset, skippedBytes uint64, encrypt bool) {
 
 	var update func([]byte, []byte)
 	if encrypt {
@@ -90,24 +82,16 @@ func (x *XtsnCipher) run(input []byte, sectorOffset, skippedBytes uint64, encryp
 			x.updateTweak(tweak)
 		}
 
-		err := x.processChunks(input, tweak, &chunkOffset, totalChunks, (x.sectorSize-skippedBytes)/16, update)
-		if err != nil {
-			return err
-		}
+		x.processChunks(input, tweak, &chunkOffset, totalChunks, (x.sectorSize-skippedBytes)/16, update)
 		sectorOffset++
 	}
 
 	for chunkOffset < totalChunks {
 		tweak := make([]byte, 16)
 		x.initTweak(tweak, sectorOffset)
-		err := x.processChunks(input, tweak, &chunkOffset, totalChunks, x.sectorSize/16, update)
-		if err != nil {
-			return err
-		}
+		x.processChunks(input, tweak, &chunkOffset, totalChunks, x.sectorSize/16, update)
 		sectorOffset++
 	}
-
-	return nil
 }
 
 func (x *XtsnCipher) initTweak(tweak []byte, sectorOffset uint64) {
@@ -125,8 +109,7 @@ func (x *XtsnCipher) updateTweak(tweak []byte) {
 	}
 }
 
-// FIXME: remove error since it's not used
-func (x *XtsnCipher) processChunks(input []byte, tweak []byte, chunkOffset *uint64, totalChunks, runs uint64, update func([]byte, []byte)) error {
+func (x *XtsnCipher) processChunks(input []byte, tweak []byte, chunkOffset *uint64, totalChunks, runs uint64, update func([]byte, []byte)) {
 	tweak64bit := (*[2]uint64)(unsafe.Pointer(&tweak[0]))
 	// Reinterpret byte slice as uint64 slice with [1<<30] for capacity
 	// then limit length with [:len(input)/8] to match input bytes
@@ -134,7 +117,7 @@ func (x *XtsnCipher) processChunks(input []byte, tweak []byte, chunkOffset *uint
 
 	for i := uint64(0); i < runs; i++ {
 		if *chunkOffset >= totalChunks {
-			return nil
+			break
 		}
 
 		inputUint64[*chunkOffset] ^= tweak64bit[0]
@@ -151,6 +134,4 @@ func (x *XtsnCipher) processChunks(input []byte, tweak []byte, chunkOffset *uint
 
 		*chunkOffset += 2
 	}
-
-	return nil
 }

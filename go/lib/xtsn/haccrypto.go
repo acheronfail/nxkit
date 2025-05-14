@@ -26,25 +26,18 @@ func (h *HcCompatibleCipher) EncryptHC(input []byte, sectorOffset, sectorSize, s
 		return nil, err
 	}
 
-	err = cipher.run(input, sectorOffset, skippedBytes, true)
-	if err != nil {
-		return nil, err
-	}
+	cipher.run(input, sectorOffset, skippedBytes, true)
 
 	return input, nil
 }
 
 func (h *HcCompatibleCipher) DecryptHC(input []byte, sectorOffset, sectorSize, skippedBytes uint64) ([]byte, error) {
-	// FIXME: ensure correct order since this is swapped
-	cipher, err := NewXtsnCipher(h.cryptoKey, h.tweakKey, sectorSize)
+	cipher, err := NewXtsnCipher(h.tweakKey, h.cryptoKey, sectorSize)
 	if err != nil {
 		return nil, err
 	}
 
-	err = cipher.run(input, sectorOffset, skippedBytes, false)
-	if err != nil {
-		return nil, err
-	}
+	cipher.run(input, sectorOffset, skippedBytes, false)
 
 	return input, nil
 }
