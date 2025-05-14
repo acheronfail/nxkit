@@ -1,5 +1,8 @@
 package xtsn
 
+// TODO: just discovered https://cs.opensource.google/go/x/crypto/+/refs/tags/v0.38.0:xts/xts.go
+// could potentially look at creating pools of tweaks for performance gains, etc
+
 import (
 	"crypto/aes"
 	"crypto/cipher"
@@ -122,6 +125,7 @@ func (x *XtsnCipher) updateTweak(tweak []byte) {
 	}
 }
 
+// FIXME: remove error since it's not used
 func (x *XtsnCipher) processChunks(input []byte, tweak []byte, chunkOffset *uint64, totalChunks, runs uint64, update func([]byte, []byte)) error {
 	tweak64bit := (*[2]uint64)(unsafe.Pointer(&tweak[0]))
 	// Reinterpret byte slice as uint64 slice with [1<<30] for capacity

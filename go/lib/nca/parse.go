@@ -1,8 +1,13 @@
 package nca
 
 import (
+	"crypto/aes"
 	"encoding/binary"
 	"fmt"
+	"strings"
+
+	"github.com/acheronfail/nxkit/lib/keys"
+	"github.com/acheronfail/nxkit/lib/xtsn"
 )
 
 const (
@@ -60,73 +65,169 @@ type SdkVersion struct {
 }
 
 type ncaHeader struct {
-	FixedKeySig    [0x100]byte // RSA-PSS signature over header with fixed key
-	NpdmKeySig     [0x100]byte // RSA-PSS signature over header with key in NPDM
-	magic          uint32
-	Distribution   uint8 // System vs gamecard
-	ContentType    uint8
-	CryptoType     uint8  // Which keyblob (field 1)
-	KaekInd        uint8  // Which kaek index?
-	NcaSize        uint64 // Entire archive size
-	TitleID        uint64
-	_              [4]byte
-	SdkVersion     uint32 // This could also be accessed as SdkVersionParts
-	CryptoType2    uint8  // Which keyblob (field 2)
-	_              [0xF]byte
-	RightsID       [0x10]byte         // Rights ID (for titlekey crypto)
-	SectionEntries [4]ncaSectionEntry // Section entry metadata
-	SectionHashes  [4][0x20]byte      // SHA-256 hashes for each section header
-	EncryptedKeys  [4][0x10]byte      // Encrypted key area
-	_              [0xC0]byte
-	FsHeaders      [4]ncaFsHeader // FS section headers
+	fixedKeySig        [0x100]byte // RSA-PSS signature over header with fixed key
+	npdmKeySig         [0x100]byte // RSA-PSS signature over header with key in NPDM
+	magic              uint32
+	distribution       uint8 // System vs gamecard
+	contentType        uint8
+	cryptoType         uint8  // Which keyblob (field 1)
+	keyAreaKeyIndex    uint8  // Which kaek index?
+	ncaSize            uint64 // Entire archive size
+	titleID            uint64
+	_                  [4]byte
+	sdkVersion         uint32 // This could also be accessed as SdkVersionParts
+	cryptoType2        uint8  // Which keyblob (field 2)
+	fixedKeyGeneration uint8
+	_                  [0xF]byte
+	rightsID           [0x10]byte         // Rights ID (for titlekey crypto)
+	sectionEntries     [4]ncaSectionEntry // Section entry metadata
+	sectionHashes      [4][0x20]byte      // SHA-256 hashes for each section header
+	encryptedKeys      [4][0x10]byte      // Encrypted key area
+	_                  [0xC0]byte
+	fsHeaders          [4]ncaFsHeader // FS section headers
 }
 
 func (h *ncaHeader) GetSdkVersionParts() SdkVersion {
 	return SdkVersion{
-		Revision: uint8(h.SdkVersion),
-		Micro:    uint8(h.SdkVersion >> 8),
-		Minor:    uint8(h.SdkVersion >> 16),
-		Major:    uint8(h.SdkVersion >> 24),
+		Revision: uint8(h.sdkVersion),
+		Micro:    uint8(h.sdkVersion >> 8),
+		Minor:    uint8(h.sdkVersion >> 16),
+		Major:    uint8(h.sdkVersion >> 24),
 	}
 }
 
 type Nca struct {
-	header ncaHeader
+	header        ncaHeader
+	decryptedKeys [4][0x10]byte
 }
 
-func NewNcaFromBytes(data []byte) (*Nca, error) {
-	// TODO: need to decrypt here before parsing
+func (n Nca) String() string {
+	var sb strings.Builder
+	sb.WriteString("NCA:\n")
 
+	m := make([]byte, 4)
+	binary.LittleEndian.PutUint32(m, n.header.magic)
+	sb.WriteString(fmt.Sprintf("Magic: %s\n", string(m)))
+
+	sb.WriteString(fmt.Sprintf("Fixed-Key Index: %x\n", n.header.fixedKeyGeneration))
+	sb.WriteString(fmt.Sprintf("Fixed-Key Signature: %x\n", n.header.fixedKeySig))
+	sb.WriteString(fmt.Sprintf("NPDM Signature: %x\n", n.header.npdmKeySig))
+	sb.WriteString(fmt.Sprintf("Content Size: 0x%x\n", n.header.ncaSize))
+	sb.WriteString(fmt.Sprintf("Title Id: 0x%x\n", n.header.titleID))
+	sdk := n.header.GetSdkVersionParts()
+	sb.WriteString(fmt.Sprintf("SDK Version: %d.%d.%d.%d\n", sdk.Major, sdk.Minor, sdk.Micro, sdk.Revision))
+	// FIXME determine this
+	sb.WriteString(fmt.Sprintf("Encryption Type: %s\n", "??"))
+	sb.WriteString(fmt.Sprintf("Key Area Encryption Key: %d\n", n.header.keyAreaKeyIndex))
+	sb.WriteString("Key Area (Encrypted):\n")
+	sb.WriteString(fmt.Sprintf("    Key 0 (Encrypted): %x\n", n.header.encryptedKeys[0]))
+	sb.WriteString(fmt.Sprintf("    Key 1 (Encrypted): %x\n", n.header.encryptedKeys[1]))
+	sb.WriteString(fmt.Sprintf("    Key 2 (Encrypted): %x\n", n.header.encryptedKeys[2]))
+	sb.WriteString(fmt.Sprintf("    Key 3 (Encrypted): %x\n", n.header.encryptedKeys[3]))
+	sb.WriteString("Key Area (Decrypted):\n")
+	sb.WriteString(fmt.Sprintf("    Key 0 (Decrypted): %x\n", n.decryptedKeys[0]))
+	sb.WriteString(fmt.Sprintf("    Key 1 (Decrypted): %x\n", n.decryptedKeys[1]))
+	sb.WriteString(fmt.Sprintf("    Key 2 (Decrypted): %x\n", n.decryptedKeys[2]))
+	sb.WriteString(fmt.Sprintf("    Key 3 (Decrypted): %x\n", n.decryptedKeys[3]))
+	sb.WriteString("Sections:\n")
+	// FIXME
+	sb.WriteString("    ??\n")
+
+	return sb.String()
+}
+
+// TODO: make keys struct so I can select which one
+func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
+	encrypted := binary.LittleEndian.Uint32(data[0x200:0x204]) != magicNCA3
+
+	// decrypt header
+	var plain []byte
+	if encrypted {
+		plain = make([]byte, len(data))
+		copy(plain, data)
+
+		c, err := xtsn.NewXtsnCipher(keys.HeaderKey[16:], keys.HeaderKey[:16], 0x200)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = c.Decrypt(plain[0x000:0xc00], 0)
+		if err != nil {
+			return nil, err
+		}
+
+		if binary.LittleEndian.Uint32(plain[0x200:0x204]) != magicNCA3 {
+			return nil, fmt.Errorf("failed to decrypt NCA header")
+		}
+	} else {
+		plain = data
+	}
+
+	// parse header
 	header := ncaHeader{
-		magic:          binary.LittleEndian.Uint32(data[0x200:0x204]),
-		Distribution:   data[0x204],
-		ContentType:    data[0x205],
-		CryptoType:     data[0x206],
-		KaekInd:        data[0x207],
-		NcaSize:        binary.LittleEndian.Uint64(data[0x208:0x210]),
-		TitleID:        binary.LittleEndian.Uint64(data[0x210:0x218]),
-		SdkVersion:     binary.LittleEndian.Uint32(data[0x21b:0x220]),
-		CryptoType2:    data[0x220],
-		SectionEntries: parseSectionEntries(data[0x240:0x280]),
-		FsHeaders:      parseFsHeaders(data[0x400:0xc00]),
-	}
-	copy(header.FixedKeySig[:], data[0:0x100])
-	copy(header.NpdmKeySig[:], data[0x100:0x200])
-	copy(header.RightsID[:], data[0x230:0x240])
-	copy(header.SectionHashes[0][:], data[0x280:0x2a0])
-	copy(header.SectionHashes[1][:], data[0x2a0:0x2c0])
-	copy(header.SectionHashes[2][:], data[0x2c0:0x2e0])
-	copy(header.SectionHashes[3][:], data[0x2e0:0x300])
-	copy(header.EncryptedKeys[0][:], data[0x300:0x310])
-	copy(header.EncryptedKeys[1][:], data[0x310:0x320])
-	copy(header.EncryptedKeys[2][:], data[0x320:0x330])
-	copy(header.EncryptedKeys[3][:], data[0x330:0x340])
-
-	if header.magic != magicNCA3 {
-		return nil, fmt.Errorf("unrecognised magic value; expected %x got %x", magicNCA3, header.magic)
+		magic:              binary.LittleEndian.Uint32(plain[0x200:0x204]),
+		distribution:       plain[0x204],
+		contentType:        plain[0x205],
+		cryptoType:         plain[0x206],
+		keyAreaKeyIndex:    plain[0x207],
+		ncaSize:            binary.LittleEndian.Uint64(plain[0x208:0x210]),
+		titleID:            binary.LittleEndian.Uint64(plain[0x210:0x218]),
+		sdkVersion:         binary.LittleEndian.Uint32(plain[0x21c:0x220]),
+		cryptoType2:        plain[0x220],
+		fixedKeyGeneration: plain[0x221],
+		sectionEntries:     parseSectionEntries(plain[0x240:0x280]),
+		fsHeaders:          parseFsHeaders(plain[0x400:0xc00]),
 	}
 
-	return &Nca{header: header}, nil
+	copy(header.fixedKeySig[:], plain[0:0x100])
+	copy(header.npdmKeySig[:], plain[0x100:0x200])
+	copy(header.rightsID[:], plain[0x230:0x240])
+	copy(header.sectionHashes[0][:], plain[0x280:0x2a0])
+	copy(header.sectionHashes[1][:], plain[0x2a0:0x2c0])
+	copy(header.sectionHashes[2][:], plain[0x2c0:0x2e0])
+	copy(header.sectionHashes[3][:], plain[0x2e0:0x300])
+	copy(header.encryptedKeys[0][:], plain[0x300:0x310])
+	copy(header.encryptedKeys[1][:], plain[0x310:0x320])
+	copy(header.encryptedKeys[2][:], plain[0x320:0x330])
+	copy(header.encryptedKeys[3][:], plain[0x330:0x340])
+
+	// decrypt the `encryptedKeys` in the header
+	encryptedKeysBytes := make([]byte, 0x40)
+	copy(encryptedKeysBytes, plain[0x300:0x340])
+	key, err := keys.GetKeyAreaKey(int(header.cryptoType), int(header.keyAreaKeyIndex))
+	if err != nil {
+		return nil, err
+	}
+
+	err = aesEcbDecrypt(key, encryptedKeysBytes)
+	if err != nil {
+		return nil, err
+	}
+
+	var decryptedKeys [4][0x10]byte
+	copy(decryptedKeys[0][:], encryptedKeysBytes[0x00:0x10])
+	copy(decryptedKeys[1][:], encryptedKeysBytes[0x10:0x20])
+	copy(decryptedKeys[2][:], encryptedKeysBytes[0x20:0x30])
+	copy(decryptedKeys[3][:], encryptedKeysBytes[0x30:0x40])
+
+	return &Nca{
+		header:        header,
+		decryptedKeys: decryptedKeys,
+	}, nil
+}
+
+func aesEcbDecrypt(key, data []byte) error {
+	if len(data)%aes.BlockSize != 0 {
+		return fmt.Errorf("invalid ECB input length")
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return err
+	}
+	for bs, be := 0, aes.BlockSize; bs < len(data); bs, be = bs+aes.BlockSize, be+aes.BlockSize {
+		block.Decrypt(data[bs:be], data[bs:be])
+	}
+	return nil
 }
 
 func parseSectionEntries(data []byte) [4]ncaSectionEntry {

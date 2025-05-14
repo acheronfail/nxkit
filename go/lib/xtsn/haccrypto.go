@@ -1,6 +1,8 @@
 package xtsn
 
-import "errors"
+import (
+	"errors"
+)
 
 type HcCompatibleCipher struct {
 	tweakKey  []byte
@@ -33,6 +35,7 @@ func (h *HcCompatibleCipher) EncryptHC(input []byte, sectorOffset, sectorSize, s
 }
 
 func (h *HcCompatibleCipher) DecryptHC(input []byte, sectorOffset, sectorSize, skippedBytes uint64) ([]byte, error) {
+	// FIXME: ensure correct order since this is swapped
 	cipher, err := NewXtsnCipher(h.cryptoKey, h.tweakKey, sectorSize)
 	if err != nil {
 		return nil, err
