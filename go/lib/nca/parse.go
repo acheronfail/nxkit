@@ -13,8 +13,9 @@ import (
 const (
 	magicNCA3              uint32 = 0x3341434E
 	pfs0ExefsHashBlockSize uint32 = 0x10000
-	ncaSectionEntrySize           = 16
-	ncaFsHeaderSize               = 512
+	ncaSectionEntrySize           = 0x10
+	ncaFsHeaderSize               = 0x200
+	mediaSize                     = 0x200
 )
 
 type ncaSectionEntry struct {
@@ -70,7 +71,7 @@ type ncaFsHeader struct {
 
 func (fsHeader *ncaFsHeader) SectionCtr(mediaStartOffset uint32) [0x10]byte {
 	var ctr [0x10]byte
-	offset := uint64(mediaStartOffset*0x200) >> 4
+	offset := uint64(mediaStartOffset*mediaSize) >> 4
 	for i := range 8 {
 		ctr[i] = fsHeader.sectionCtr[0x8-i-1]
 		ctr[0x10-i-1] = byte(offset & 0xff)
@@ -78,6 +79,10 @@ func (fsHeader *ncaFsHeader) SectionCtr(mediaStartOffset uint32) [0x10]byte {
 	}
 
 	return ctr
+}
+
+func (fsHeader *ncaFsHeader) FsType() SectionFsType {
+	return SectionFsType(fsHeader.fsType)
 }
 
 type pfs0Superblock struct {
@@ -104,8 +109,54 @@ func pfs0SuperblockFromBytes(data [0x138]byte) pfs0Superblock {
 	return sb
 }
 
-func (fsHeader *ncaFsHeader) FsType() SectionFsType {
-	return SectionFsType(fsHeader.fsType)
+const ivfcMaxLevel uint32 = 6
+
+type ivfcLevelHeader struct {
+	logicalOffset uint64
+	hashDataSize  uint64
+	blockSize     uint32
+	_             uint32
+}
+
+func (header *ivfcLevelHeader) HashBlockSize() uint32 {
+	return 1 << header.blockSize
+}
+
+type ivfcHeader struct {
+	magic          uint32
+	id             uint32
+	masterHashSize uint32
+	numLevels      uint32
+	levelHeaders   [ivfcMaxLevel]ivfcLevelHeader
+	_              [0x20]byte
+	masterHash     [0x20]byte
+}
+
+type romfsSuperblock struct {
+	ivfcHeader ivfcHeader
+	_          [0x58]byte
+}
+
+func romfsSuperblockFromBytes(data [0x138]byte) romfsSuperblock {
+	ivfcHeader := ivfcHeader{
+		magic:          binary.LittleEndian.Uint32(data[:0x4]),
+		id:             binary.LittleEndian.Uint32(data[0x4:0x8]),
+		masterHashSize: binary.LittleEndian.Uint32(data[0x8:0xc]),
+		numLevels:      binary.LittleEndian.Uint32(data[0xc:0x10]),
+	}
+	copy(ivfcHeader.masterHash[:], data[0xc0:0xe0])
+
+	ivfcStart := uint32(0x10)
+	for i := range ivfcMaxLevel {
+		off := ivfcStart + (i * 24)
+		ivfcHeader.levelHeaders[i] = ivfcLevelHeader{
+			logicalOffset: binary.LittleEndian.Uint64(data[off : off+0x8]),
+			hashDataSize:  binary.LittleEndian.Uint64(data[off+0x8 : off+0x10]),
+			blockSize:     binary.LittleEndian.Uint32(data[off+0x10 : off+0x14]),
+		}
+	}
+
+	return romfsSuperblock{ivfcHeader: ivfcHeader}
 }
 
 type SdkVersion struct {
@@ -156,9 +207,11 @@ func (n Nca) String() string {
 	var sb strings.Builder
 	sb.WriteString("NCA:\n")
 
-	m := make([]byte, 4)
-	binary.LittleEndian.PutUint32(m, n.header.magic)
-	sdk := n.header.GetSdkVersionParts()
+	nToString := func(n uint32) string {
+		m := make([]byte, 4)
+		binary.LittleEndian.PutUint32(m, n)
+		return string(m)
+	}
 
 	type field struct {
 		label string
@@ -195,8 +248,9 @@ func (n Nca) String() string {
 		}
 	}
 
+	sdk := n.header.GetSdkVersionParts()
 	allFields := []field{
-		{"Magic", string(m)},
+		{"Magic", nToString(n.header.magic)},
 		{"Fixed-Key Index", fmt.Sprintf("0x%x", n.header.fixedKeyGeneration)},
 		{"Fixed-Key Signature", fmt.Sprintf("%x", n.header.fixedKeySig)},
 		{"NPDM Signature", fmt.Sprintf("%x", n.header.npdmKeySig)},
@@ -225,22 +279,22 @@ func (n Nca) String() string {
 		}
 
 		sectionHeader := n.header.fsHeaders[i]
-		start := section.MediaStartOffset * 0x200
-		end := section.MediaEndOffset * 0x200
+		start := section.MediaStartOffset * mediaSize
+		end := section.MediaEndOffset * mediaSize
 		fsType := sectionHeader.FsType()
-		superblock := pfs0SuperblockFromBytes(sectionHeader.superblock)
 
 		allFields = append(allFields,
 			field{fmt.Sprintf("    Section %d", i), ""},
 			field{"        Offset", fmt.Sprintf("0x%016x", start)},
 			field{"        Size", fmt.Sprintf("0x%016x", end-start)},
 			field{"        Partition Type", fsType.String()},
+			field{"        Section CTR", fmt.Sprintf("%x", sectionHeader.SectionCtr(section.MediaStartOffset))},
 		)
 
 		switch fsType {
 		case FsTypePfs0:
+			superblock := pfs0SuperblockFromBytes(sectionHeader.superblock)
 			allFields = append(allFields,
-				field{"        Section CTR", fmt.Sprintf("%x", sectionHeader.SectionCtr(section.MediaStartOffset))},
 				field{"        Superblock Hash", fmt.Sprintf("%x", superblock.masterHash)},
 				field{"        Hash Table", ""},
 				field{"            Offset", fmt.Sprintf("%016x", superblock.hashTableOffset)},
@@ -250,9 +304,30 @@ func (n Nca) String() string {
 				field{"        PFS0 Size", fmt.Sprintf("%016x", superblock.pfs0Size)},
 			)
 		case FsTypeRomfs:
-			allFields = append(allFields, field{"        TODO ROMFS", ""})
+			superblock := romfsSuperblockFromBytes(sectionHeader.superblock)
+			allFields = append(allFields,
+				field{"        Superblock Hash", fmt.Sprintf("%x", superblock.ivfcHeader.masterHash)},
+				field{"        Magic", nToString(superblock.ivfcHeader.magic)},
+				field{"        ID", fmt.Sprintf("%08x", superblock.ivfcHeader.id)},
+			)
+
+			for i := range superblock.ivfcHeader.numLevels - 1 {
+				allFields = append(
+					allFields,
+					field{fmt.Sprintf("        Level %d", i), ""},
+					field{"            Data Offset", fmt.Sprintf("0x%012x", superblock.ivfcHeader.levelHeaders[i].logicalOffset)},
+					field{"            Data Size", fmt.Sprintf("0x%012x", superblock.ivfcHeader.levelHeaders[i].hashDataSize)},
+				)
+				if i > 0 {
+					allFields = append(allFields, field{"            Hash Offset", fmt.Sprintf("0x%012x", superblock.ivfcHeader.levelHeaders[i-1].logicalOffset)})
+				}
+				allFields = append(allFields, field{"            Hash Block Size", fmt.Sprintf("0x%08x", superblock.ivfcHeader.levelHeaders[i].HashBlockSize())})
+			}
+		// TODO: NCA0_ROMFS
+		// TODO: BKTR
+		// TODO: INVALID
 		default:
-			allFields = append(allFields, field{"        TODO", ""})
+			allFields = append(allFields, field{"        Unknown/invalid superblock", ""})
 		}
 
 	}
