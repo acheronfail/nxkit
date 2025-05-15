@@ -18,6 +18,85 @@ const (
 	mediaSize                     = 0x200
 )
 
+type DistributionType uint8
+
+const (
+	DistributionTypeDownload DistributionType = 0
+	DistributionTypeGamecard DistributionType = 1
+)
+
+func (dt DistributionType) String() string {
+	switch dt {
+	case DistributionTypeDownload:
+		return "Download"
+	case DistributionTypeGamecard:
+		return "Gamecard"
+	default:
+		return "Unknown"
+	}
+}
+
+type ContentType uint8
+
+const (
+	ContentTypeProgram    ContentType = 0
+	ContentTypeMeta       ContentType = 1
+	ContentTypeControl    ContentType = 2
+	ContentTypeManual     ContentType = 3
+	ContentTypeData       ContentType = 4
+	ContentTypePublicData ContentType = 5
+)
+
+func (dt ContentType) String() string {
+	switch dt {
+	case ContentTypeProgram:
+		return "Program"
+	case ContentTypeMeta:
+		return "Meta"
+	case ContentTypeControl:
+		return "Control"
+	case ContentTypeManual:
+		return "Manual"
+	case ContentTypeData:
+		return "Data"
+	case ContentTypePublicData:
+		return "PublicData"
+	default:
+		return "Unknown"
+	}
+}
+
+type CryptoType uint8
+
+func (ct CryptoType) String() string {
+	switch ct {
+	case 0:
+		return "1.0.0-2.3.0"
+	case 1:
+		return "3.0.0"
+	case 2:
+		return "3.0.1-3.0.2"
+	case 3:
+		return "4.0.0-4.1.0"
+	case 4:
+		return "5.0.0-5.1.0"
+	case 5:
+		return "6.0.0-6.1.0"
+	case 6:
+		return "6.2.0"
+	case 7:
+		return "7.0.0-8.0.1"
+	case 8:
+		return "8.1.0-8.1.1"
+	case 9:
+		return "9.0.0-9.0.1"
+	case 0xA:
+		return "9.1.0-"
+	default:
+		return "Unknown"
+	}
+}
+
 type ncaSectionEntry struct {
 	MediaStartOffset uint32
 	MediaEndOffset   uint32
@@ -60,9 +139,9 @@ const (
 
 type ncaFsHeader struct {
 	version    uint16
-	fsType     uint8 // SectionFsType
-	hashType   uint8 // SectionHashType
-	cryptType  uint8 // SectionCryptType
+	fsType     SectionFsType
+	hashType   SectionHashType
+	cryptType  SectionCryptType
 	_          [3]byte
 	superblock [0x138]byte // FS-specific superblock
 	sectionCtr [8]byte
@@ -170,9 +249,9 @@ type ncaHeader struct {
 	fixedKeySig        [0x100]byte // RSA-PSS signature over header with fixed key
 	npdmKeySig         [0x100]byte // RSA-PSS signature over header with key in NPDM
 	magic              uint32
-	distribution       uint8 // System vs gamecard
-	contentType        uint8
-	cryptoType         uint8  // Which keyblob (field 1)
+	distribution       DistributionType
+	contentType        ContentType
+	cryptoType         CryptoType
 	keyAreaKeyIndex    uint8  // Which kaek index?
 	ncaSize            uint64 // Entire archive size
 	titleID            uint64
@@ -196,6 +275,24 @@ func (h *ncaHeader) GetSdkVersionParts() SdkVersion {
 		Minor:    uint8(h.sdkVersion >> 16),
 		Major:    uint8(h.sdkVersion >> 24),
 	}
+}
+
+func (h *ncaHeader) HasRightsId() bool {
+	for _, b := range h.rightsID {
+		if b != 0x0 {
+			return true
+		}
+	}
+
+	return false
+}
+
+func (h *ncaHeader) EncryptionType() string {
+	if h.HasRightsId() {
+		return "Titlekey crypto"
+	}
+
+	return "Standard crypto"
 }
 
 type Nca struct {
@@ -257,19 +354,21 @@ func (n Nca) String() string {
 		{"Content Size", fmt.Sprintf("0x%016x", n.header.ncaSize)},
 		{"Title Id", fmt.Sprintf("0x%016x", n.header.titleID)},
 		{"SDK Version", fmt.Sprintf("%d.%d.%d.%d", sdk.Major, sdk.Minor, sdk.Micro, sdk.Revision)},
-		// FIXME
-		{"Encryption Type", "??"},
+		{"Distribution Type", n.header.distribution.String()},
+		{"Content Type", n.header.contentType.String()},
+		{"Master Key Revision", fmt.Sprintf("0x%x (%s)", uint8(n.header.cryptoType), n.header.cryptoType.String())},
+		{"Encryption Type", n.header.EncryptionType()},
 		{"Key Area Encryption Key", fmt.Sprintf("%d", n.header.keyAreaKeyIndex)},
 		{"Key Area (Encrypted)", ""},
-		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[0])},
-		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[1])},
-		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[2])},
-		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[3])},
+		{"    Key 0 (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[0])},
+		{"    Key 1 (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[1])},
+		{"    Key 2 (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[2])},
+		{"    Key 3 (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[3])},
 		{"Key Area (Decrypted)", ""},
-		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[0])},
-		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[1])},
-		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[2])},
-		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[3])},
+		{"    Key 0 (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[0])},
+		{"    Key 1 (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[1])},
+		{"    Key 2 (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[2])},
+		{"    Key 3 (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[3])},
 		{"Sections", ""},
 	}
 
@@ -393,9 +492,9 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 func ncaHeaderFromBytes(plain []byte) ncaHeader {
 	header := ncaHeader{
 		magic:              binary.LittleEndian.Uint32(plain[0x200:0x204]),
-		distribution:       plain[0x204],
-		contentType:        plain[0x205],
-		cryptoType:         plain[0x206],
+		distribution:       DistributionType(plain[0x204]),
+		contentType:        ContentType(plain[0x205]),
+		cryptoType:         CryptoType(plain[0x206]),
 		keyAreaKeyIndex:    plain[0x207],
 		ncaSize:            binary.LittleEndian.Uint64(plain[0x208:0x210]),
 		titleID:            binary.LittleEndian.Uint64(plain[0x210:0x218]),
@@ -453,9 +552,9 @@ func parseFsHeaders(data []byte) [4]ncaFsHeader {
 		start := i * ncaFsHeaderSize
 		fsHeaders[i] = ncaFsHeader{
 			version:   binary.LittleEndian.Uint16(data[start : start+2]),
-			fsType:    data[start+2],
-			hashType:  data[start+3],
-			cryptType: data[start+4],
+			fsType:    SectionFsType(data[start+2]),
+			hashType:  SectionHashType(data[start+3]),
+			cryptType: SectionCryptType(data[start+4]),
 		}
 		copy(fsHeaders[i].superblock[:], data[start+8:start+0x140])
 		copy(fsHeaders[i].sectionCtr[:], data[start+0x140:start+0x148])
