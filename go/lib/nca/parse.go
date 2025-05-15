@@ -1,9 +1,12 @@
 package nca
 
 import (
+	"bytes"
 	"crypto/aes"
+	"crypto/cipher"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 
 	"github.com/acheronfail/nxkit/lib/keys"
@@ -136,6 +139,21 @@ const (
 	CryptCtr  SectionCryptType = 3
 	CryptBktr SectionCryptType = 4
 )
+
+func (sc SectionCryptType) String() string {
+	switch sc {
+	case CryptNone:
+		return "None"
+	case CryptXts:
+		return "XTS"
+	case CryptCtr:
+		return "CTR"
+	case CryptBktr:
+		return "BKTR"
+	default:
+		return "Unknown"
+	}
+}
 
 type ncaFsHeader struct {
 	version    uint16
@@ -295,9 +313,85 @@ func (h *ncaHeader) EncryptionType() string {
 	return "Standard crypto"
 }
 
+type NcaSection struct {
+	offset    int64
+	size      int64
+	cryptType SectionCryptType
+	fsType    SectionFsType
+	key       []byte
+	ctr       [0x10]byte
+	nca       *Nca
+}
+
+func (s *NcaSection) Open() (io.Reader, error) {
+	sr := io.NewSectionReader(s.nca.reader, s.offset, s.size)
+	switch s.cryptType {
+	case CryptNone:
+		return sr, nil
+	case CryptCtr:
+		block, err := aes.NewCipher(s.key[:])
+		if err != nil {
+			return nil, err
+		}
+
+		return &cipher.StreamReader{S: cipher.NewCTR(block, s.ctr[:]), R: sr}, nil
+	// TODO other encryption types (XTS with xtsn, etc)
+	default:
+		return nil, fmt.Errorf("unimplemented decryption for sections encrypted with %s", s.cryptType)
+	}
+}
+
+func (s *NcaSection) FsType() SectionFsType {
+	return s.fsType
+}
+
+func (s *NcaSection) Size() int64 {
+	return s.size
+}
+
 type Nca struct {
+	reader        NcaReader
 	header        ncaHeader
 	decryptedKeys [4][0x10]byte
+}
+
+func (n *Nca) Sections() []NcaSection {
+	sections := make([]NcaSection, 0)
+	for i, section := range n.header.sectionEntries {
+		if section.MediaStartOffset == 0 {
+			continue
+		}
+
+		sectionHeader := n.header.fsHeaders[i]
+		start := section.MediaStartOffset * mediaSize
+		end := section.MediaEndOffset * mediaSize
+		fsType := sectionHeader.FsType()
+
+		var key []byte
+		if n.header.HasRightsId() {
+			// TODO: find titlekey and use that (if not found hactool falls back to empty)
+			// `settings_get_titlekey`
+			key = make([]byte, 0x10)
+		} else {
+			if sectionHeader.cryptType == CryptCtr {
+				key = n.decryptedKeys[2][:]
+			} else if sectionHeader.cryptType == CryptXts {
+				key = bytes.Join([][]byte{n.decryptedKeys[0][:], n.decryptedKeys[1][:]}, []byte{})
+			}
+		}
+
+		sections = append(sections, NcaSection{
+			offset:    int64(start),
+			size:      int64(end - start),
+			key:       key,
+			ctr:       sectionHeader.SectionCtr(section.MediaStartOffset),
+			fsType:    fsType,
+			cryptType: sectionHeader.cryptType,
+			nca:       n,
+		})
+	}
+
+	return sections
 }
 
 func (n Nca) String() string {
@@ -437,7 +531,18 @@ func (n Nca) String() string {
 
 }
 
-func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
+type NcaReader interface {
+	io.Reader
+	io.ReaderAt
+}
+
+func NewNca(reader NcaReader, keys keys.Keys) (*Nca, error) {
+	data := make([]byte, 0xc00)
+	_, err := reader.ReadAt(data, 0)
+	if err != nil {
+		return nil, err
+	}
+
 	encrypted := binary.LittleEndian.Uint32(data[0x200:0x204]) != magicNCA3
 
 	// decrypt header
@@ -483,6 +588,7 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 	copy(decryptedKeys[3][:], encryptedKeysBytes[0x30:0x40])
 
 	return &Nca{
+		reader:        reader,
 		header:        header,
 		decryptedKeys: decryptedKeys,
 	}, nil

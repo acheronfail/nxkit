@@ -14,6 +14,11 @@ const (
 	entryListSize = 24
 )
 
+type Pfs0Reader interface {
+	io.ReadCloser
+	io.ReaderAt
+}
+
 type pfs0Header struct {
 	magic           uint32
 	numFiles        uint32
@@ -35,14 +40,13 @@ type Pfs0Entry struct {
 	index int
 }
 
-func (entry *Pfs0Entry) Open() (io.ReadCloser, error) {
+func (entry *Pfs0Entry) Open() (*io.SectionReader, error) {
 	if entry.fs == nil || entry.index >= len(entry.fs.entries) {
 		return nil, os.ErrInvalid
 	}
 
 	e := entry.fs.entries[entry.index]
-	section := io.NewSectionReader(entry.fs.file, entry.fs.dataOffset+int64(e.offset), int64(e.size))
-	return io.NopCloser(section), nil
+	return io.NewSectionReader(entry.fs.reader, entry.fs.dataOffset+int64(e.offset), int64(e.size)), nil
 }
 
 func (entry *Pfs0Entry) Name() string {
@@ -54,7 +58,7 @@ func (entry *Pfs0Entry) Size() uint64 {
 }
 
 type Pfs0Fs struct {
-	file        *os.File
+	reader      Pfs0Reader
 	header      pfs0Header
 	entries     []pfs0EntryListing
 	stringTable []string
@@ -62,7 +66,7 @@ type Pfs0Fs struct {
 }
 
 func (fs *Pfs0Fs) Close() error {
-	return fs.file.Close()
+	return fs.reader.Close()
 }
 
 func (fs *Pfs0Fs) Entries() []Pfs0Entry {
@@ -79,14 +83,9 @@ func (fs *Pfs0Fs) Entries() []Pfs0Entry {
 	return entries
 }
 
-func OpenPfs0(path string) (*Pfs0Fs, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-
+func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	headerBytes := make([]byte, headerSize)
-	_, err = file.Read(headerBytes)
+	_, err := reader.Read(headerBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +97,7 @@ func OpenPfs0(path string) (*Pfs0Fs, error) {
 
 	entryListingSize := int(entryListSize * header.numFiles)
 	entryListingBytes := make([]byte, entryListingSize)
-	_, err = file.Read(entryListingBytes)
+	_, err = reader.Read(entryListingBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +108,7 @@ func OpenPfs0(path string) (*Pfs0Fs, error) {
 	}
 
 	stringTableBytes := make([]byte, header.stringTableSize)
-	_, err = file.Read(stringTableBytes)
+	_, err = reader.Read(stringTableBytes)
 	if err != nil {
 		return nil, err
 	}
@@ -120,7 +119,7 @@ func OpenPfs0(path string) (*Pfs0Fs, error) {
 	}
 
 	return &Pfs0Fs{
-		file:        file,
+		reader:      reader,
 		header:      *header,
 		entries:     entries,
 		stringTable: stringTable,
