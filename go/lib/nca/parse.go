@@ -30,6 +30,17 @@ const (
 	FsTypePfs0  SectionFsType = 1
 )
 
+func (t SectionFsType) String() string {
+	switch t {
+	case FsTypeRomfs:
+		return "ROMFS"
+	case FsTypePfs0:
+		return "PFS0"
+	}
+
+	return "<UNKNOWN>"
+}
+
 type SectionHashType uint8
 
 const (
@@ -47,14 +58,54 @@ const (
 )
 
 type ncaFsHeader struct {
-	Version    uint16
-	FsType     uint8 // SectionFsType
-	HashType   uint8 // SectionHashType
-	CryptType  uint8 // SectionCryptType
+	version    uint16
+	fsType     uint8 // SectionFsType
+	hashType   uint8 // SectionHashType
+	cryptType  uint8 // SectionCryptType
 	_          [3]byte
-	Superblock [0x138]byte // FS-specific superblock, size = 0x138
-	SectionCtr [8]byte
+	superblock [0x138]byte // FS-specific superblock
+	sectionCtr [8]byte
 	_          [0xB8]byte
+}
+
+func (fsHeader *ncaFsHeader) SectionCtr(mediaStartOffset uint32) [0x10]byte {
+	var ctr [0x10]byte
+	offset := uint64(mediaStartOffset*0x200) >> 4
+	for i := range 8 {
+		ctr[i] = fsHeader.sectionCtr[0x8-i-1]
+		ctr[0x10-i-1] = byte(offset & 0xff)
+		offset >>= 8
+	}
+
+	return ctr
+}
+
+type pfs0Superblock struct {
+	masterHash      [0x20]byte
+	blockSize       uint32
+	always2         uint32
+	hashTableOffset uint64
+	hashTableSize   uint64
+	pfs0Offset      uint64
+	pfs0Size        uint64
+	_               [0xf0]byte
+}
+
+func pfs0SuperblockFromBytes(data [0x138]byte) pfs0Superblock {
+	sb := pfs0Superblock{
+		blockSize:       binary.LittleEndian.Uint32(data[0x20:0x24]),
+		always2:         binary.LittleEndian.Uint32(data[0x24:0x28]),
+		hashTableOffset: binary.LittleEndian.Uint64(data[0x28:0x30]),
+		hashTableSize:   binary.LittleEndian.Uint64(data[0x30:0x38]),
+		pfs0Offset:      binary.LittleEndian.Uint64(data[0x38:0x40]),
+		pfs0Size:        binary.LittleEndian.Uint64(data[0x40:0x48]),
+	}
+	copy(sb.masterHash[:], data[:0x20])
+	return sb
+}
+
+func (fsHeader *ncaFsHeader) FsType() SectionFsType {
+	return SectionFsType(fsHeader.fsType)
 }
 
 type SdkVersion struct {
@@ -107,33 +158,109 @@ func (n Nca) String() string {
 
 	m := make([]byte, 4)
 	binary.LittleEndian.PutUint32(m, n.header.magic)
-	sb.WriteString(fmt.Sprintf("Magic: %s\n", string(m)))
-
-	sb.WriteString(fmt.Sprintf("Fixed-Key Index: %x\n", n.header.fixedKeyGeneration))
-	sb.WriteString(fmt.Sprintf("Fixed-Key Signature: %x\n", n.header.fixedKeySig))
-	sb.WriteString(fmt.Sprintf("NPDM Signature: %x\n", n.header.npdmKeySig))
-	sb.WriteString(fmt.Sprintf("Content Size: 0x%x\n", n.header.ncaSize))
-	sb.WriteString(fmt.Sprintf("Title Id: 0x%x\n", n.header.titleID))
 	sdk := n.header.GetSdkVersionParts()
-	sb.WriteString(fmt.Sprintf("SDK Version: %d.%d.%d.%d\n", sdk.Major, sdk.Minor, sdk.Micro, sdk.Revision))
-	// FIXME determine this
-	sb.WriteString(fmt.Sprintf("Encryption Type: %s\n", "??"))
-	sb.WriteString(fmt.Sprintf("Key Area Encryption Key: %d\n", n.header.keyAreaKeyIndex))
-	sb.WriteString("Key Area (Encrypted):\n")
-	sb.WriteString(fmt.Sprintf("    Key 0 (Encrypted): %x\n", n.header.encryptedKeys[0]))
-	sb.WriteString(fmt.Sprintf("    Key 1 (Encrypted): %x\n", n.header.encryptedKeys[1]))
-	sb.WriteString(fmt.Sprintf("    Key 2 (Encrypted): %x\n", n.header.encryptedKeys[2]))
-	sb.WriteString(fmt.Sprintf("    Key 3 (Encrypted): %x\n", n.header.encryptedKeys[3]))
-	sb.WriteString("Key Area (Decrypted):\n")
-	sb.WriteString(fmt.Sprintf("    Key 0 (Decrypted): %x\n", n.decryptedKeys[0]))
-	sb.WriteString(fmt.Sprintf("    Key 1 (Decrypted): %x\n", n.decryptedKeys[1]))
-	sb.WriteString(fmt.Sprintf("    Key 2 (Decrypted): %x\n", n.decryptedKeys[2]))
-	sb.WriteString(fmt.Sprintf("    Key 3 (Decrypted): %x\n", n.decryptedKeys[3]))
-	sb.WriteString("Sections:\n")
-	// FIXME
-	sb.WriteString("    ??\n")
+
+	type field struct {
+		label string
+		value string
+	}
+	writeFields := func(fields []field) {
+		maxLen := 0
+		for _, f := range fields {
+			if len(f.label) > maxLen {
+				maxLen = len(f.label)
+			}
+		}
+
+		// account for ":"
+		maxLen++
+
+		for _, f := range fields {
+			label := f.label + ":"
+			value := f.value
+			if len(value) <= 64 {
+				sb.WriteString(fmt.Sprintf("%-*s %s\n", maxLen, label, f.value))
+				continue
+			}
+
+			sb.WriteString(fmt.Sprintf("%-*s %s\n", maxLen, label, value[:min(len(value), 64)]))
+			for {
+				value = value[min(len(value), 64):]
+				if len(value) == 0 {
+					break
+				}
+
+				sb.WriteString(fmt.Sprintf("%-*s %s\n", maxLen, "", value[:min(len(value), 64)]))
+			}
+		}
+	}
+
+	allFields := []field{
+		{"Magic", string(m)},
+		{"Fixed-Key Index", fmt.Sprintf("0x%x", n.header.fixedKeyGeneration)},
+		{"Fixed-Key Signature", fmt.Sprintf("%x", n.header.fixedKeySig)},
+		{"NPDM Signature", fmt.Sprintf("%x", n.header.npdmKeySig)},
+		{"Content Size", fmt.Sprintf("0x%016x", n.header.ncaSize)},
+		{"Title Id", fmt.Sprintf("0x%016x", n.header.titleID)},
+		{"SDK Version", fmt.Sprintf("%d.%d.%d.%d", sdk.Major, sdk.Minor, sdk.Micro, sdk.Revision)},
+		// FIXME
+		{"Encryption Type", "??"},
+		{"Key Area Encryption Key", fmt.Sprintf("%d", n.header.keyAreaKeyIndex)},
+		{"Key Area (Encrypted)", ""},
+		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[0])},
+		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[1])},
+		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[2])},
+		{"    Key %d (Encrypted)", fmt.Sprintf("%x", n.header.encryptedKeys[3])},
+		{"Key Area (Decrypted)", ""},
+		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[0])},
+		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[1])},
+		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[2])},
+		{"    Key %d (Decrypted)", fmt.Sprintf("%x", n.decryptedKeys[3])},
+		{"Sections", ""},
+	}
+
+	for i, section := range n.header.sectionEntries {
+		if section.MediaStartOffset == 0 {
+			continue
+		}
+
+		sectionHeader := n.header.fsHeaders[i]
+		start := section.MediaStartOffset * 0x200
+		end := section.MediaEndOffset * 0x200
+		fsType := sectionHeader.FsType()
+		superblock := pfs0SuperblockFromBytes(sectionHeader.superblock)
+
+		allFields = append(allFields,
+			field{fmt.Sprintf("    Section %d", i), ""},
+			field{"        Offset", fmt.Sprintf("0x%016x", start)},
+			field{"        Size", fmt.Sprintf("0x%016x", end-start)},
+			field{"        Partition Type", fsType.String()},
+		)
+
+		switch fsType {
+		case FsTypePfs0:
+			allFields = append(allFields,
+				field{"        Section CTR", fmt.Sprintf("%x", sectionHeader.SectionCtr(section.MediaStartOffset))},
+				field{"        Superblock Hash", fmt.Sprintf("%x", superblock.masterHash)},
+				field{"        Hash Table", ""},
+				field{"            Offset", fmt.Sprintf("%016x", superblock.hashTableOffset)},
+				field{"            Size", fmt.Sprintf("%016x", superblock.hashTableSize)},
+				field{"            Block Size", fmt.Sprintf("0x%x", superblock.blockSize)},
+				field{"        PFS0 Offset", fmt.Sprintf("%016x", superblock.pfs0Offset)},
+				field{"        PFS0 Size", fmt.Sprintf("%016x", superblock.pfs0Size)},
+			)
+		case FsTypeRomfs:
+			allFields = append(allFields, field{"        TODO ROMFS", ""})
+		default:
+			allFields = append(allFields, field{"        TODO", ""})
+		}
+
+	}
+
+	writeFields(allFields)
 
 	return sb.String()
+
 }
 
 func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
@@ -150,7 +277,7 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 			return nil, err
 		}
 
-		c.Decrypt(plain[0x000:0xc00], 0)
+		c.Decrypt(plain[:0xc00], 0)
 
 		if binary.LittleEndian.Uint32(plain[0x200:0x204]) != magicNCA3 {
 			return nil, fmt.Errorf("failed to decrypt NCA header")
@@ -160,32 +287,7 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 	}
 
 	// parse header
-	header := ncaHeader{
-		magic:              binary.LittleEndian.Uint32(plain[0x200:0x204]),
-		distribution:       plain[0x204],
-		contentType:        plain[0x205],
-		cryptoType:         plain[0x206],
-		keyAreaKeyIndex:    plain[0x207],
-		ncaSize:            binary.LittleEndian.Uint64(plain[0x208:0x210]),
-		titleID:            binary.LittleEndian.Uint64(plain[0x210:0x218]),
-		sdkVersion:         binary.LittleEndian.Uint32(plain[0x21c:0x220]),
-		cryptoType2:        plain[0x220],
-		fixedKeyGeneration: plain[0x221],
-		sectionEntries:     parseSectionEntries(plain[0x240:0x280]),
-		fsHeaders:          parseFsHeaders(plain[0x400:0xc00]),
-	}
-
-	copy(header.fixedKeySig[:], plain[0:0x100])
-	copy(header.npdmKeySig[:], plain[0x100:0x200])
-	copy(header.rightsID[:], plain[0x230:0x240])
-	copy(header.sectionHashes[0][:], plain[0x280:0x2a0])
-	copy(header.sectionHashes[1][:], plain[0x2a0:0x2c0])
-	copy(header.sectionHashes[2][:], plain[0x2c0:0x2e0])
-	copy(header.sectionHashes[3][:], plain[0x2e0:0x300])
-	copy(header.encryptedKeys[0][:], plain[0x300:0x310])
-	copy(header.encryptedKeys[1][:], plain[0x310:0x320])
-	copy(header.encryptedKeys[2][:], plain[0x320:0x330])
-	copy(header.encryptedKeys[3][:], plain[0x330:0x340])
+	header := ncaHeaderFromBytes(plain[:0xc00])
 
 	// decrypt the `encryptedKeys` in the header
 	encryptedKeysBytes := make([]byte, 0x40)
@@ -210,6 +312,36 @@ func NewNcaFromBytes(data []byte, keys keys.Keys) (*Nca, error) {
 		header:        header,
 		decryptedKeys: decryptedKeys,
 	}, nil
+}
+
+// assumes decrypted bytes
+func ncaHeaderFromBytes(plain []byte) ncaHeader {
+	header := ncaHeader{
+		magic:              binary.LittleEndian.Uint32(plain[0x200:0x204]),
+		distribution:       plain[0x204],
+		contentType:        plain[0x205],
+		cryptoType:         plain[0x206],
+		keyAreaKeyIndex:    plain[0x207],
+		ncaSize:            binary.LittleEndian.Uint64(plain[0x208:0x210]),
+		titleID:            binary.LittleEndian.Uint64(plain[0x210:0x218]),
+		sdkVersion:         binary.LittleEndian.Uint32(plain[0x21c:0x220]),
+		cryptoType2:        plain[0x220],
+		fixedKeyGeneration: plain[0x221],
+		sectionEntries:     parseSectionEntries(plain[0x240:0x280]),
+		fsHeaders:          parseFsHeaders(plain[0x400:0xc00]),
+	}
+	copy(header.fixedKeySig[:], plain[0:0x100])
+	copy(header.npdmKeySig[:], plain[0x100:0x200])
+	copy(header.rightsID[:], plain[0x230:0x240])
+	copy(header.sectionHashes[0][:], plain[0x280:0x2a0])
+	copy(header.sectionHashes[1][:], plain[0x2a0:0x2c0])
+	copy(header.sectionHashes[2][:], plain[0x2c0:0x2e0])
+	copy(header.sectionHashes[3][:], plain[0x2e0:0x300])
+	copy(header.encryptedKeys[0][:], plain[0x300:0x310])
+	copy(header.encryptedKeys[1][:], plain[0x310:0x320])
+	copy(header.encryptedKeys[2][:], plain[0x320:0x330])
+	copy(header.encryptedKeys[3][:], plain[0x330:0x340])
+	return header
 }
 
 // TODO: move this somewhere more relevant
@@ -245,13 +377,13 @@ func parseFsHeaders(data []byte) [4]ncaFsHeader {
 	for i := range 4 {
 		start := i * ncaFsHeaderSize
 		fsHeaders[i] = ncaFsHeader{
-			Version:   binary.LittleEndian.Uint16(data[start : start+2]),
-			FsType:    data[start+2],
-			HashType:  data[start+3],
-			CryptType: data[start+4],
+			version:   binary.LittleEndian.Uint16(data[start : start+2]),
+			fsType:    data[start+2],
+			hashType:  data[start+3],
+			cryptType: data[start+4],
 		}
-		copy(fsHeaders[i].Superblock[:], data[start+8:start+0x140])
-		copy(fsHeaders[i].SectionCtr[:], data[start+0x140:start+0x148])
+		copy(fsHeaders[i].superblock[:], data[start+8:start+0x140])
+		copy(fsHeaders[i].sectionCtr[:], data[start+0x140:start+0x148])
 	}
 
 	return fsHeaders
