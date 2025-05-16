@@ -143,9 +143,9 @@ func parseEntryList(data []byte) ([]pfs0EntryListing, error) {
 	entries := make([]pfs0EntryListing, 0, len(data)/entryListSize)
 	for i := 0; i < len(data); i += entryListSize {
 		entry := pfs0EntryListing{
-			offset:            binary.LittleEndian.Uint64(data[i : i+8]),
-			size:              binary.LittleEndian.Uint64(data[i+8 : i+16]),
-			stringTableOffset: binary.LittleEndian.Uint32(data[i+16 : i+20]),
+			offset:            binary.LittleEndian.Uint64(data[i : i+0x8]),
+			size:              binary.LittleEndian.Uint64(data[i+0x8 : i+0x10]),
+			stringTableOffset: binary.LittleEndian.Uint32(data[i+0x10 : i+0x14]),
 		}
 
 		entries = append(entries, entry)

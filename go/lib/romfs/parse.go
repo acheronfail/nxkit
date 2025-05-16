@@ -77,7 +77,7 @@ func parseDirEntry(r io.Reader) (*romFsDirEntry, error) {
 	if dirEntry.nameSize > 0 {
 		dirEntry.name = make([]byte, dirEntry.nameSize)
 		if _, err := io.ReadFull(r, dirEntry.name); err != nil {
-			return nil, fmt.Errorf("failed to read name: %w", err)
+			return nil, fmt.Errorf("failed to read name: %s", err)
 		}
 	}
 
@@ -247,7 +247,7 @@ func calcPathHash(parent uint32, name string) uint32 {
 }
 
 func (fs *RomFs) OpenFile(path string) (*io.SectionReader, error) {
-	segments := strings.Split(strings.TrimPrefix(path, "/"), "/")
+	segments := strings.Split(path, "/")
 	if len(segments) == 0 {
 		return nil, fmt.Errorf("empty path")
 	}
@@ -257,8 +257,11 @@ func (fs *RomFs) OpenFile(path string) (*io.SectionReader, error) {
 
 	// walk through all but the last segment (directories)
 bucketLoop:
-	for i := range len(segments) - 1 {
-		name := segments[i]
+	for _, name := range segments[:len(segments)-1] {
+		if name == "" {
+			continue
+		}
+
 		hash := calcPathHash(parentHash, name)
 		entryOffset := fs.directoryTable[hash%uint32(len(fs.directoryTable))]
 
