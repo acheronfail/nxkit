@@ -314,14 +314,13 @@ func (h *ncaHeader) EncryptionType() string {
 }
 
 type NcaSection struct {
-	superblock pfs0Superblock
-	offset     int64
-	size       int64
-	cryptType  SectionCryptType
-	fsType     SectionFsType
-	key        []byte
-	ctr        [0x10]byte
-	nca        *Nca
+	offset        int64
+	size          int64
+	cryptType     SectionCryptType
+	key           []byte
+	ctr           [0x10]byte
+	sectionHeader ncaFsHeader
+	nca           *Nca
 }
 
 type CtrReader struct {
@@ -367,16 +366,32 @@ func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
 }
 
 func (s *NcaSection) Open() (NcaReader, error) {
-	sr := io.NewSectionReader(s.nca.reader, s.offset, s.size)
+	var dataOffset, dataSize int64
+	switch s.sectionHeader.FsType() {
+	case SectionFsTypePfs0:
+		superblock := pfs0SuperblockFromBytes(s.sectionHeader.superblock)
+		dataOffset = int64(superblock.pfs0Offset)
+		dataSize = int64(superblock.pfs0Size)
+	case SectionFsTypeRomfs:
+		superblock := romfsSuperblockFromBytes(s.sectionHeader.superblock)
+		lvl := superblock.ivfcHeader.levelHeaders[ivfcMaxLevel-1]
+		dataOffset = int64(lvl.logicalOffset)
+		dataSize = int64(lvl.hashDataSize)
+	default:
+		return nil, fmt.Errorf("currently unsupported fs type %s", s.sectionHeader.FsType())
+	}
+
+	sr := io.NewSectionReader(s.nca.reader, s.offset+dataOffset, dataSize)
 	switch s.cryptType {
 	case CryptNone:
 		return sr, nil
 	case CryptCtr:
 		return &CtrReader{
-			sr:        sr,
-			key:       s.key,
-			ctr:       s.ctr,
-			ctrOffset: s.offset,
+			sr:         sr,
+			key:        s.key,
+			ctr:        s.ctr,
+			ctrOffset:  s.offset,
+			readOffset: dataOffset,
 		}, nil
 	// TODO other encryption types (XTS with xtsn, etc)
 	default:
@@ -385,7 +400,7 @@ func (s *NcaSection) Open() (NcaReader, error) {
 }
 
 func (s *NcaSection) FsType() SectionFsType {
-	return s.fsType
+	return s.sectionHeader.FsType()
 }
 
 func (s *NcaSection) Size() int64 {
@@ -408,7 +423,6 @@ func (n *Nca) Sections() []NcaSection {
 		sectionHeader := n.header.fsHeaders[i]
 		start := section.MediaStartOffset * mediaSize
 		end := section.MediaEndOffset * mediaSize
-		fsType := sectionHeader.FsType()
 
 		var key []byte
 		if n.header.HasRightsId() {
@@ -424,14 +438,13 @@ func (n *Nca) Sections() []NcaSection {
 		}
 
 		sections = append(sections, NcaSection{
-			superblock: pfs0SuperblockFromBytes(sectionHeader.superblock),
-			offset:     int64(start),
-			size:       int64(end - start),
-			key:        key,
-			ctr:        sectionHeader.SectionCtr(section.MediaStartOffset),
-			fsType:     fsType,
-			cryptType:  sectionHeader.cryptType,
-			nca:        n,
+			offset:        int64(start),
+			size:          int64(end - start),
+			key:           key,
+			ctr:           sectionHeader.SectionCtr(section.MediaStartOffset),
+			sectionHeader: sectionHeader,
+			cryptType:     sectionHeader.cryptType,
+			nca:           n,
 		})
 	}
 
