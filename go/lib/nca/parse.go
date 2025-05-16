@@ -109,15 +109,15 @@ type ncaSectionEntry struct {
 type SectionFsType uint8
 
 const (
-	FsTypeRomfs SectionFsType = 0
-	FsTypePfs0  SectionFsType = 1
+	SectionFsTypeRomfs SectionFsType = 0
+	SectionFsTypePfs0  SectionFsType = 1
 )
 
 func (t SectionFsType) String() string {
 	switch t {
-	case FsTypeRomfs:
+	case SectionFsTypeRomfs:
 		return "ROMFS"
-	case FsTypePfs0:
+	case SectionFsTypePfs0:
 		return "PFS0"
 	}
 
@@ -314,27 +314,70 @@ func (h *ncaHeader) EncryptionType() string {
 }
 
 type NcaSection struct {
-	offset    int64
-	size      int64
-	cryptType SectionCryptType
-	fsType    SectionFsType
-	key       []byte
-	ctr       [0x10]byte
-	nca       *Nca
+	superblock pfs0Superblock
+	offset     int64
+	size       int64
+	cryptType  SectionCryptType
+	fsType     SectionFsType
+	key        []byte
+	ctr        [0x10]byte
+	nca        *Nca
 }
 
-func (s *NcaSection) Open() (io.Reader, error) {
+type CtrReader struct {
+	sr         *io.SectionReader
+	key        []byte
+	ctr        [0x10]byte
+	ctrOffset  int64
+	readOffset int64
+}
+
+func (r *CtrReader) Read(p []byte) (int, error) {
+	n, err := r.ReadAt(p, r.readOffset)
+	r.readOffset += int64(n)
+	return n, err
+}
+
+func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
+	if off == r.sr.Size() {
+		return 0, io.EOF
+	}
+
+	block, err := aes.NewCipher(r.key[:])
+	if err != nil {
+		return 0, err
+	}
+
+	if off == 0 {
+		ctrReader := cipher.StreamReader{S: cipher.NewCTR(block, r.ctr[:]), R: r.sr}
+		return ctrReader.Read(p)
+	}
+
+	// advance counter as if we'd read up to the offset
+	advancedCtr := bytes.Clone(r.ctr[:])
+	ctrOffset := (r.ctrOffset + off) >> 4
+	for i := range 0x8 {
+		advancedCtr[0x10-i-1] = byte(ctrOffset & 0xff)
+		ctrOffset >>= 8
+	}
+
+	// FIXME: if offset isn't 0x10 aligned, start before and after and return subslice
+	ctrReader := cipher.StreamReader{S: cipher.NewCTR(block, advancedCtr[:]), R: r.sr}
+	return ctrReader.Read(p)
+}
+
+func (s *NcaSection) Open() (NcaReader, error) {
 	sr := io.NewSectionReader(s.nca.reader, s.offset, s.size)
 	switch s.cryptType {
 	case CryptNone:
 		return sr, nil
 	case CryptCtr:
-		block, err := aes.NewCipher(s.key[:])
-		if err != nil {
-			return nil, err
-		}
-
-		return &cipher.StreamReader{S: cipher.NewCTR(block, s.ctr[:]), R: sr}, nil
+		return &CtrReader{
+			sr:        sr,
+			key:       s.key,
+			ctr:       s.ctr,
+			ctrOffset: s.offset,
+		}, nil
 	// TODO other encryption types (XTS with xtsn, etc)
 	default:
 		return nil, fmt.Errorf("unimplemented decryption for sections encrypted with %s", s.cryptType)
@@ -381,13 +424,14 @@ func (n *Nca) Sections() []NcaSection {
 		}
 
 		sections = append(sections, NcaSection{
-			offset:    int64(start),
-			size:      int64(end - start),
-			key:       key,
-			ctr:       sectionHeader.SectionCtr(section.MediaStartOffset),
-			fsType:    fsType,
-			cryptType: sectionHeader.cryptType,
-			nca:       n,
+			superblock: pfs0SuperblockFromBytes(sectionHeader.superblock),
+			offset:     int64(start),
+			size:       int64(end - start),
+			key:        key,
+			ctr:        sectionHeader.SectionCtr(section.MediaStartOffset),
+			fsType:     fsType,
+			cryptType:  sectionHeader.cryptType,
+			nca:        n,
 		})
 	}
 
@@ -485,7 +529,7 @@ func (n Nca) String() string {
 		)
 
 		switch fsType {
-		case FsTypePfs0:
+		case SectionFsTypePfs0:
 			superblock := pfs0SuperblockFromBytes(sectionHeader.superblock)
 			allFields = append(allFields,
 				field{"        Superblock Hash", fmt.Sprintf("%x", superblock.masterHash)},
@@ -496,7 +540,7 @@ func (n Nca) String() string {
 				field{"        PFS0 Offset", fmt.Sprintf("%016x", superblock.pfs0Offset)},
 				field{"        PFS0 Size", fmt.Sprintf("%016x", superblock.pfs0Size)},
 			)
-		case FsTypeRomfs:
+		case SectionFsTypeRomfs:
 			superblock := romfsSuperblockFromBytes(sectionHeader.superblock)
 			allFields = append(allFields,
 				field{"        Superblock Hash", fmt.Sprintf("%x", superblock.ivfcHeader.masterHash)},
@@ -567,31 +611,31 @@ func NewNca(reader NcaReader, keys keys.Keys) (*Nca, error) {
 
 	// parse header
 	header := ncaHeaderFromBytes(plain[:0xc00])
+	nca := &Nca{reader: reader, header: header}
 
-	// decrypt the `encryptedKeys` in the header
-	encryptedKeysBytes := make([]byte, 0x40)
-	copy(encryptedKeysBytes, plain[0x300:0x340])
-	key, err := keys.GetKeyAreaKey(int(header.cryptoType), int(header.keyAreaKeyIndex))
-	if err != nil {
-		return nil, err
+	if header.HasRightsId() {
+		// TODO: decrypt title key
+	} else {
+		// decrypt the `encryptedKeys` in the header
+		encryptedKeysBytes := make([]byte, 0x40)
+		copy(encryptedKeysBytes, plain[0x300:0x340])
+		key, err := keys.GetKeyAreaKey(int(header.cryptoType), int(header.keyAreaKeyIndex))
+		if err != nil {
+			return nil, err
+		}
+
+		err = aesEcbDecrypt(key, encryptedKeysBytes)
+		if err != nil {
+			return nil, err
+		}
+
+		copy(nca.decryptedKeys[0][:], encryptedKeysBytes[0x00:0x10])
+		copy(nca.decryptedKeys[1][:], encryptedKeysBytes[0x10:0x20])
+		copy(nca.decryptedKeys[2][:], encryptedKeysBytes[0x20:0x30])
+		copy(nca.decryptedKeys[3][:], encryptedKeysBytes[0x30:0x40])
 	}
 
-	err = aesEcbDecrypt(key, encryptedKeysBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	var decryptedKeys [4][0x10]byte
-	copy(decryptedKeys[0][:], encryptedKeysBytes[0x00:0x10])
-	copy(decryptedKeys[1][:], encryptedKeysBytes[0x10:0x20])
-	copy(decryptedKeys[2][:], encryptedKeysBytes[0x20:0x30])
-	copy(decryptedKeys[3][:], encryptedKeysBytes[0x30:0x40])
-
-	return &Nca{
-		reader:        reader,
-		header:        header,
-		decryptedKeys: decryptedKeys,
-	}, nil
+	return nca, nil
 }
 
 // assumes decrypted bytes

@@ -15,7 +15,7 @@ const (
 )
 
 type Pfs0Reader interface {
-	io.ReadCloser
+	io.Reader
 	io.ReaderAt
 }
 
@@ -63,10 +63,6 @@ type Pfs0Fs struct {
 	entries     []pfs0EntryListing
 	stringTable []string
 	dataOffset  int64
-}
-
-func (fs *Pfs0Fs) Close() error {
-	return fs.reader.Close()
 }
 
 func (fs *Pfs0Fs) Entries() []Pfs0Entry {
