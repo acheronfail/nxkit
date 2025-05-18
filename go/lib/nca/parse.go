@@ -314,7 +314,7 @@ func (h *ncaHeader) EncryptionType() string {
 }
 
 type NcaSection struct {
-	offset        int64
+	sectionOffset int64
 	size          int64
 	cryptType     SectionCryptType
 	key           []byte
@@ -324,11 +324,13 @@ type NcaSection struct {
 }
 
 type CtrReader struct {
-	sr         *io.SectionReader
-	key        []byte
-	ctr        [0x10]byte
-	ctrOffset  int64
-	readOffset int64
+	nca           *Nca
+	key           []byte
+	ctr           [0x10]byte
+	sectionOffset int64
+	dataOffset    int64
+	dataSize      int64
+	readOffset    int64
 }
 
 func (r *CtrReader) Read(p []byte) (int, error) {
@@ -338,9 +340,7 @@ func (r *CtrReader) Read(p []byte) (int, error) {
 }
 
 func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
-	if off == r.sr.Size() {
-		return 0, io.EOF
-	}
+	off += r.dataOffset
 
 	block, err := aes.NewCipher(r.key[:])
 	if err != nil {
@@ -348,20 +348,25 @@ func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
 	}
 
 	if off == 0 {
-		ctrReader := cipher.StreamReader{S: cipher.NewCTR(block, r.ctr[:]), R: r.sr}
+		ctrReader := cipher.StreamReader{
+			S: cipher.NewCTR(block, r.ctr[:]),
+			R: io.NewSectionReader(r.nca.reader, r.sectionOffset+off, r.dataSize),
+		}
 		return ctrReader.Read(p)
 	}
 
 	// advance counter as if we'd read up to the offset
 	advancedCtr := bytes.Clone(r.ctr[:])
-	ctrOffset := (r.ctrOffset + off) >> 4
+	ctrOffset := (r.sectionOffset + off) >> 4
 	for i := range 0x8 {
 		advancedCtr[0x10-i-1] = byte(ctrOffset & 0xff)
 		ctrOffset >>= 8
 	}
 
-	// FIXME: if offset isn't 0x10 aligned, start before and after and return subslice
-	ctrReader := cipher.StreamReader{S: cipher.NewCTR(block, advancedCtr[:]), R: r.sr}
+	ctrReader := cipher.StreamReader{
+		S: cipher.NewCTR(block, advancedCtr[:]),
+		R: io.NewSectionReader(r.nca.reader, r.sectionOffset+off, r.dataSize),
+	}
 	return ctrReader.Read(p)
 }
 
@@ -381,17 +386,18 @@ func (s *NcaSection) Open() (NcaReader, error) {
 		return nil, fmt.Errorf("currently unsupported fs type %s", s.sectionHeader.FsType())
 	}
 
-	sr := io.NewSectionReader(s.nca.reader, s.offset+dataOffset, dataSize)
 	switch s.cryptType {
 	case CryptNone:
-		return sr, nil
+		return io.NewSectionReader(s.nca.reader, s.sectionOffset+dataOffset, dataSize), nil
 	case CryptCtr:
 		return &CtrReader{
-			sr:         sr,
-			key:        s.key,
-			ctr:        s.ctr,
-			ctrOffset:  s.offset,
-			readOffset: dataOffset,
+			nca:           s.nca,
+			key:           s.key,
+			ctr:           s.ctr,
+			dataSize:      dataSize,
+			sectionOffset: s.sectionOffset,
+			dataOffset:    dataOffset,
+			// readOffset: dataOffset,
 		}, nil
 	// TODO other encryption types (XTS with xtsn, etc)
 	default:
@@ -438,7 +444,7 @@ func (n *Nca) Sections() []NcaSection {
 		}
 
 		sections = append(sections, NcaSection{
-			offset:        int64(start),
+			sectionOffset: int64(start),
 			size:          int64(end - start),
 			key:           key,
 			ctr:           sectionHeader.SectionCtr(section.MediaStartOffset),

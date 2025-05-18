@@ -83,35 +83,35 @@ func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	headerBytes := make([]byte, headerSize)
 	_, err := reader.Read(headerBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read header %s", err)
 	}
 
 	header, err := parseHeader(headerBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse header %s", err)
 	}
 
 	entryListingSize := int(entryListSize * header.numFiles)
 	entryListingBytes := make([]byte, entryListingSize)
 	_, err = reader.Read(entryListingBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read entry listing %s", err)
 	}
 
 	entries, err := parseEntryList(entryListingBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse entry listing %s", err)
 	}
 
 	stringTableBytes := make([]byte, header.stringTableSize)
 	_, err = reader.Read(stringTableBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read string table %s", err)
 	}
 
 	stringTable, err := parseStringTable(entries, stringTableBytes)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse string table %s", err)
 	}
 
 	return &Pfs0Fs{

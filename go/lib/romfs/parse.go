@@ -77,7 +77,7 @@ func parseDirEntry(r io.Reader) (*romFsDirEntry, error) {
 	if dirEntry.nameSize > 0 {
 		dirEntry.name = make([]byte, dirEntry.nameSize)
 		if _, err := io.ReadFull(r, dirEntry.name); err != nil {
-			return nil, fmt.Errorf("failed to read name: %s", err)
+			return nil, fmt.Errorf("failed to read dir name: %s", err)
 		}
 	}
 
@@ -112,7 +112,7 @@ func parseFileEntry(r io.Reader) (*romFsFileEntry, error) {
 	if fileEntry.nameSize > 0 {
 		fileEntry.name = make([]byte, fileEntry.nameSize)
 		if _, err := io.ReadFull(r, fileEntry.name); err != nil {
-			return nil, fmt.Errorf("failed to read name: %w", err)
+			return nil, fmt.Errorf("failed to read file name: %w", err)
 		}
 	}
 
@@ -191,7 +191,7 @@ func (fs *RomFs) visitFile(offset uint32, currentPath string, v visitor) error {
 func (fs *RomFs) visitDir(offset uint32, currentPath string, v visitor) error {
 	currentDir, err := fs.getDirEntry(offset)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to read dir at offset %d: %s", offset, err)
 	}
 
 	currentPath = filepath.Join(currentPath, string(currentDir.name))
