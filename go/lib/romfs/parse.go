@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -246,18 +247,24 @@ func calcPathHash(parent uint32, name string) uint32 {
 	return hash
 }
 
-func (fs *RomFs) OpenFile(path string) (*io.SectionReader, error) {
+func (fs *RomFs) findDir(path string) (*romFsDirEntry, uint32, error) {
 	segments := strings.Split(path, "/")
 	if len(segments) == 0 {
-		return nil, fmt.Errorf("empty path")
+		return nil, 0, fmt.Errorf("empty path")
+	}
+
+	// root
+	if !slices.ContainsFunc(segments, func(s string) bool { return s != "" }) {
+		root, err := fs.getDirEntry(0)
+		return root, 0, err
 	}
 
 	// dir root is defined as 0
-	var dirOffset, parentHash uint32
+	var parentHash uint32
 
 	// walk through all but the last segment (directories)
 bucketLoop:
-	for _, name := range segments[:len(segments)-1] {
+	for i, name := range segments {
 		if name == "" {
 			continue
 		}
@@ -269,11 +276,14 @@ bucketLoop:
 		for entryOffset != romFsEmptyEntry {
 			dirEntry, err := fs.getDirEntry(entryOffset)
 			if err != nil {
-				return nil, err
+				return nil, 0, err
 			}
 
 			if string(dirEntry.name) == name {
-				dirOffset = entryOffset
+				if i == len(segments)-1 {
+					return dirEntry, entryOffset, nil
+				}
+
 				parentHash = hash
 				continue bucketLoop
 			}
@@ -281,7 +291,28 @@ bucketLoop:
 			entryOffset = dirEntry.sibling
 		}
 
-		return nil, fmt.Errorf("directory not found: %s", path)
+		return nil, 0, fmt.Errorf("directory not found: %s", path)
+	}
+
+	return nil, 0, fmt.Errorf("directory not found: %s", path)
+
+}
+
+func (fs *RomFs) findFile(path string) (*romFsFileEntry, error) {
+	segments := strings.Split(path, "/")
+	if len(segments) == 0 {
+		return nil, fmt.Errorf("empty path")
+	}
+
+	dirPath := filepath.Join(segments[:len(segments)-1]...)
+	dirEntry, dirOffset, err := fs.findDir(dirPath)
+	if err != nil {
+		return nil, err
+	}
+
+	var parentHash uint32
+	if dirOffset != 0 {
+		parentHash = dirEntry.hash
 	}
 
 	// last segment in the path is the file
@@ -297,14 +328,43 @@ bucketLoop:
 		}
 
 		if fileEntry.parent == dirOffset && string(fileEntry.name) == fileName {
-			dataStart := int64(fs.header.dataOffset + fileEntry.offset)
-			return io.NewSectionReader(fs.r, dataStart, int64(fileEntry.size)), nil
+			return fileEntry, nil
 		}
 
 		entryOffset = fileEntry.sibling
 	}
 
 	return nil, fmt.Errorf("file not found: %s", path)
+}
+
+type Stat struct {
+	path string
+	size uint64
+}
+
+func (s *Stat) Path() string { return s.path }
+func (s *Stat) Size() uint64 { return s.size }
+
+func (fs *RomFs) StatFile(path string) (*Stat, error) {
+	if _, _, err := fs.findDir(path); err == nil {
+		return &Stat{path: path, size: 0}, nil
+	}
+
+	if fileEntry, err := fs.findFile(path); err == nil {
+		return &Stat{path: path, size: fileEntry.size}, nil
+	}
+
+	return nil, fmt.Errorf("no such file or directory: %s", path)
+}
+
+func (fs *RomFs) OpenFile(path string) (*io.SectionReader, error) {
+	fileEntry, err := fs.findFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	dataStart := int64(fs.header.dataOffset + fileEntry.offset)
+	return io.NewSectionReader(fs.r, dataStart, int64(fileEntry.size)), nil
 }
 
 func NewRomFs(r RomFsReader) (*RomFs, error) {
