@@ -81,8 +81,7 @@ func (fs *Pfs0Fs) Entries() []Pfs0Entry {
 
 func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	headerBytes := make([]byte, headerSize)
-	_, err := reader.Read(headerBytes)
-	if err != nil {
+	if _, err := reader.Read(headerBytes); err != nil {
 		return nil, fmt.Errorf("failed to read header %s", err)
 	}
 
@@ -93,8 +92,7 @@ func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 
 	entryListingSize := int(entryListSize * header.numFiles)
 	entryListingBytes := make([]byte, entryListingSize)
-	_, err = reader.Read(entryListingBytes)
-	if err != nil {
+	if _, err = reader.Read(entryListingBytes); err != nil {
 		return nil, fmt.Errorf("failed to read entry listing %s", err)
 	}
 
@@ -104,8 +102,7 @@ func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	}
 
 	stringTableBytes := make([]byte, header.stringTableSize)
-	_, err = reader.Read(stringTableBytes)
-	if err != nil {
+	if _, err = reader.Read(stringTableBytes); err != nil {
 		return nil, fmt.Errorf("failed to read string table %s", err)
 	}
 

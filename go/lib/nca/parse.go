@@ -328,7 +328,6 @@ type CtrReader struct {
 	key           []byte
 	ctr           [0x10]byte
 	sectionOffset int64
-	dataOffset    int64
 	dataSize      int64
 	readOffset    int64
 }
@@ -339,35 +338,50 @@ func (r *CtrReader) Read(p []byte) (int, error) {
 	return n, err
 }
 
-func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
-	off += r.dataOffset
+func (r *CtrReader) ctrForOffset(offset int64) []byte {
+	ctr := bytes.Clone(r.ctr[:])
+	binary.BigEndian.PutUint64(ctr[8:], uint64(r.sectionOffset+offset)>>4)
+	return ctr
+}
 
+func (r *CtrReader) ReadAt(p []byte, off int64) (int, error) {
 	block, err := aes.NewCipher(r.key[:])
 	if err != nil {
 		return 0, err
 	}
 
-	if off == 0 {
+	before := off % 0x10
+	alignedOffset := off - before
+
+	// if offset is aligned, just read directly
+	if before == 0 {
 		ctrReader := cipher.StreamReader{
-			S: cipher.NewCTR(block, r.ctr[:]),
+			S: cipher.NewCTR(block, r.ctrForOffset(alignedOffset)),
 			R: io.NewSectionReader(r.nca.reader, r.sectionOffset+off, r.dataSize),
 		}
 		return ctrReader.Read(p)
 	}
 
-	// advance counter as if we'd read up to the offset
-	advancedCtr := bytes.Clone(r.ctr[:])
-	ctrOffset := (r.sectionOffset + off) >> 4
-	for i := range 0x8 {
-		advancedCtr[0x10-i-1] = byte(ctrOffset & 0xff)
-		ctrOffset >>= 8
+	// if the read isn't aligned, then read the block that the offset is in...
+	var prefix [16]byte
+	prefixReader := cipher.StreamReader{
+		S: cipher.NewCTR(block, r.ctrForOffset(alignedOffset)),
+		R: io.NewSectionReader(r.nca.reader, r.sectionOffset+alignedOffset, 16),
+	}
+	if _, err := io.ReadFull(prefixReader, prefix[:]); err != nil {
+		return 0, err
 	}
 
+	// ... copy the part the caller wanted into p ...
+	n := copy(p, prefix[before:])
+
+	// ... and finally perform the rest of the read
 	ctrReader := cipher.StreamReader{
-		S: cipher.NewCTR(block, advancedCtr[:]),
-		R: io.NewSectionReader(r.nca.reader, r.sectionOffset+off, r.dataSize),
+		S: cipher.NewCTR(block, r.ctrForOffset(alignedOffset+16)),
+		R: io.NewSectionReader(r.nca.reader, r.sectionOffset+alignedOffset+16, r.dataSize),
 	}
-	return ctrReader.Read(p)
+	m, err := ctrReader.Read(p[n:])
+	return n + m, err
 }
 
 func (s *NcaSection) Open() (NcaReader, error) {
@@ -395,9 +409,7 @@ func (s *NcaSection) Open() (NcaReader, error) {
 			key:           s.key,
 			ctr:           s.ctr,
 			dataSize:      dataSize,
-			sectionOffset: s.sectionOffset,
-			dataOffset:    dataOffset,
-			// readOffset: dataOffset,
+			sectionOffset: s.sectionOffset + dataOffset,
 		}, nil
 	// TODO other encryption types (XTS with xtsn, etc)
 	default:
