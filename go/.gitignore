@@ -2,5 +2,7 @@
 *.nacp
 *.nca
 *.npdm
+*.romfs
+*.pfs0
 *.nsp
 staging/

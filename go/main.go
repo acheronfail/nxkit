@@ -25,12 +25,26 @@ import (
 // - [-] port hacbrewpack to golang (or compile it and then spawn it?)
 //     - [x] nacp
 //     - [x] npdm
-//     - [ ] nca program
-//     - [ ] nca control
-//     - [ ] nca htmldoc
-//     - [ ] nca legalinfo
-//     - [ ] nca meta
-//     - [ ] nsp
+//     - [x] nca reading
+//     - [x] pfs0 reading
+//     - [ ] pfs0 creation
+//     - [x] romfs reading
+//     - [ ] romfs creation
+//     - [ ] cnmt reading
+//     - [ ] cnmt creation
+//     - [ ] nca id calculation (will be used to compute names for the following nca's)
+//     - [ ] create nca program
+//         - [ ] section 0 pfs0  with main + main.npdm
+//         - [ ] section 1 romfs with /nextArgv + /nextNroPath
+//         - [ ] section 2 pfs0  with NintendoLogo.png + StartupMovie.gif
+//     - [ ] create nca control
+//         - [ ] section 0 romfs with /control.nacp + /icon_AmericanEnglish.dat
+//     - [ ] create nca htmldoc
+//     - [ ] create nca legalinfo
+//         - [ ] section 0 romfs with ???
+//     - [ ] create nca meta
+//         - [ ] section 0 pfs0 with Application_${TITLE_ID}.cnmt
+//     - [ ] package nsp (a pfs0 filesystem with nca's inside)
 // - [ ] have a way to ship assets (*.nso, etc)
 
 func createNsp() {
