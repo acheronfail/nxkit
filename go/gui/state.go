@@ -29,6 +29,8 @@ type appState struct {
 	ShowAdvanced        bool
 }
 
+var packagedBuild = "false"
+
 func newAppState(options Options) (*appState, error) {
 	payloadDir, err := payloadDirectory()
 	if err != nil {
@@ -58,11 +60,13 @@ func prodKeysSearchPaths() []string {
 	if home != "" {
 		paths = append(paths, filepath.Join(home, ".switch", "prod.keys"))
 	}
-	if wd, err := os.Getwd(); err == nil {
-		paths = append(paths, filepath.Join(wd, "prod.keys"))
-	}
-	if exe, err := os.Executable(); err == nil {
-		paths = append(paths, filepath.Join(filepath.Dir(exe), "prod.keys"))
+	if isDevMode() {
+		if wd, err := os.Getwd(); err == nil {
+			paths = append(paths, filepath.Join(wd, "prod.keys"))
+		}
+		if exe, err := os.Executable(); err == nil {
+			paths = append(paths, filepath.Join(filepath.Dir(exe), "prod.keys"))
+		}
 	}
 	return uniqueStrings(paths)
 }
@@ -175,6 +179,10 @@ func isMacAppBundle() bool {
 	}
 	exe = filepath.Clean(exe)
 	return strings.Contains(exe, ".app"+string(filepath.Separator)+"Contents"+string(filepath.Separator)+"MacOS")
+}
+
+func isDevMode() bool {
+	return packagedBuild != "true" && !isMacAppBundle()
 }
 
 func generateTitleID() (string, error) {

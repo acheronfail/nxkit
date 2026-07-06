@@ -126,7 +126,7 @@ package:
         -product-ver-patch "$ver_patch" \
         -product-ver-build "$build_version")
     fi
-    go build -trimpath -o "dist/${binary}" main.go
+    go build -trimpath -ldflags "-X github.com/acheronfail/nxkit/gui.packagedBuild=true" -o "dist/${binary}" main.go
 
     if [[ "$os" != "darwin" ]]; then
       echo "Built dist/${binary}"
