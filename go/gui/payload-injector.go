@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
@@ -15,6 +17,8 @@ import (
 	"fyne.io/fyne/v2/widget"
 	"github.com/acheronfail/nxkit/lib/inject"
 )
+
+const payloadDirectoryWatchInterval = 1 * time.Second
 
 var (
 	//go:embed markdown/rcm-help.linux.md
@@ -34,6 +38,13 @@ type payloadDownloadOption struct {
 	displayName string
 	link        string
 	markdown    string
+}
+
+type payloadInjectorTab struct {
+	content   fyne.CanvasObject
+	reload    func()
+	watchMu   sync.Mutex
+	watchStop chan struct{}
 }
 
 var payloadDownloadOptions = []payloadDownloadOption{
@@ -76,10 +87,12 @@ func getPayloads() ([]string, error) {
 }
 
 func PayloadInjectorTab() fyne.CanvasObject {
+	return newPayloadInjectorTab().content
+}
+
+func newPayloadInjectorTab() *payloadInjectorTab {
 	emptyWidget := widget.NewLabelWithStyle("No payloads found.", fyne.TextAlignCenter, fyne.TextStyle{Monospace: true})
-	output := widget.NewMultiLineEntry()
-	output.SetPlaceHolder("Payload injection log")
-	output.Disable()
+	output := newPayloadOutput()
 	output.Hide()
 
 	payloadRows := container.New(layout.NewCustomPaddedVBoxLayout(0))
@@ -184,7 +197,6 @@ func PayloadInjectorTab() fyne.CanvasObject {
 	top := container.NewVBox(
 		widget.NewRichTextFromMarkdown("Choose a payload to inject to a Switch in RCM mode."),
 		container.NewHBox(
-			widget.NewButton("Refresh", reloadPaths),
 			widget.NewButton("Copy payload in", copyIn),
 			widget.NewButton("Open Payload Folder", func() {
 				showError(openPath(state.PayloadDirectory))
@@ -209,11 +221,91 @@ func PayloadInjectorTab() fyne.CanvasObject {
 		helpMarkdown,
 	)
 
-	return container.NewBorder(top, bottom, nil, nil, payloadListPanel)
+	return &payloadInjectorTab{
+		content: container.NewBorder(top, bottom, nil, nil, payloadListPanel),
+		reload:  reloadPaths,
+	}
 }
 
-func newPayloadListRow(payloadPath string, index int, output *widget.Entry) fyne.CanvasObject {
-	return newActionListRow(filepath.Base(payloadPath), index, theme.FileIcon(), "Inject", false, func() {
+func (t *payloadInjectorTab) startWatching() {
+	t.watchMu.Lock()
+	defer t.watchMu.Unlock()
+
+	if t.watchStop != nil {
+		return
+	}
+	t.reload()
+	t.watchStop = make(chan struct{})
+	go watchPayloadDirectory(t.watchStop, func() {
+		fyne.Do(t.reload)
+	})
+}
+
+func (t *payloadInjectorTab) stopWatching() {
+	t.watchMu.Lock()
+	defer t.watchMu.Unlock()
+
+	if t.watchStop == nil {
+		return
+	}
+	close(t.watchStop)
+	t.watchStop = nil
+}
+
+func watchPayloadDirectory(stop <-chan struct{}, onChanged func()) {
+	lastSnapshot, err := payloadDirectorySnapshot()
+	if err != nil {
+		lastSnapshot = ""
+	}
+
+	ticker := time.NewTicker(payloadDirectoryWatchInterval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-stop:
+			return
+		case <-ticker.C:
+			nextSnapshot, err := payloadDirectorySnapshot()
+			if err != nil {
+				continue
+			}
+			if nextSnapshot == lastSnapshot {
+				continue
+			}
+			lastSnapshot = nextSnapshot
+			onChanged()
+		}
+	}
+}
+
+func payloadDirectorySnapshot() (string, error) {
+	if err := os.MkdirAll(state.PayloadDirectory, 0o755); err != nil {
+		return "", err
+	}
+
+	files, err := os.ReadDir(state.PayloadDirectory)
+	if err != nil {
+		return "", err
+	}
+
+	var snapshot strings.Builder
+	for _, file := range files {
+		if file.IsDir() || !strings.HasSuffix(file.Name(), ".bin") {
+			continue
+		}
+		info, err := file.Info()
+		if err != nil {
+			continue
+		}
+		fmt.Fprintf(&snapshot, "%s\x00%d\x00%d\n", file.Name(), info.Size(), info.ModTime().UnixNano())
+	}
+
+	return snapshot.String(), nil
+}
+
+func newPayloadListRow(payloadPath string, index int, output *payloadOutput) fyne.CanvasObject {
+	return newActionListRow(filepath.Base(payloadPath), index, theme.FileIcon(), "Inject", false, widget.HighImportance, func() {
 		basename := filepath.Base(payloadPath)
 		output.Show()
 		output.SetText(fmt.Sprintf("Injecting %s...\n", basename))

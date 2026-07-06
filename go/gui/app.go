@@ -23,6 +23,7 @@ func StartGuiApp(options Options) {
 	}
 
 	nxkitApp = app.NewWithID("fail.acheron.nxkit")
+	nxkitApp.Settings().SetTheme(newNXKitTheme())
 	mainWindow = nxkitApp.NewWindow("NXKit")
 	mainWindow.Resize(fyne.NewSize(960, 720))
 
@@ -31,8 +32,10 @@ func StartGuiApp(options Options) {
 		nxkitApp.Quit()
 	})
 
+	payloadInjector := newPayloadInjectorTab()
+	payloadInjectorItem := container.NewTabItem("Payload Injector", payloadInjector.content)
 	tabs := container.NewAppTabs(
-		container.NewTabItem("Payload Injector", PayloadInjectorTab()),
+		payloadInjectorItem,
 		container.NewTabItem("NRO Forwarder", NroForwarderTab()),
 		container.NewTabItem("NAND Explorer", NandExplorerTab()),
 		container.NewTabItem("Tools", ToolsTab()),
@@ -40,6 +43,17 @@ func StartGuiApp(options Options) {
 	)
 
 	tabs.SetTabLocation(container.TabLocationTop)
+	tabs.OnSelected = func(item *container.TabItem) {
+		if item == payloadInjectorItem {
+			payloadInjector.startWatching()
+		}
+	}
+	tabs.OnUnselected = func(item *container.TabItem) {
+		if item == payloadInjectorItem {
+			payloadInjector.stopWatching()
+		}
+	}
+	nxkitApp.Lifecycle().SetOnStopped(payloadInjector.stopWatching)
 
 	for i := 1; i <= 5; i++ {
 		index := i - 1
@@ -53,6 +67,7 @@ func StartGuiApp(options Options) {
 	}
 
 	mainWindow.SetContent(tabs)
+	payloadInjector.startWatching()
 
 	mainWindow.ShowAndRun()
 }

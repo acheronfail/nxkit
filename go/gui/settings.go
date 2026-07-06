@@ -12,18 +12,30 @@ import (
 
 func SettingsTab() fyne.CanvasObject {
 	status := widget.NewLabel("")
-	status.Wrapping = fyne.TextWrapWord
+	status.Wrapping = fyne.TextWrapBreak
 	searchPaths := widget.NewRichTextFromMarkdown("By default NXKit searches:\n\n- `" + strings.Join(state.ProdKeysSearchPaths, "`\n- `") + "`")
+	searchPaths.Wrapping = fyne.TextWrapBreak
+	description := widget.NewRichTextFromMarkdown("Prod keys are required for creating NSPs with the NRO Forwarder and for reading encrypted NAND partitions.")
+	description.Wrapping = fyne.TextWrapWord
 	advanced := widget.NewCheck("Show Advanced Settings", func(checked bool) {
 		state.ShowAdvanced = checked
 	})
 	advanced.SetChecked(state.ShowAdvanced)
 
+	var clearKeys *widget.Button
 	refreshStatus := func() {
-		if state.KeysPath == "" {
+		noKeysConfigured := state.KeysPath == ""
+		if noKeysConfigured {
 			status.SetText("No prod.keys configured.")
 		} else {
 			status.SetText(fmt.Sprintf("Configured keys: %s", state.KeysPath))
+		}
+		if clearKeys != nil {
+			if noKeysConfigured {
+				clearKeys.Disable()
+			} else {
+				clearKeys.Enable()
+			}
 		}
 	}
 	refreshStatus()
@@ -40,10 +52,12 @@ func SettingsTab() fyne.CanvasObject {
 		})
 	})
 
-	clearKeys := widget.NewButton("Clear selected keys", func() {
+	clearKeys = widget.NewButton("Clear selected keys", func() {
 		state.ClearKeys()
 		refreshStatus()
 	})
+	clearKeys.Importance = widget.DangerImportance
+	refreshStatus()
 
 	reloadKeys := widget.NewButton("Search default paths", func() {
 		state.ClearKeys()
@@ -55,7 +69,7 @@ func SettingsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("Select Prod Keys", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		status,
 		container.NewHBox(chooseKeys, clearKeys, reloadKeys, layout.NewSpacer()),
-		widget.NewRichTextFromMarkdown("Prod keys are required for creating NSPs with the NRO Forwarder and for reading encrypted NAND partitions."),
+		description,
 		searchPaths,
 		widget.NewSeparator(),
 		widget.NewLabelWithStyle("Other toggles", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),

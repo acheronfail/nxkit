@@ -7,7 +7,6 @@ import (
 	"runtime"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/driver"
 	"github.com/ncruces/zenity"
 )
 
@@ -89,9 +88,6 @@ func nativeFileOptions(title string, filters []nativeFileFilter) []zenity.Option
 	if icon, ok := nativeDialogWindowIcon(); ok {
 		opts = append(opts, zenity.WindowIcon(icon))
 	}
-	if attach, ok := nativeDialogAttachOption(); ok {
-		opts = append(opts, attach)
-	}
 	for _, filter := range filters {
 		opts = append(opts, filter)
 	}
@@ -125,36 +121,6 @@ func nativeDialogWindowIcon() (string, bool) {
 		}
 	}
 	return "", false
-}
-
-func nativeDialogAttachOption() (zenity.Option, bool) {
-	if runtime.GOOS == "darwin" {
-		return nil, false
-	}
-
-	nativeWindow, ok := mainWindow.(driver.NativeWindow)
-	if !ok {
-		return nil, false
-	}
-
-	var attach any
-	nativeWindow.RunNative(func(context any) {
-		switch ctx := context.(type) {
-		case driver.WindowsWindowContext:
-			if ctx.HWND != 0 {
-				attach = ctx.HWND
-			}
-		case driver.X11WindowContext:
-			if ctx.WindowHandle != 0 {
-				attach = int(ctx.WindowHandle)
-			}
-		}
-	})
-	if attach == nil {
-		return nil, false
-	}
-
-	return zenity.Attach(attach), true
 }
 
 func nativePathResult(path string, err error) (string, bool, error) {

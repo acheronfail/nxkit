@@ -121,8 +121,12 @@ func NandExplorerTab() fyne.CanvasObject {
 	}
 	status := widget.NewLabel("Choose your rawnand.bin or rawnand.bin.00 file to begin.")
 	status.Wrapping = fyne.TextWrapWord
+	var updateOpenNandImportance func()
 	readOnly := widget.NewCheck("Read-Only Mode", func(checked bool) {
 		model.readOnly = checked
+		if updateOpenNandImportance != nil {
+			updateOpenNandImportance()
+		}
 	})
 	readOnly.SetChecked(true)
 
@@ -142,6 +146,17 @@ func NandExplorerTab() fyne.CanvasObject {
 	var choosePartitionButton *widget.Button
 	var showInitialScreen func()
 	copyInProgress := false
+	updateOpenNandImportance = func() {
+		if chooseNand == nil {
+			return
+		}
+		if readOnly.Checked {
+			chooseNand.Importance = widget.HighImportance
+		} else {
+			chooseNand.Importance = widget.DangerImportance
+		}
+		chooseNand.Refresh()
+	}
 	nandHeader := func() *fyne.Container {
 		return container.NewVBox(status, container.NewHBox(closeButton, layout.NewSpacer(), readOnly))
 	}
@@ -282,7 +297,7 @@ func NandExplorerTab() fyne.CanvasObject {
 			mountable := isMountablePartition(info)
 			size := formatBytes(int64(part.Size))
 			title := fmt.Sprintf("%s (%s, %s)", part.Name, strings.ToUpper(info.format), size)
-			row := newActionListRow(title, rowIndex, theme.FileApplicationIcon(), "Mount", !mountable, func(p *gpt.Partition) func() {
+			row := newActionListRow(title, rowIndex, theme.FileApplicationIcon(), "Mount", !mountable, widget.MediumImportance, func(p *gpt.Partition) func() {
 				return func() {
 					runAsync(nil, func() error {
 						return mountPartition(p)
@@ -631,6 +646,7 @@ func NandExplorerTab() fyne.CanvasObject {
 				})
 			}, mainWindow)
 		})
+		deleteButton.Importance = widget.DangerImportance
 		exportButton := widget.NewButton("Copy file out", func() {
 			path := selectedPath.Text
 			node, ok := model.nodeLookup[path]
@@ -698,7 +714,9 @@ func NandExplorerTab() fyne.CanvasObject {
 			})
 		})
 	})
+	updateOpenNandImportance()
 	closeButton = widget.NewButton("Close NAND", closeNand)
+	closeButton.Importance = widget.DangerImportance
 	showInitialScreen = func() {
 		setContent(container.NewStack(
 			container.NewCenter(chooseNand),

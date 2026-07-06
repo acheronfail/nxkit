@@ -11,12 +11,13 @@ import (
 type actionListRow struct {
 	widget.BaseWidget
 
-	title          string
-	index          int
-	icon           fyne.Resource
-	actionText     string
-	actionDisabled bool
-	onAction       func()
+	title            string
+	index            int
+	icon             fyne.Resource
+	actionText       string
+	actionDisabled   bool
+	actionImportance widget.Importance
+	onAction         func()
 
 	actionPos  fyne.Position
 	actionSize fyne.Size
@@ -38,15 +39,17 @@ func newActionListRow(
 	icon fyne.Resource,
 	actionText string,
 	actionDisabled bool,
+	actionImportance widget.Importance,
 	onAction func(),
 ) *actionListRow {
 	row := &actionListRow{
-		title:          title,
-		index:          index,
-		icon:           icon,
-		actionText:     actionText,
-		actionDisabled: actionDisabled,
-		onAction:       onAction,
+		title:            title,
+		index:            index,
+		icon:             icon,
+		actionText:       actionText,
+		actionDisabled:   actionDisabled,
+		actionImportance: actionImportance,
+		onAction:         onAction,
 	}
 	row.ExtendBaseWidget(row)
 	return row
@@ -172,8 +175,17 @@ func (r *actionListRowRenderer) Refresh() {
 		r.actionButton.FillColor = theme.Color(theme.ColorNameDisabledButton)
 		r.actionText.Color = theme.Color(theme.ColorNameDisabled)
 	} else {
-		r.actionButton.FillColor = theme.Color(theme.ColorNameButton)
-		r.actionText.Color = theme.Color(theme.ColorNameForeground)
+		switch r.row.actionImportance {
+		case widget.HighImportance:
+			r.actionButton.FillColor = theme.Color(theme.ColorNamePrimary)
+			r.actionText.Color = theme.Color(theme.ColorNameForegroundOnPrimary)
+		case widget.DangerImportance:
+			r.actionButton.FillColor = theme.Color(theme.ColorNameError)
+			r.actionText.Color = theme.Color(theme.ColorNameForegroundOnError)
+		default:
+			r.actionButton.FillColor = theme.Color(theme.ColorNameButton)
+			r.actionText.Color = theme.Color(theme.ColorNameForeground)
+		}
 	}
 	r.actionButton.Refresh()
 	r.actionText.Text = r.row.actionText

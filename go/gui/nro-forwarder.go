@@ -48,6 +48,7 @@ func NroForwarderTab() fyne.CanvasObject {
 	romPathRow := container.NewBorder(nil, nil, widget.NewLabel("ROM Path"), nil, romPath)
 	romPathRow.Hide()
 
+	var clearImage *widget.Button
 	mode.OnChanged = func(value string) {
 		if value == "RetroArch ROM" {
 			title.SetPlaceHolder("Kirby's Adventure")
@@ -62,6 +63,14 @@ func NroForwarderTab() fyne.CanvasObject {
 		}
 	}
 
+	clearForwarderImage := func() {
+		imagePath.SetText("")
+		imagePreview.File = ""
+		imagePreview.Refresh()
+		imagePreviewContainer.Hide()
+		clearImage.Disable()
+	}
+
 	chooseImage := widget.NewButton("Choose image", func() {
 		chooseNativeFile("Choose NSP image", []nativeFileFilter{
 			extensionFilter("Images", ".jpg", ".jpeg", ".png"),
@@ -70,8 +79,12 @@ func NroForwarderTab() fyne.CanvasObject {
 			imagePreview.File = path
 			imagePreview.Refresh()
 			imagePreviewContainer.Show()
+			clearImage.Enable()
 		})
 	})
+	clearImage = widget.NewButton("Clear image", clearForwarderImage)
+	clearImage.Importance = widget.DangerImportance
+	clearImage.Disable()
 
 	regenerate := widget.NewButton("Regenerate ID", func() {
 		generated, err := generateTitleID()
@@ -150,7 +163,7 @@ func NroForwarderTab() fyne.CanvasObject {
 			widget.NewLabel("NRO Path"), nroPath,
 		),
 		romPathRow,
-		container.NewBorder(nil, nil, widget.NewLabel("Image"), chooseImage, imagePath),
+		container.NewBorder(nil, nil, widget.NewLabel("Image"), container.NewHBox(chooseImage, clearImage), imagePath),
 		imagePreviewContainer,
 		container.NewHBox(layout.NewSpacer(), generate),
 		status,

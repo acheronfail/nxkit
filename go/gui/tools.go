@@ -106,6 +106,37 @@ func ToolsTab() fyne.CanvasObject {
 	})
 	mergeCancelButton.Disable()
 
+	var splitButton *widget.Button
+	var mergeButton *widget.Button
+	updateSplitButtonImportance := func() {
+		if splitButton == nil {
+			return
+		}
+		if splitMakeCopy.Checked {
+			splitButton.Importance = widget.HighImportance
+		} else {
+			splitButton.Importance = widget.DangerImportance
+		}
+		splitButton.Refresh()
+	}
+	updateMergeButtonImportance := func() {
+		if mergeButton == nil {
+			return
+		}
+		if mergeMakeCopy.Checked {
+			mergeButton.Importance = widget.HighImportance
+		} else {
+			mergeButton.Importance = widget.DangerImportance
+		}
+		mergeButton.Refresh()
+	}
+	splitMakeCopy.OnChanged = func(checked bool) {
+		updateSplitButtonImportance()
+	}
+	mergeMakeCopy.OnChanged = func(checked bool) {
+		updateMergeButtonImportance()
+	}
+
 	setProgress := func(label *widget.Label, bar *widget.ProgressBar, done, total int64) {
 		fyne.Do(func() {
 			if total <= 0 {
@@ -119,7 +150,6 @@ func ToolsTab() fyne.CanvasObject {
 		})
 	}
 
-	var splitButton *widget.Button
 	splitButton = widget.NewButton("Choose file to split", func() {
 		chooseNativeFile("Choose file to split", nil, func(path string) {
 			asArchive := splitAsArchive.Checked
@@ -164,8 +194,8 @@ func ToolsTab() fyne.CanvasObject {
 			}()
 		})
 	})
+	updateSplitButtonImportance()
 
-	var mergeButton *widget.Button
 	mergeButton = widget.NewButton("Choose file to merge", func() {
 		chooseNativeFile("Choose file to merge", nil, func(inputPath string) {
 			inPlace := !mergeMakeCopy.Checked
@@ -215,6 +245,7 @@ func ToolsTab() fyne.CanvasObject {
 			}()
 		})
 	})
+	updateMergeButtonImportance()
 
 	var compressButton *widget.Button
 	compressButton = widget.NewButton("Choose NSP to compress", func() {
@@ -262,6 +293,7 @@ func ToolsTab() fyne.CanvasObject {
 			}()
 		})
 	})
+	compressButton.Importance = widget.HighImportance
 
 	var decompressButton *widget.Button
 	decompressButton = widget.NewButton("Choose NSZ to decompress", func() {
@@ -304,6 +336,7 @@ func ToolsTab() fyne.CanvasObject {
 			}()
 		})
 	})
+	decompressButton.Importance = widget.HighImportance
 
 	splitPanel := container.NewVBox(
 		widget.NewLabelWithStyle("File Splitter", fyne.TextAlignCenter, s),
