@@ -10,8 +10,8 @@ import (
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/binding"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/acheronfail/nxkit/lib/inject"
 )
@@ -76,73 +76,38 @@ func getPayloads() ([]string, error) {
 }
 
 func PayloadInjectorTab() fyne.CanvasObject {
-	emptyWidget := widget.NewLabel("No payloads found.")
-	emptyWidget.Hide()
+	emptyWidget := widget.NewLabelWithStyle("No payloads found.", fyne.TextAlignCenter, fyne.TextStyle{Monospace: true})
 	output := widget.NewMultiLineEntry()
 	output.SetPlaceHolder("Payload injection log")
 	output.Disable()
 	output.Hide()
 
-	payloads := binding.NewStringList()
-	payloadList := widget.NewListWithData(payloads,
-		func() fyne.CanvasObject {
-			return container.New(layout.NewHBoxLayout(),
-				widget.NewLabel("<payload>"),
-				layout.NewSpacer(),
-				widget.NewButton("Inject", func() {}),
-			)
-		},
-		func(i binding.DataItem, o fyne.CanvasObject) {
-			payloadPath, err := i.(binding.String).Get()
-			if err != nil {
-				showError(err)
-				return
-			}
-
-			basename := filepath.Base(payloadPath)
-			container := o.(*fyne.Container)
-
-			label := container.Objects[0].(*widget.Label)
-			label.SetText(basename)
-
-			button := container.Objects[2].(*widget.Button)
-			button.OnTapped = func() {
-				output.Show()
-				output.SetText(fmt.Sprintf("Injecting %s...\n", basename))
-				runAsync(nil, func() error {
-					return inject.Inject(payloadPath)
-				}, func() {
-					output.SetText(output.Text + "Payload injection complete.\n")
-				})
-			}
-		},
-	)
-
-	// prevent selections
-	payloadList.OnSelected = func(_ widget.ListItemID) {
-		payloadList.UnselectAll()
-	}
-
-	listContainer := container.New(layout.NewVBoxLayout(),
-		widget.NewLabel("Available Payloads:"),
-		payloadList,
-	)
+	payloadRows := container.New(layout.NewCustomPaddedVBoxLayout(0))
+	payloadList := container.NewVScroll(payloadRows)
+	payloadListContent := container.NewStack(payloadList)
+	payloadListPanel := newNandListPanel(payloadListContent)
 
 	reloadPaths := func() {
 		payloadPaths, err := getPayloads()
 		if err != nil {
 			showError(err)
-		} else {
-			payloads.Set(payloadPaths)
+			return
 		}
 
 		if len(payloadPaths) > 0 {
-			emptyWidget.Hide()
-			payloadList.Show()
+			rows := make([]fyne.CanvasObject, 0, len(payloadPaths))
+			for i, payloadPath := range payloadPaths {
+				rows = append(rows, newPayloadListRow(payloadPath, i, output))
+			}
+			payloadRows.Objects = rows
+			payloadRows.Refresh()
+			payloadListContent.Objects = []fyne.CanvasObject{payloadList}
 		} else {
-			emptyWidget.Show()
-			payloadList.Hide()
+			payloadRows.Objects = nil
+			payloadRows.Refresh()
+			payloadListContent.Objects = []fyne.CanvasObject{container.NewCenter(emptyWidget)}
 		}
+		payloadListContent.Refresh()
 	}
 
 	reloadPaths()
@@ -216,7 +181,7 @@ func PayloadInjectorTab() fyne.CanvasObject {
 		})
 	}
 
-	tab := container.NewVBox(
+	top := container.NewVBox(
 		widget.NewRichTextFromMarkdown("Choose a payload to inject to a Switch in RCM mode."),
 		container.NewHBox(
 			widget.NewButton("Refresh", reloadPaths),
@@ -226,8 +191,10 @@ func PayloadInjectorTab() fyne.CanvasObject {
 			}),
 			layout.NewSpacer(),
 		),
-		listContainer,
-		emptyWidget,
+		widget.NewLabelWithStyle("Available Payloads", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
+	)
+
+	bottom := container.NewVBox(
 		widget.NewSeparator(),
 		container.NewHBox(
 			widget.NewLabel("Go download a payload:"),
@@ -242,7 +209,20 @@ func PayloadInjectorTab() fyne.CanvasObject {
 		helpMarkdown,
 	)
 
-	return tab
+	return container.NewBorder(top, bottom, nil, nil, payloadListPanel)
+}
+
+func newPayloadListRow(payloadPath string, index int, output *widget.Entry) fyne.CanvasObject {
+	return newActionListRow(filepath.Base(payloadPath), index, theme.FileIcon(), "Inject", false, func() {
+		basename := filepath.Base(payloadPath)
+		output.Show()
+		output.SetText(fmt.Sprintf("Injecting %s...\n", basename))
+		runAsync(nil, func() error {
+			return inject.Inject(payloadPath)
+		}, func() {
+			output.SetText(output.Text + "Payload injection complete.\n")
+		})
+	})
 }
 
 func payloadHelpMarkdown() string {

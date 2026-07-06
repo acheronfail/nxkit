@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -57,6 +58,8 @@ var (
 	nandListDropTargetColor = color.NRGBA{R: 0x1f, G: 0x36, B: 0x2d, A: 0xff}
 )
 
+const nandDirectoryOpenTapThreshold = 350 * time.Millisecond
+
 type nandExplorerState struct {
 	path       string
 	readOnly   bool
@@ -91,6 +94,7 @@ type nandFileListRow struct {
 	dragging    bool
 	dropTarget  bool
 	lastDragPos fyne.Position
+	lastTapAt   time.Time
 	hasDragged  bool
 	onSelect    func(string)
 	onOpenDir   func(string)
@@ -117,38 +121,29 @@ func NandExplorerTab() fyne.CanvasObject {
 	}
 	status := widget.NewLabel("Choose your rawnand.bin or rawnand.bin.00 file to begin.")
 	status.Wrapping = fyne.TextWrapWord
-	readOnly := widget.NewCheck("Read-Only", func(checked bool) {
+	readOnly := widget.NewCheck("Read-Only Mode", func(checked bool) {
 		model.readOnly = checked
 	})
 	readOnly.SetChecked(true)
 
-	content := container.NewStack(widget.NewLabel("No NAND is open."))
+	content := container.NewStack()
 	setContent := func(object fyne.CanvasObject) {
 		content.Objects = []fyne.CanvasObject{object}
 		content.Refresh()
 	}
 	selectedPath := widget.NewLabel("No entry selected")
+	selectedPath.Wrapping = fyne.TextWrapBreak
+	selectedPath.TextStyle = fyne.TextStyle{Monospace: true}
 
 	var rebuildPartitions func()
 	var rebuildMounted func()
 	var chooseNand *widget.Button
 	var closeButton *widget.Button
-	var topControls *fyne.Container
 	var choosePartitionButton *widget.Button
+	var showInitialScreen func()
 	copyInProgress := false
-	refreshTopControls := func() {
-		if topControls == nil || chooseNand == nil || closeButton == nil {
-			return
-		}
-		controls := make([]fyne.CanvasObject, 0, 3)
-		if model.raw == nil {
-			controls = append(controls, chooseNand)
-		} else {
-			controls = append(controls, closeButton)
-		}
-		controls = append(controls, layout.NewSpacer(), readOnly)
-		topControls.Objects = controls
-		topControls.Refresh()
+	nandHeader := func() *fyne.Container {
+		return container.NewVBox(status, container.NewHBox(closeButton, layout.NewSpacer(), readOnly))
 	}
 	updateCopyControls := func() {
 		if closeButton != nil {
@@ -178,10 +173,8 @@ func NandExplorerTab() fyne.CanvasObject {
 		model.nodeCache = map[string][]nandNode{}
 		model.nodeLookup = map[string]nandNode{"/": {name: "/", path: "/", isDir: true}}
 		readOnly.Enable()
-		status.SetText("Choose your rawnand.bin or rawnand.bin.00 file to begin.")
 		choosePartitionButton = nil
-		setContent(widget.NewLabel("No NAND is open."))
-		refreshTopControls()
+		showInitialScreen()
 		updateCopyControls()
 	}
 
@@ -262,7 +255,7 @@ func NandExplorerTab() fyne.CanvasObject {
 
 	rebuildPartitions = func() {
 		if model.table == nil {
-			setContent(widget.NewLabel("No NAND is open."))
+			showInitialScreen()
 			return
 		}
 		choosePartitionButton = nil
@@ -277,9 +270,10 @@ func NandExplorerTab() fyne.CanvasObject {
 				nil,
 				nil,
 				nil,
-				newNandListPanel(container.NewPadded(partitions)),
+				newNandListPanel(container.NewVScroll(partitions)),
 			),
 		)
+		rowIndex := 0
 		for _, part := range model.table.Partitions {
 			if part == nil {
 				continue
@@ -287,7 +281,8 @@ func NandExplorerTab() fyne.CanvasObject {
 			info := nxPartitionInfoFor(part)
 			mountable := isMountablePartition(info)
 			size := formatBytes(int64(part.Size))
-			button := widget.NewButton("Mount", func(p *gpt.Partition) func() {
+			title := fmt.Sprintf("%s (%s, %s)", part.Name, strings.ToUpper(info.format), size)
+			row := newActionListRow(title, rowIndex, theme.FileApplicationIcon(), "Mount", !mountable, func(p *gpt.Partition) func() {
 				return func() {
 					runAsync(nil, func() error {
 						return mountPartition(p)
@@ -297,19 +292,16 @@ func NandExplorerTab() fyne.CanvasObject {
 					})
 				}
 			}(part))
-			if !mountable {
-				button.Disable()
-			}
-			row := container.NewBorder(nil, nil, widget.NewLabel(fmt.Sprintf("%s (%s, %s)", part.Name, strings.ToUpper(info.format), size)), button)
 			partitions.Add(row)
+			rowIndex++
 		}
-		setContent(partitionsList)
+		setContent(container.NewBorder(nandHeader(), nil, nil, nil, partitionsList))
 	}
 
 	rebuildMounted = func() {
 		currentDir := "/"
-		currentDirLabel := widget.NewLabel("Current directory: /")
-		currentDirLabel.TextStyle = fyne.TextStyle{Monospace: true}
+		currentDirLabel := widget.NewLabelWithStyle("/", fyne.TextAlignCenter, fyne.TextStyle{Bold: true, Monospace: true})
+		currentDirLabel.Wrapping = fyne.TextWrapBreak
 		listRows := container.New(layout.NewCustomPaddedVBoxLayout(0))
 		fileList := container.NewVScroll(listRows)
 		var renderedRows []*nandFileListRow
@@ -355,7 +347,7 @@ func NandExplorerTab() fyne.CanvasObject {
 				path = "/"
 			}
 			currentDir = path
-			currentDirLabel.SetText("Current directory: " + currentDir)
+			currentDirLabel.SetText(currentDir)
 			selectedPath.SetText("No entry selected")
 			refreshFileList()
 		}
@@ -687,38 +679,36 @@ func NandExplorerTab() fyne.CanvasObject {
 		updateCopyControls()
 		top := container.NewVBox(
 			widget.NewLabelWithStyle("Currently exploring "+model.part.Name, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-			currentDirLabel,
 			container.NewHBox(choosePartitionButton, layout.NewSpacer()),
+			currentDirLabel,
 		)
 		bottom := container.NewVBox(selectedPath, container.NewHBox(exportButton, importButton, newFolderButton, deleteButton), copyProgressContainer)
-		setContent(container.NewBorder(top, bottom, nil, nil, newNandListPanel(fileList)))
+		setContent(container.NewBorder(nandHeader(), nil, nil, nil, container.NewBorder(top, bottom, nil, nil, newNandListPanel(fileList))))
 	}
 
-	chooseNand = widget.NewButton("Choose NAND", func() {
+	chooseNand = widget.NewButton("Open NAND", func() {
 		chooseNativeFile("Choose NAND dump", nil, func(path string) {
 			runAsync(nil, func() error {
 				return openDump(path)
 			}, func() {
 				readOnly.Disable()
 				status.SetText("Opened " + path)
-				refreshTopControls()
 				updateCopyControls()
 				rebuildPartitions()
 			})
 		})
 	})
 	closeButton = widget.NewButton("Close NAND", closeNand)
-	topControls = container.NewHBox()
-	refreshTopControls()
+	showInitialScreen = func() {
+		setContent(container.NewStack(
+			container.NewCenter(chooseNand),
+			container.NewBorder(nil, container.NewHBox(layout.NewSpacer(), readOnly, layout.NewSpacer()), nil, nil),
+		))
+	}
+	showInitialScreen()
 	updateCopyControls()
 
-	return container.NewBorder(
-		container.NewVBox(status, topControls),
-		nil,
-		nil,
-		nil,
-		content,
-	)
+	return content
 }
 
 func nxPartitionInfoFor(part *gpt.Partition) nxPartitionInfo {
@@ -838,11 +828,16 @@ func (r *nandFileListRow) Tapped(_ *fyne.PointEvent) {
 	if r.onSelect != nil {
 		r.onSelect(r.node.path)
 	}
-	if r.node.isDir {
-		if r.onOpenDir != nil {
-			r.onOpenDir(r.node.path)
-		}
+	if !r.node.isDir || r.onOpenDir == nil {
+		return
 	}
+	now := time.Now()
+	if !r.lastTapAt.IsZero() && now.Sub(r.lastTapAt) <= nandDirectoryOpenTapThreshold {
+		r.lastTapAt = time.Time{}
+		r.onOpenDir(r.node.path)
+		return
+	}
+	r.lastTapAt = now
 }
 
 func (r *nandFileListRow) Dragged(event *fyne.DragEvent) {

@@ -32,8 +32,8 @@ func StartGuiApp(options Options) {
 	})
 
 	tabs := container.NewAppTabs(
-		container.NewTabItem("NRO Forwarder", NroForwarderTab()),
 		container.NewTabItem("Payload Injector", PayloadInjectorTab()),
+		container.NewTabItem("NRO Forwarder", NroForwarderTab()),
 		container.NewTabItem("NAND Explorer", NandExplorerTab()),
 		container.NewTabItem("Tools", ToolsTab()),
 		container.NewTabItem("Settings", SettingsTab()),
