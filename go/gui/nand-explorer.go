@@ -144,8 +144,10 @@ func NandExplorerTab() fyne.CanvasObject {
 	var chooseNand *widget.Button
 	var closeButton *widget.Button
 	var choosePartitionButton *widget.Button
+	var repairPartitionTableButton *widget.Button
 	var showInitialScreen func()
 	copyInProgress := false
+	repairInProgress := false
 	updateOpenNandImportance = func() {
 		if chooseNand == nil {
 			return
@@ -157,24 +159,43 @@ func NandExplorerTab() fyne.CanvasObject {
 		}
 		chooseNand.Refresh()
 	}
+	updateAdvancedControls := func() {
+		if repairPartitionTableButton == nil {
+			return
+		}
+		if state.ShowAdvanced && model.raw != nil {
+			repairPartitionTableButton.Show()
+		} else {
+			repairPartitionTableButton.Hide()
+		}
+		if model.raw == nil || model.readOnly || copyInProgress || repairInProgress {
+			repairPartitionTableButton.Disable()
+		} else {
+			repairPartitionTableButton.Enable()
+		}
+	}
+	state.OnAdvancedSettingsChanged(func(bool) {
+		updateAdvancedControls()
+	})
 	nandHeader := func() *fyne.Container {
-		return container.NewVBox(status, container.NewHBox(closeButton, layout.NewSpacer(), readOnly))
+		return container.NewVBox(status, container.NewHBox(closeButton, repairPartitionTableButton, layout.NewSpacer(), readOnly))
 	}
 	updateCopyControls := func() {
 		if closeButton != nil {
-			if copyInProgress {
+			if copyInProgress || repairInProgress {
 				closeButton.Disable()
 			} else if model.raw != nil {
 				closeButton.Enable()
 			}
 		}
 		if choosePartitionButton != nil {
-			if copyInProgress {
+			if copyInProgress || repairInProgress {
 				choosePartitionButton.Disable()
 			} else {
 				choosePartitionButton.Enable()
 			}
 		}
+		updateAdvancedControls()
 	}
 	closeNand := func() {
 		if model.raw != nil {
@@ -231,6 +252,46 @@ func NandExplorerTab() fyne.CanvasObject {
 			return
 		}
 		dialog.ShowInformation("Partition table", "Partition table is valid.", mainWindow)
+	}
+
+	repairPartitionTable := func() error {
+		if model.raw == nil {
+			return fmt.Errorf("no NAND is open")
+		}
+		if model.readOnly {
+			return fmt.Errorf("reopen the NAND with read-only mode disabled before repairing the partition table")
+		}
+		stat, err := model.raw.Stat()
+		if err != nil {
+			return err
+		}
+		if stat.Size() < nand.MinimumSwitchGPTSize() {
+			return fmt.Errorf("NAND is too small for a Switch GPT backup: %s is smaller than %s", formatBytes(stat.Size()), formatBytes(nand.MinimumSwitchGPTSize()))
+		}
+		writable, err := model.raw.Writable()
+		if err != nil {
+			return err
+		}
+		table := nand.BuildSwitchGPTTable(model.table)
+		if err := table.Write(writable, stat.Size()); err != nil {
+			return err
+		}
+		if file, err := model.raw.Sys(); err == nil && file != nil {
+			_ = file.Sync()
+		}
+		table, err = gpt.Read(model.raw, int(nand.SectorSize), int(nand.SectorSize))
+		if err != nil {
+			return fmt.Errorf("partition table was written but could not be read back: %w", err)
+		}
+		if err := table.Verify(model.raw, uint64(stat.Size())); err != nil {
+			return fmt.Errorf("partition table was written but verification failed: %w", err)
+		}
+		model.table = table
+		model.fs = nil
+		model.part = nil
+		model.nodeCache = map[string][]nandNode{}
+		model.nodeLookup = map[string]nandNode{"/": {name: "/", path: "/", isDir: true}}
+		return nil
 	}
 
 	mountPartition := func(part *gpt.Partition) error {
@@ -717,6 +778,32 @@ func NandExplorerTab() fyne.CanvasObject {
 	updateOpenNandImportance()
 	closeButton = widget.NewButton("Close NAND", closeNand)
 	closeButton.Importance = widget.DangerImportance
+	repairPartitionTableButton = widget.NewButton("Repair partition table", func() {
+		dialog.ShowConfirm(
+			"Repair partition table",
+			"This rewrites the Switch GPT layout, including the primary and backup partition tables. Continue only if you have a NAND backup.",
+			func(ok bool) {
+				if !ok {
+					return
+				}
+				runAsync(func(loading bool) {
+					repairInProgress = loading
+					if loading {
+						status.SetText("Repairing partition table...")
+					}
+					updateCopyControls()
+				}, repairPartitionTable, func() {
+					status.SetText("Partition table repaired for " + model.path)
+					updateCopyControls()
+					rebuildPartitions()
+					dialog.ShowInformation("Partition table", "Partition table repair completed.", mainWindow)
+				})
+			},
+			mainWindow,
+		)
+	})
+	repairPartitionTableButton.Importance = widget.DangerImportance
+	updateAdvancedControls()
 	showInitialScreen = func() {
 		setContent(container.NewStack(
 			container.NewCenter(chooseNand),

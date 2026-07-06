@@ -18,7 +18,7 @@ func SettingsTab() fyne.CanvasObject {
 	description := widget.NewRichTextFromMarkdown("Prod keys are required for creating NSPs with the NRO Forwarder and for reading encrypted NAND partitions.")
 	description.Wrapping = fyne.TextWrapWord
 	advanced := widget.NewCheck("Show Advanced Settings", func(checked bool) {
-		state.ShowAdvanced = checked
+		state.SetShowAdvanced(checked)
 	})
 	advanced.SetChecked(state.ShowAdvanced)
 

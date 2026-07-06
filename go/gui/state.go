@@ -27,6 +27,7 @@ type appState struct {
 	KeysPath            string
 	Keys                *keys.Keys
 	ShowAdvanced        bool
+	advancedListeners   []func(bool)
 }
 
 var packagedBuild = "false"
@@ -105,6 +106,20 @@ func (s *appState) SetKeysPath(path string) error {
 func (s *appState) ClearKeys() {
 	s.KeysPath = ""
 	s.Keys = nil
+}
+
+func (s *appState) SetShowAdvanced(show bool) {
+	if s.ShowAdvanced == show {
+		return
+	}
+	s.ShowAdvanced = show
+	for _, listener := range s.advancedListeners {
+		listener(show)
+	}
+}
+
+func (s *appState) OnAdvancedSettingsChanged(listener func(bool)) {
+	s.advancedListeners = append(s.advancedListeners, listener)
 }
 
 func showError(err error) {
