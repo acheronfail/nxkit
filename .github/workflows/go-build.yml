@@ -262,4 +262,4 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t files < <(find release-assets -type f | sort)
-          gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
