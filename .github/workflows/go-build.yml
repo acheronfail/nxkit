@@ -100,7 +100,7 @@ jobs:
             artifact-path: go/dist/NXKit-macos-amd64.app.tar.gz
           - target: windows-amd64
             os: windows-latest
-            artifact-path: go/dist/nxkit-windows-amd64.exe
+            artifact-path: go/dist/nxkit-windows-amd64.zip
 
     steps:
       - name: Checkout repository
@@ -176,6 +176,45 @@ jobs:
           BUILD_NUMBER: ${{ github.run_number }}
           CGO_ENABLED: '1'
         run: just package
+
+      - name: Bundle Windows runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msys2 = '${{ steps.msys2.outputs.msys2-location }}'
+          $dist = (Resolve-Path 'go/dist').Path
+          $exe = Join-Path $dist 'nxkit-windows-amd64.exe'
+          $zip = Join-Path $dist 'nxkit-windows-amd64.zip'
+          $ucrtBin = Join-Path $msys2 'ucrt64\bin'
+          $requiredDlls = @('libusb-1.0.dll')
+          $optionalDlls = @('libwinpthread-1.dll', 'libgcc_s_seh-1.dll')
+
+          if (!(Test-Path $exe)) {
+            throw "Windows executable not found at $exe"
+          }
+
+          $archivePaths = @($exe)
+          foreach ($dll in $requiredDlls) {
+            $source = Join-Path $ucrtBin $dll
+            if (!(Test-Path $source)) {
+              throw "MSYS2 runtime dependency not found at $source"
+            }
+
+            $destination = Join-Path $dist $dll
+            Copy-Item $source $destination -Force
+            $archivePaths += $destination
+          }
+
+          foreach ($dll in $optionalDlls) {
+            $source = Join-Path $ucrtBin $dll
+            if (Test-Path $source) {
+              $destination = Join-Path $dist $dll
+              Copy-Item $source $destination -Force
+              $archivePaths += $destination
+            }
+          }
+
+          Compress-Archive -LiteralPath $archivePaths -DestinationPath $zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
