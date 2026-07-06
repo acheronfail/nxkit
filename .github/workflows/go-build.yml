@@ -95,7 +95,7 @@ jobs:
             artifact-path: go/dist/NXKit-macos-amd64.app.tar.gz
           - target: windows-amd64
             os: windows-latest
-            artifact-path: go/dist/nxkit-windows-amd64.zip
+            artifact-path: go/dist/nxkit-windows-amd64/*
 
     steps:
       - name: Checkout repository
@@ -175,7 +175,7 @@ jobs:
           $msys2 = '${{ steps.msys2.outputs.msys2-location }}'
           $dist = (Resolve-Path 'go/dist').Path
           $exe = Join-Path $dist 'nxkit-windows-amd64.exe'
-          $zip = Join-Path $dist 'nxkit-windows-amd64.zip'
+          $bundleDir = Join-Path $dist 'nxkit-windows-amd64'
           $ucrtBin = Join-Path $msys2 'ucrt64\bin'
           $requiredDlls = @('libusb-1.0.dll')
           $optionalDlls = @('libwinpthread-1.dll', 'libgcc_s_seh-1.dll')
@@ -184,28 +184,26 @@ jobs:
             throw "Windows executable not found at $exe"
           }
 
-          $archivePaths = @($exe)
+          New-Item -ItemType Directory -Path $bundleDir -Force | Out-Null
+          Copy-Item $exe (Join-Path $bundleDir 'nxkit-windows-amd64.exe') -Force
+
           foreach ($dll in $requiredDlls) {
             $source = Join-Path $ucrtBin $dll
             if (!(Test-Path $source)) {
               throw "MSYS2 runtime dependency not found at $source"
             }
 
-            $destination = Join-Path $dist $dll
+            $destination = Join-Path $bundleDir $dll
             Copy-Item $source $destination -Force
-            $archivePaths += $destination
           }
 
           foreach ($dll in $optionalDlls) {
             $source = Join-Path $ucrtBin $dll
             if (Test-Path $source) {
-              $destination = Join-Path $dist $dll
+              $destination = Join-Path $bundleDir $dll
               Copy-Item $source $destination -Force
-              $archivePaths += $destination
             }
           }
-
-          Compress-Archive -LiteralPath $archivePaths -DestinationPath $zip -Force
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
@@ -227,8 +225,27 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           pattern: '*-*'
-          merge-multiple: true
           path: release-artifacts
+
+      - name: Package release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v zip >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y zip
+          fi
+
+          mkdir -p release-assets
+
+          cp release-artifacts/linux-amd64/nxkit-linux-amd64 release-assets/
+          cp release-artifacts/macos-arm64/NXKit-macos-arm64.app.tar.gz release-assets/
+          cp release-artifacts/macos-amd64/NXKit-macos-amd64.app.tar.gz release-assets/
+
+          (
+            cd release-artifacts/windows-amd64
+            zip -r ../../release-assets/nxkit-windows-amd64.zip .
+          )
 
       - name: Create GitHub release
         shell: bash
@@ -236,5 +253,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          mapfile -t files < <(find release-artifacts -type f | sort)
+          mapfile -t files < <(find release-assets -type f | sort)
           gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
