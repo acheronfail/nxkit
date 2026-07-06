@@ -28,7 +28,7 @@ export function getResources(isPackaged: boolean) {
   const resources = {
     tegraRcmSmash: isPackaged
       ? path.resolve(process.resourcesPath, 'TegraRcmSmash.exe')
-      : path.resolve('vendor', 'TegraRcmSmash', 'TegraRcmSmash.exe'),
+      : path.resolve('..', 'vendor', 'TegraRcmSmash', 'TegraRcmSmash.exe'),
   } satisfies Record<string, string>;
 
   return resources;

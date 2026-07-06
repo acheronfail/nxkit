@@ -99,9 +99,9 @@ precommit.diff
 *.cpuprofile
 bench.json
 bench.formatted.json
-scripts/*.wasm
-scripts/build/
-scripts/bench100m.js
+legacy/scripts/*.wasm
+legacy/scripts/build/
+legacy/scripts/bench100m.js
 .bin/
 .tmp/
 go/dist/
