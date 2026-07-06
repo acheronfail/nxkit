@@ -69,15 +69,15 @@ type nandExplorerState struct {
 }
 
 type nandNode struct {
-	name  string
-	path  string
-	size  int64
-	isDir bool
+	name     string
+	path     string
+	size     int64
+	isDir    bool
+	isParent bool
 }
 
 type visibleNandNode struct {
 	node  nandNode
-	depth int
 	index int
 }
 
@@ -85,17 +85,15 @@ type nandFileListRow struct {
 	widget.BaseWidget
 
 	node        nandNode
-	depth       int
 	index       int
 	selected    bool
-	expanded    bool
 	readOnly    bool
 	dragging    bool
 	dropTarget  bool
 	lastDragPos fyne.Position
 	hasDragged  bool
 	onSelect    func(string)
-	onToggle    func(string)
+	onOpenDir   func(string)
 	onDragMove  func(string, fyne.Position)
 	onDragEnd   func(string, fyne.Position)
 }
@@ -103,10 +101,13 @@ type nandFileListRow struct {
 type nandFileListRowRenderer struct {
 	row        *nandFileListRow
 	background *canvas.Rectangle
-	icon       *widget.Icon
-	label      *widget.Label
+	typeIcon   *widget.Icon
+	nameText   *canvas.Text
+	sizeText   *canvas.Text
 	objects    []fyne.CanvasObject
 }
+
+type nandCopyProgressFunc func(string, int64)
 
 func NandExplorerTab() fyne.CanvasObject {
 	model := &nandExplorerState{
@@ -130,6 +131,41 @@ func NandExplorerTab() fyne.CanvasObject {
 
 	var rebuildPartitions func()
 	var rebuildMounted func()
+	var chooseNand *widget.Button
+	var closeButton *widget.Button
+	var topControls *fyne.Container
+	var choosePartitionButton *widget.Button
+	copyInProgress := false
+	refreshTopControls := func() {
+		if topControls == nil || chooseNand == nil || closeButton == nil {
+			return
+		}
+		controls := make([]fyne.CanvasObject, 0, 3)
+		if model.raw == nil {
+			controls = append(controls, chooseNand)
+		} else {
+			controls = append(controls, closeButton)
+		}
+		controls = append(controls, layout.NewSpacer(), readOnly)
+		topControls.Objects = controls
+		topControls.Refresh()
+	}
+	updateCopyControls := func() {
+		if closeButton != nil {
+			if copyInProgress {
+				closeButton.Disable()
+			} else if model.raw != nil {
+				closeButton.Enable()
+			}
+		}
+		if choosePartitionButton != nil {
+			if copyInProgress {
+				choosePartitionButton.Disable()
+			} else {
+				choosePartitionButton.Enable()
+			}
+		}
+	}
 	closeNand := func() {
 		if model.raw != nil {
 			_ = model.raw.Close()
@@ -143,7 +179,10 @@ func NandExplorerTab() fyne.CanvasObject {
 		model.nodeLookup = map[string]nandNode{"/": {name: "/", path: "/", isDir: true}}
 		readOnly.Enable()
 		status.SetText("Choose your rawnand.bin or rawnand.bin.00 file to begin.")
+		choosePartitionButton = nil
 		setContent(widget.NewLabel("No NAND is open."))
+		refreshTopControls()
+		updateCopyControls()
 	}
 
 	openDump := func(path string) error {
@@ -226,6 +265,7 @@ func NandExplorerTab() fyne.CanvasObject {
 			setContent(widget.NewLabel("No NAND is open."))
 			return
 		}
+		choosePartitionButton = nil
 		partitions := container.NewVBox()
 		partitionsList := container.NewBorder(
 			widget.NewLabelWithStyle("Choose a partition to explore", fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
@@ -237,7 +277,7 @@ func NandExplorerTab() fyne.CanvasObject {
 				nil,
 				nil,
 				nil,
-				newNandListPanel(partitions),
+				newNandListPanel(container.NewPadded(partitions)),
 			),
 		)
 		for _, part := range model.table.Partitions {
@@ -267,29 +307,31 @@ func NandExplorerTab() fyne.CanvasObject {
 	}
 
 	rebuildMounted = func() {
-		expanded := map[string]bool{"/": true}
-		listRows := container.NewVBox()
+		currentDir := "/"
+		currentDirLabel := widget.NewLabel("Current directory: /")
+		currentDirLabel.TextStyle = fyne.TextStyle{Monospace: true}
+		listRows := container.New(layout.NewCustomPaddedVBoxLayout(0))
 		fileList := container.NewVScroll(listRows)
 		var renderedRows []*nandFileListRow
-		rowByPath := map[string]*nandFileListRow{}
 		var refreshFileList func()
 		var dragPopup *widget.PopUp
 		var dragPopupLabel *widget.Label
 		var dragTargetPath string
-		loadingDirs := map[string]bool{}
 
 		selectedDirPath := func() string {
-			dirPath := selectedPath.Text
-			if dirPath == "" || dirPath == "No entry selected" {
+			if currentDir == "" || currentDir == "." {
 				return "/"
 			}
-			if node, ok := model.nodeLookup[dirPath]; ok && !node.isDir {
-				dirPath = filepath.Dir(dirPath)
+			return currentDir
+		}
+
+		rowForPath := func(path string) (*nandFileListRow, bool) {
+			for _, row := range renderedRows {
+				if row.node.path == path {
+					return row, true
+				}
 			}
-			if dirPath == "." || dirPath == "" {
-				return "/"
-			}
-			return dirPath
+			return nil, false
 		}
 
 		selectPath := func(path string) {
@@ -298,20 +340,30 @@ func NandExplorerTab() fyne.CanvasObject {
 				return
 			}
 			selectedPath.SetText(path)
-			if previousRow, ok := rowByPath[previousPath]; ok && previousRow.selected {
+			if previousRow, ok := rowForPath(previousPath); ok && previousRow.selected {
 				previousRow.selected = false
 				previousRow.Refresh()
 			}
-			if nextRow, ok := rowByPath[path]; ok && !nextRow.selected {
+			if nextRow, ok := rowForPath(path); ok && !nextRow.selected {
 				nextRow.selected = true
 				nextRow.Refresh()
 			}
 		}
 
+		navigateToDir := func(path string) {
+			if path == "" || path == "." {
+				path = "/"
+			}
+			currentDir = path
+			currentDirLabel.SetText("Current directory: " + currentDir)
+			selectedPath.SetText("No entry selected")
+			refreshFileList()
+		}
+
 		rowAtAbsolute := func(position fyne.Position, sourcePath string) (nandNode, bool) {
 			driver := fyne.CurrentApp().Driver()
 			for _, row := range renderedRows {
-				if row.node.path == sourcePath || !row.node.isDir {
+				if row.node.path == sourcePath || !row.node.isDir || row.node.isParent {
 					continue
 				}
 				if sourcePath != "" && isSameOrDescendantNandPath(row.node.path, sourcePath) {
@@ -333,16 +385,15 @@ func NandExplorerTab() fyne.CanvasObject {
 			if model.readOnly || sourcePath == "/" {
 				return
 			}
-			target, ok := rowAtAbsolute(position, sourcePath)
-			if !ok {
-				return
+			targetPath := currentDir
+			if target, ok := rowAtAbsolute(position, sourcePath); ok {
+				targetPath = target.path
 			}
 			runAsync(nil, func() error {
-				return model.moveEntry(sourcePath, target.path)
+				return model.moveEntry(sourcePath, targetPath)
 			}, func() {
-				expanded[target.path] = true
 				model.invalidateAll()
-				selectedPath.SetText(nandChildPath(target.path, filepath.Base(sourcePath)))
+				selectedPath.SetText(nandChildPath(targetPath, filepath.Base(sourcePath)))
 				refreshFileList()
 			})
 		}
@@ -409,93 +460,39 @@ func NandExplorerTab() fyne.CanvasObject {
 			moveEntryToDropTarget(sourcePath, position)
 		}
 
-		togglePath := func(path string) {
-			if path == "/" {
-				return
-			}
-			if expanded[path] {
-				expanded[path] = false
-				if row, ok := rowByPath[path]; ok {
-					row.expanded = false
-					row.Refresh()
-				}
-				refreshFileList()
-				return
-			}
-			if _, ok := model.nodeCache[path]; ok {
-				expanded[path] = true
-				if row, ok := rowByPath[path]; ok {
-					row.expanded = true
-					row.Refresh()
-				}
-				refreshFileList()
-				return
-			}
-			if loadingDirs[path] {
-				return
-			}
-			loadingDirs[path] = true
-			status.SetText("Loading " + path)
-			go func() {
-				_, err := model.children(path)
-				fyne.Do(func() {
-					delete(loadingDirs, path)
-					if err != nil {
-						showError(err)
-						return
-					}
-					expanded[path] = true
-					if row, ok := rowByPath[path]; ok {
-						row.expanded = true
-						row.Refresh()
-					}
-					status.SetText(fmt.Sprintf("Mounted %s from %s", model.part.Name, model.path))
-					refreshFileList()
-				})
-			}()
-		}
-
 		refreshFileList = func() {
-			nodes, err := model.visibleNodes(expanded)
+			children, err := model.children(currentDir)
 			if err != nil {
 				status.SetText(err.Error())
 				return
 			}
+			nodes := make([]visibleNandNode, 0, len(children)+1)
+			if currentDir != "/" {
+				parent := filepath.Dir(currentDir)
+				if parent == "." || parent == "" {
+					parent = "/"
+				}
+				nodes = append(nodes, visibleNandNode{
+					node:  nandNode{name: "..", path: parent, isDir: true, isParent: true},
+					index: len(nodes),
+				})
+			}
+			for _, child := range children {
+				nodes = append(nodes, visibleNandNode{node: child, index: len(nodes)})
+			}
 			renderedRows = make([]*nandFileListRow, 0, len(nodes))
 			objects := make([]fyne.CanvasObject, 0, len(nodes))
 			for _, visible := range nodes {
-				row, ok := rowByPath[visible.node.path]
-				if !ok {
-					row = newNandFileListRow(
-						visible.node,
-						visible.depth,
-						visible.index,
-						visible.node.path == selectedPath.Text,
-						expanded[visible.node.path],
-						model.readOnly,
-						func(path string) {
-							selectPath(path)
-						},
-						func(path string) {
-							togglePath(path)
-						},
-						updateDragIndicator,
-						finishDrag,
-					)
-					rowByPath[visible.node.path] = row
-				}
-				row.Update(
+				row := newNandFileListRow(
 					visible.node,
-					visible.depth,
 					visible.index,
 					visible.node.path == selectedPath.Text,
-					expanded[visible.node.path],
 					model.readOnly,
 					func(path string) {
 						selectPath(path)
 					},
 					func(path string) {
-						togglePath(path)
+						navigateToDir(path)
 					},
 					updateDragIndicator,
 					finishDrag,
@@ -508,18 +505,87 @@ func NandExplorerTab() fyne.CanvasObject {
 		}
 		refreshFileList()
 
+		copyProgressLabel := widget.NewLabel("")
+		copyProgressLabel.Hide()
+		copyProgress := widget.NewProgressBar()
+		copyProgress.Hide()
+		copyProgressContainer := container.NewVBox(copyProgressLabel, copyProgress)
+		copyProgressContainer.Hide()
+
 		copyHostPathsIn := func(dirPath string, hostPaths []string) {
-			runAsync(nil, func() error {
+			if copyInProgress {
+				return
+			}
+			totalBytes := int64(1)
+			copiedBytes := int64(0)
+			copyProgress.Min = 0
+			copyProgress.Max = 1
+			copyProgress.TextFormatter = func() string {
+				return fmt.Sprintf("%s / %s", formatBytes(copiedBytes), formatBytes(totalBytes))
+			}
+			copyProgress.SetValue(0)
+			copyProgressLabel.SetText("Preparing copy into " + dirPath)
+			copyProgressLabel.Show()
+			copyProgress.Show()
+			copyProgressContainer.Show()
+			copyInProgress = true
+			updateCopyControls()
+			go func() {
+				countedBytes, countErr := countHostCopyBytes(hostPaths)
+				if countErr != nil {
+					fyne.Do(func() {
+						copyInProgress = false
+						updateCopyControls()
+						copyProgressContainer.Hide()
+						copyProgress.Hide()
+						copyProgressLabel.Hide()
+						showError(countErr)
+					})
+					return
+				}
+				if countedBytes > 0 {
+					fyne.DoAndWait(func() {
+						totalBytes = countedBytes
+					})
+				}
+				fyne.DoAndWait(func() {
+					copiedBytes = 0
+					copyProgressLabel.SetText("Copying into " + dirPath)
+					copyProgress.SetValue(0)
+				})
+				progress := func(hostPath string, copied int64) {
+					fyne.Do(func() {
+						copiedBytes += copied
+						copyProgressLabel.SetText("Copying " + filepath.Base(hostPath))
+						if totalBytes <= 0 {
+							copyProgress.SetValue(1)
+						} else {
+							copyProgress.SetValue(float64(copiedBytes) / float64(totalBytes))
+						}
+					})
+				}
+				var copyErr error
 				for _, hostPath := range hostPaths {
-					if err := model.copyPathIn(dirPath, hostPath); err != nil {
-						return err
+					if err := model.copyPathInWithProgress(dirPath, hostPath, progress); err != nil {
+						copyErr = err
+						break
 					}
 				}
-				return nil
-			}, func() {
-				model.invalidateAll()
-				refreshFileList()
-			})
+				fyne.Do(func() {
+					copyInProgress = false
+					updateCopyControls()
+					copyProgressContainer.Hide()
+					copyProgress.Hide()
+					copyProgressLabel.Hide()
+					if copyErr != nil {
+						showError(copyErr)
+						return
+					}
+					copyProgress.SetValue(1)
+					model.invalidateAll()
+					refreshFileList()
+				})
+			}()
 		}
 
 		importButton := widget.NewButton("Copy file in", func() {
@@ -547,7 +613,6 @@ func NandExplorerTab() fyne.CanvasObject {
 					return model.createDirectory(dirPath, name)
 				}, func() {
 					model.invalidate(dirPath)
-					expanded[dirPath] = true
 					refreshFileList()
 				})
 			}, mainWindow)
@@ -618,29 +683,37 @@ func NandExplorerTab() fyne.CanvasObject {
 			copyHostPathsIn(dirPath, hostPaths)
 		})
 
+		choosePartitionButton = widget.NewButton("Choose another partition", rebuildPartitions)
+		updateCopyControls()
 		top := container.NewVBox(
 			widget.NewLabelWithStyle("Currently exploring "+model.part.Name, fyne.TextAlignCenter, fyne.TextStyle{Bold: true}),
-			container.NewHBox(widget.NewButton("Choose another partition", rebuildPartitions), layout.NewSpacer()),
+			currentDirLabel,
+			container.NewHBox(choosePartitionButton, layout.NewSpacer()),
 		)
-		bottom := container.NewVBox(selectedPath, container.NewHBox(exportButton, importButton, newFolderButton, deleteButton))
+		bottom := container.NewVBox(selectedPath, container.NewHBox(exportButton, importButton, newFolderButton, deleteButton), copyProgressContainer)
 		setContent(container.NewBorder(top, bottom, nil, nil, newNandListPanel(fileList)))
 	}
 
-	chooseNand := widget.NewButton("Choose your rawnand.bin", func() {
+	chooseNand = widget.NewButton("Choose NAND", func() {
 		chooseNativeFile("Choose NAND dump", nil, func(path string) {
 			runAsync(nil, func() error {
 				return openDump(path)
 			}, func() {
 				readOnly.Disable()
 				status.SetText("Opened " + path)
+				refreshTopControls()
+				updateCopyControls()
 				rebuildPartitions()
 			})
 		})
 	})
-	closeButton := widget.NewButton("Close NAND", closeNand)
+	closeButton = widget.NewButton("Close NAND", closeNand)
+	topControls = container.NewHBox()
+	refreshTopControls()
+	updateCopyControls()
 
 	return container.NewBorder(
-		container.NewVBox(status, container.NewHBox(chooseNand, closeButton, layout.NewSpacer(), readOnly)),
+		container.NewVBox(status, topControls),
 		nil,
 		nil,
 		nil,
@@ -677,6 +750,48 @@ func newNandDragPreview(label *widget.Label) fyne.CanvasObject {
 	return container.NewMax(background, container.NewPadded(label))
 }
 
+func countHostCopyBytes(hostPaths []string) (int64, error) {
+	total := int64(0)
+	for _, hostPath := range hostPaths {
+		count, err := countHostCopyPathBytes(hostPath, true)
+		if err != nil {
+			return 0, err
+		}
+		total += count
+	}
+	return total, nil
+}
+
+func countHostCopyPathBytes(hostPath string, topLevel bool) (int64, error) {
+	info, err := os.Stat(hostPath)
+	if err != nil {
+		return 0, err
+	}
+	if !info.IsDir() {
+		if !info.Mode().IsRegular() {
+			if topLevel {
+				return 0, fmt.Errorf("cannot copy non-regular file into NAND: %s", hostPath)
+			}
+			return 0, nil
+		}
+		return info.Size(), nil
+	}
+
+	total := int64(0)
+	entries, err := os.ReadDir(hostPath)
+	if err != nil {
+		return 0, err
+	}
+	for _, entry := range entries {
+		childCount, err := countHostCopyPathBytes(filepath.Join(hostPath, entry.Name()), false)
+		if err != nil {
+			return 0, err
+		}
+		total += childCount
+	}
+	return total, nil
+}
+
 func partitionHasMagic(raw backend.Storage, part *gpt.Partition, info nxPartitionInfo) bool {
 	if len(info.magicBytes) == 0 {
 		return false
@@ -697,25 +812,21 @@ func partitionBackendHasMagic(partBackend backend.Storage, part *gpt.Partition, 
 
 func newNandFileListRow(
 	node nandNode,
-	depth int,
 	index int,
 	selected bool,
-	expanded bool,
 	readOnly bool,
 	onSelect func(string),
-	onToggle func(string),
+	onOpenDir func(string),
 	onDragMove func(string, fyne.Position),
 	onDragEnd func(string, fyne.Position),
 ) *nandFileListRow {
 	row := &nandFileListRow{
 		node:       node,
-		depth:      depth,
 		index:      index,
 		selected:   selected,
-		expanded:   expanded,
 		readOnly:   readOnly,
 		onSelect:   onSelect,
-		onToggle:   onToggle,
+		onOpenDir:  onOpenDir,
 		onDragMove: onDragMove,
 		onDragEnd:  onDragEnd,
 	}
@@ -723,65 +834,19 @@ func newNandFileListRow(
 	return row
 }
 
-func (r *nandFileListRow) Update(
-	node nandNode,
-	depth int,
-	index int,
-	selected bool,
-	expanded bool,
-	readOnly bool,
-	onSelect func(string),
-	onToggle func(string),
-	onDragMove func(string, fyne.Position),
-	onDragEnd func(string, fyne.Position),
-) {
-	changed := r.node != node ||
-		r.depth != depth ||
-		r.index != index ||
-		r.selected != selected ||
-		r.expanded != expanded ||
-		r.readOnly != readOnly
-	r.node = node
-	r.depth = depth
-	r.index = index
-	r.selected = selected
-	r.expanded = expanded
-	r.readOnly = readOnly
-	r.onSelect = onSelect
-	r.onToggle = onToggle
-	r.onDragMove = onDragMove
-	r.onDragEnd = onDragEnd
-	if changed {
-		r.Refresh()
-	}
-}
-
-func (r *nandFileListRow) Tapped(event *fyne.PointEvent) {
-	if r.node.isDir && r.node.path != "/" && event.Position.X <= float32(r.depth*24+36) {
-		if r.onToggle != nil {
-			r.onToggle(r.node.path)
-		}
-		return
-	}
+func (r *nandFileListRow) Tapped(_ *fyne.PointEvent) {
 	if r.onSelect != nil {
 		r.onSelect(r.node.path)
 	}
-}
-
-func (r *nandFileListRow) DoubleTapped(_ *fyne.PointEvent) {
-	if r.node.isDir && r.node.path != "/" {
-		if r.onToggle != nil {
-			r.onToggle(r.node.path)
+	if r.node.isDir {
+		if r.onOpenDir != nil {
+			r.onOpenDir(r.node.path)
 		}
-		return
-	}
-	if r.onSelect != nil {
-		r.onSelect(r.node.path)
 	}
 }
 
 func (r *nandFileListRow) Dragged(event *fyne.DragEvent) {
-	if r.readOnly || r.node.path == "/" {
+	if r.readOnly || r.node.path == "/" || r.node.isParent {
 		return
 	}
 	r.lastDragPos = event.AbsolutePosition
@@ -802,6 +867,9 @@ func (r *nandFileListRow) DragEnd() {
 }
 
 func (r *nandFileListRow) Cursor() desktop.Cursor {
+	if r.node.isDir || (!r.readOnly && r.node.path != "/") {
+		return desktop.PointerCursor
+	}
 	if r.readOnly || r.node.path == "/" {
 		return desktop.DefaultCursor
 	}
@@ -810,14 +878,21 @@ func (r *nandFileListRow) Cursor() desktop.Cursor {
 
 func (r *nandFileListRow) CreateRenderer() fyne.WidgetRenderer {
 	background := canvas.NewRectangle(nandListRowEvenColor)
-	icon := widget.NewIcon(nil)
-	label := widget.NewLabel("")
+	typeIcon := widget.NewIcon(nil)
+	nameText := canvas.NewText("", theme.Color(theme.ColorNameForeground))
+	nameText.TextStyle = fyne.TextStyle{Monospace: true}
+	nameText.TextSize = theme.Size(theme.SizeNameText)
+	sizeText := canvas.NewText("", theme.Color(theme.ColorNameForeground))
+	sizeText.Alignment = fyne.TextAlignTrailing
+	sizeText.TextStyle = fyne.TextStyle{Monospace: true}
+	sizeText.TextSize = theme.Size(theme.SizeNameText)
 	renderer := &nandFileListRowRenderer{
 		row:        r,
 		background: background,
-		icon:       icon,
-		label:      label,
-		objects:    []fyne.CanvasObject{background, icon, label},
+		typeIcon:   typeIcon,
+		nameText:   nameText,
+		sizeText:   sizeText,
+		objects:    []fyne.CanvasObject{background, typeIcon, nameText, sizeText},
 	}
 	renderer.Refresh()
 	return renderer
@@ -827,26 +902,63 @@ func (r *nandFileListRowRenderer) Layout(size fyne.Size) {
 	r.background.Move(fyne.NewPos(0, 0))
 	r.background.Resize(size)
 
-	iconSize := float32(20)
-	indent := float32(r.row.depth * 24)
-	iconX := indent + 8
+	iconSize := float32(16)
 	iconY := (size.Height - iconSize) / 2
-	r.icon.Move(fyne.NewPos(iconX, iconY))
-	r.icon.Resize(fyne.NewSize(iconSize, iconSize))
+	typeIconX := float32(6)
+	r.typeIcon.Move(fyne.NewPos(typeIconX, iconY))
+	r.typeIcon.Resize(fyne.NewSize(iconSize, iconSize))
 
-	labelX := indent + 36
-	if labelX > size.Width {
-		labelX = 0
+	nameX := typeIconX + iconSize + 6
+	if nameX > size.Width {
+		nameX = 0
 	}
-	r.label.Move(fyne.NewPos(labelX, 0))
-	r.label.Resize(fyne.NewSize(size.Width-labelX-8, size.Height))
+	sizeWidth := float32(0)
+	if !r.row.node.isDir {
+		sizeWidth = r.sizeText.MinSize().Width + 12
+	}
+	sizeX := size.Width - sizeWidth - 12
+	if sizeX < nameX {
+		sizeX = nameX
+	}
+	nameWidth := sizeX - nameX - 8
+	if nameWidth < 0 {
+		nameWidth = 0
+	}
+
+	displayName := truncateTextToWidth(r.row.node.name, nameWidth, r.nameText.TextSize, r.nameText.TextStyle)
+	if r.nameText.Text != displayName {
+		r.nameText.Text = displayName
+		r.nameText.Refresh()
+	}
+
+	nameHeight := r.nameText.MinSize().Height
+	nameY := (size.Height - nameHeight) / 2
+	if nameY < 0 {
+		nameY = 0
+		nameHeight = size.Height
+	}
+	r.nameText.Move(fyne.NewPos(nameX, nameY))
+	r.nameText.Resize(fyne.NewSize(nameWidth, nameHeight))
+
+	sizeHeight := r.sizeText.MinSize().Height
+	sizeY := (size.Height - sizeHeight) / 2
+	if sizeY < 0 {
+		sizeY = 0
+		sizeHeight = size.Height
+	}
+	r.sizeText.Move(fyne.NewPos(sizeX, sizeY))
+	r.sizeText.Resize(fyne.NewSize(sizeWidth, sizeHeight))
 }
 
 func (r *nandFileListRowRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(320, 40)
+	return fyne.NewSize(320, 28)
 }
 
 func (r *nandFileListRowRenderer) Refresh() {
+	r.nameText.Color = theme.Color(theme.ColorNameForeground)
+	r.nameText.TextSize = theme.Size(theme.SizeNameText)
+	r.sizeText.Color = theme.Color(theme.ColorNameForeground)
+	r.sizeText.TextSize = theme.Size(theme.SizeNameText)
 	if r.row.dropTarget {
 		r.background.FillColor = nandListDropTargetColor
 	} else if r.row.dragging {
@@ -860,21 +972,19 @@ func (r *nandFileListRowRenderer) Refresh() {
 	}
 	r.background.Refresh()
 
-	switch {
-	case r.row.node.path == "/" || !r.row.node.isDir:
-		r.icon.SetResource(nil)
-	case r.row.expanded:
-		r.icon.SetResource(theme.MenuDropDownIcon())
-	default:
-		r.icon.SetResource(theme.NavigateNextIcon())
-	}
-
 	if r.row.node.isDir {
-		r.label.SetText("[DIR] " + r.row.node.name)
+		if r.row.node.isParent {
+			r.typeIcon.SetResource(theme.NavigateBackIcon())
+		} else {
+			r.typeIcon.SetResource(theme.FolderIcon())
+		}
+		r.sizeText.Text = ""
 	} else {
-		r.label.SetText(fmt.Sprintf("%s (%s)", r.row.node.name, formatBytes(r.row.node.size)))
+		r.typeIcon.SetResource(theme.FileIcon())
+		r.sizeText.Text = formatBytes(r.row.node.size)
 	}
-	r.label.Refresh()
+	r.nameText.Refresh()
+	r.sizeText.Refresh()
 }
 
 func (r *nandFileListRowRenderer) Objects() []fyne.CanvasObject {
@@ -913,34 +1023,6 @@ func (n *nandExplorerState) children(path string) ([]nandNode, error) {
 	})
 	n.nodeCache[path] = children
 	return children, nil
-}
-
-func (n *nandExplorerState) visibleNodes(expanded map[string]bool) ([]visibleNandNode, error) {
-	root := nandNode{name: "/", path: "/", isDir: true}
-	n.nodeLookup["/"] = root
-	nodes := []visibleNandNode{{node: root, depth: 0, index: 0}}
-
-	var appendChildren func(path string, depth int) error
-	appendChildren = func(path string, depth int) error {
-		children, err := n.children(path)
-		if err != nil {
-			return err
-		}
-		for _, child := range children {
-			nodes = append(nodes, visibleNandNode{node: child, depth: depth, index: len(nodes)})
-			if child.isDir && expanded[child.path] {
-				if err := appendChildren(child.path, depth+1); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
-	}
-
-	if err := appendChildren("/", 1); err != nil {
-		return nil, err
-	}
-	return nodes, nil
 }
 
 func (n *nandExplorerState) invalidate(path string) {
@@ -983,20 +1065,28 @@ func (n *nandExplorerState) copyFileOut(pathInNand string, destPath string) erro
 }
 
 func (n *nandExplorerState) copyPathIn(dirPathInNand string, hostPath string) error {
+	return n.copyPathInWithProgress(dirPathInNand, hostPath, nil)
+}
+
+func (n *nandExplorerState) copyPathInWithProgress(dirPathInNand string, hostPath string, progress nandCopyProgressFunc) error {
 	inputInfo, err := os.Stat(hostPath)
 	if err != nil {
 		return err
 	}
 	if inputInfo.IsDir() {
-		return n.copyDirectoryIn(dirPathInNand, hostPath)
+		return n.copyDirectoryInWithProgress(dirPathInNand, hostPath, progress)
 	}
 	if !inputInfo.Mode().IsRegular() {
 		return fmt.Errorf("cannot copy non-regular file into NAND: %s", hostPath)
 	}
-	return n.copyFileIn(dirPathInNand, hostPath)
+	return n.copyFileInWithProgress(dirPathInNand, hostPath, progress)
 }
 
 func (n *nandExplorerState) copyDirectoryIn(dirPathInNand string, hostPath string) error {
+	return n.copyDirectoryInWithProgress(dirPathInNand, hostPath, nil)
+}
+
+func (n *nandExplorerState) copyDirectoryInWithProgress(dirPathInNand string, hostPath string, progress nandCopyProgressFunc) error {
 	name := filepath.Base(hostPath)
 	if err := validateNandChildName(name); err != nil {
 		return err
@@ -1016,7 +1106,7 @@ func (n *nandExplorerState) copyDirectoryIn(dirPathInNand string, hostPath strin
 			return err
 		}
 		if info.IsDir() {
-			if err := n.copyDirectoryIn(targetPath, childHostPath); err != nil {
+			if err := n.copyDirectoryInWithProgress(targetPath, childHostPath, progress); err != nil {
 				return err
 			}
 			continue
@@ -1024,7 +1114,7 @@ func (n *nandExplorerState) copyDirectoryIn(dirPathInNand string, hostPath strin
 		if !info.Mode().IsRegular() {
 			continue
 		}
-		if err := n.copyFileIn(targetPath, childHostPath); err != nil {
+		if err := n.copyFileInWithProgress(targetPath, childHostPath, progress); err != nil {
 			return err
 		}
 	}
@@ -1032,6 +1122,10 @@ func (n *nandExplorerState) copyDirectoryIn(dirPathInNand string, hostPath strin
 }
 
 func (n *nandExplorerState) copyFileIn(dirPathInNand string, hostPath string) error {
+	return n.copyFileInWithProgress(dirPathInNand, hostPath, nil)
+}
+
+func (n *nandExplorerState) copyFileInWithProgress(dirPathInNand string, hostPath string, progress nandCopyProgressFunc) error {
 	input, err := os.Open(hostPath)
 	if err != nil {
 		return err
@@ -1055,11 +1149,23 @@ func (n *nandExplorerState) copyFileIn(dirPathInNand string, hostPath string) er
 	for {
 		read, readErr := input.Read(buf)
 		if read > 0 {
-			written, writeErr := file.WriteAt(buf[:read], off)
-			if writeErr != nil {
-				return writeErr
+			chunk := buf[:read]
+			for len(chunk) > 0 {
+				written, writeErr := file.WriteAt(chunk, off)
+				if written > 0 {
+					off += int64(written)
+					chunk = chunk[written:]
+					if progress != nil {
+						progress(hostPath, int64(written))
+					}
+				}
+				if writeErr != nil {
+					return writeErr
+				}
+				if written == 0 {
+					return io.ErrUnexpectedEOF
+				}
 			}
-			off += int64(written)
 		}
 		if readErr == io.EOF {
 			return nil
@@ -1147,6 +1253,32 @@ func isSameOrDescendantNandPath(path string, parent string) bool {
 		return strings.HasPrefix(path, "/")
 	}
 	return strings.HasPrefix(path, parent+"/")
+}
+
+func truncateTextToWidth(text string, maxWidth float32, textSize float32, textStyle fyne.TextStyle) string {
+	if maxWidth <= 0 {
+		return ""
+	}
+	if fyne.MeasureText(text, textSize, textStyle).Width <= maxWidth {
+		return text
+	}
+	suffix := "..."
+	if fyne.MeasureText(suffix, textSize, textStyle).Width > maxWidth {
+		return ""
+	}
+	runes := []rune(text)
+	low := 0
+	high := len(runes)
+	for low < high {
+		mid := (low + high + 1) / 2
+		candidate := string(runes[:mid]) + suffix
+		if fyne.MeasureText(candidate, textSize, textStyle).Width <= maxWidth {
+			low = mid
+		} else {
+			high = mid - 1
+		}
+	}
+	return string(runes[:low]) + suffix
 }
 
 func (n *nandExplorerState) delete(pathInNand string) error {
