@@ -1,5 +1,17 @@
 go_dir := 'go'
 nxkit_image := 'nxkit'
+git_version := `
+tag="$(git describe --tags --exact-match --match 'v*' 2>/dev/null || true)"
+
+if printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+  printf '%s' "${tag#v}"
+else
+  sha="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
+  printf '0.0.0+%s' "$sha"
+fi
+`
+version := env_var_or_default("NXKIT_VERSION", git_version)
+buildVersion := env_var_or_default("NXKIT_BUILD_VERSION", "1")
 
 _default:
     just -l
@@ -45,10 +57,17 @@ package:
     #!/usr/bin/env bash
     set -euo pipefail
     cd go
+    export GOCACHE="${GOCACHE:-$PWD/../.gocache}"
+    trap 'rm -f resource_windows_*.syso' EXIT
 
     os="$(go env GOOS)"
     arch="$(go env GOARCH)"
     platform="$os"
+    version="{{ version }}"
+    build_version="{{ buildVersion }}"
+    if ! [[ "$build_version" =~ ^[0-9]+$ ]]; then
+      build_version="1"
+    fi
     if [[ "$os" == "darwin" ]]; then
       platform="macos"
     fi
@@ -59,6 +78,51 @@ package:
     fi
 
     mkdir -p dist
+    rm -f resource_windows_*.syso
+    if [[ "$os" == "windows" ]]; then
+      icon_path="resources/NXKit.ico"
+
+      version_core="${version%%[-+]*}"
+      IFS=. read -r ver_major ver_minor ver_patch <<< "$version_core"
+      for part in ver_major ver_minor ver_patch; do
+        if ! [[ "${!part:-}" =~ ^[0-9]+$ ]]; then
+          printf -v "$part" '%s' "0"
+        fi
+      done
+
+      arch_flag=()
+      case "$arch" in
+        amd64)
+          arch_flag=(-64)
+          ;;
+        arm)
+          arch_flag=(-arm)
+          ;;
+        arm64)
+          arch_flag=(-arm -64)
+          ;;
+      esac
+
+      (unset GOOS GOARCH; go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo \
+        -skip-versioninfo \
+        -icon "$icon_path" \
+        -o "resource_windows_${arch}.syso" \
+        "${arch_flag[@]}" \
+        -description "NXKit" \
+        -product-name "NXKit" \
+        -internal-name "${binary}" \
+        -original-name "${binary}" \
+        -file-version "$version" \
+        -product-version "$version" \
+        -ver-major "$ver_major" \
+        -ver-minor "$ver_minor" \
+        -ver-patch "$ver_patch" \
+        -ver-build "$build_version" \
+        -product-ver-major "$ver_major" \
+        -product-ver-minor "$ver_minor" \
+        -product-ver-patch "$ver_patch" \
+        -product-ver-build "$build_version")
+    fi
     go build -trimpath -o "dist/${binary}" main.go
 
     if [[ "$os" != "darwin" ]]; then
@@ -109,8 +173,8 @@ package:
     fi
     /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string fail.acheron.nxkit" "$plist"
     /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.0.1" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD_NUMBER:-1}" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${version}" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${build_version}" "$plist"
     /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.utilities" "$plist"
     /usr/libexec/PlistBuddy -c "Add :NSHighResolutionCapable bool true" "$plist"
 

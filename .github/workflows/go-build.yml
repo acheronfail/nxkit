@@ -161,10 +161,17 @@ jobs:
         working-directory: go
         run: go mod download
 
+      - name: Configure package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" && "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "NXKIT_VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+          fi
+
       - name: Package
         shell: bash
         env:
-          BUILD_NUMBER: ${{ github.run_number }}
           CGO_ENABLED: '1'
         run: just package
 
@@ -236,15 +243,16 @@ jobs:
             sudo apt-get install -y zip
           fi
 
+          version="${GITHUB_REF_NAME#v}"
           mkdir -p release-assets
 
-          cp release-artifacts/linux-amd64/nxkit-linux-amd64 release-assets/
-          cp release-artifacts/macos-arm64/NXKit-macos-arm64.app.tar.gz release-assets/
-          cp release-artifacts/macos-amd64/NXKit-macos-amd64.app.tar.gz release-assets/
+          cp release-artifacts/linux-amd64/nxkit-linux-amd64 "release-assets/nxkit-${version}-linux-amd64"
+          cp release-artifacts/macos-arm64/NXKit-macos-arm64.app.tar.gz "release-assets/NXKit-${version}-macos-arm64.app.tar.gz"
+          cp release-artifacts/macos-amd64/NXKit-macos-amd64.app.tar.gz "release-assets/NXKit-${version}-macos-amd64.app.tar.gz"
 
           (
             cd release-artifacts/windows-amd64
-            zip -r ../../release-assets/nxkit-windows-amd64.zip .
+            zip -r "../../release-assets/nxkit-${version}-windows-amd64.zip" .
           )
 
       - name: Create GitHub release
