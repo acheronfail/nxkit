@@ -248,10 +248,7 @@ func (ctx *buildContext) stageInputs() error {
 	} else if err := os.WriteFile(filepath.Join(ctx.tmpDir, "control", "icon_AmericanEnglish.dat"), defaultIcon, 0o644); err != nil {
 		return err
 	}
-	if err := copyPathOrBytes(ctx.opt.ExefsMainPath, defaultExefsMain, filepath.Join(ctx.tmpDir, "exefs", "main")); err != nil {
-		return err
-	}
-	if err := copyPathOrBytes(ctx.opt.ExefsNPDMPath, defaultExefsNPDM, filepath.Join(ctx.tmpDir, "exefs", "main.npdm")); err != nil {
+	if err := ctx.stageExeFS(); err != nil {
 		return err
 	}
 	pubKeyPath := filepath.Join(ctx.tmpDir, "hacbrewpack.pub.pem")
@@ -307,6 +304,13 @@ func (ctx *buildContext) stageInputs() error {
 		}
 	}
 	return nil
+}
+
+func (ctx *buildContext) stageExeFS() error {
+	if err := copyPathOrBytes(ctx.opt.ExefsMainPath, defaultExefsMain, filepath.Join(ctx.tmpDir, "exefs", "main")); err != nil {
+		return err
+	}
+	return copyPathOrBytes(ctx.opt.ExefsNPDMPath, defaultExefsNPDM, filepath.Join(ctx.tmpDir, "exefs", "main.npdm"))
 }
 
 func (ctx *buildContext) loadOrCreateNACP() (*nacp.Nacp, error) {

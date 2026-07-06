@@ -90,6 +90,8 @@ vendor: _nxkit_image
 
 vendor-nro: _nxkit_image
   docker run -ti --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{nxkit_image}} bash -c '(cd /src; make clean; make all)'
+  cp vendor/Forwarder-Mod/hbl.nso go/lib/hacbrewpack/assets/main.nso
+  cp vendor/Forwarder-Mod/hbl.npdm go/lib/hacbrewpack/assets/main.npdm
 vendor-hacbrewpack: _nxkit_image
   docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{nxkit_image}} bash -c '(cd /src; make clean_full; make)'
 
