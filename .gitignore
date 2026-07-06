@@ -104,6 +104,7 @@ legacy/scripts/build/
 legacy/scripts/bench100m.js
 .bin/
 .tmp/
+.gocache/
 go/dist/
 resources.json
 *.nacp

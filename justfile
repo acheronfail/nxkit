@@ -13,9 +13,12 @@ setup:
     go install github.com/cespare/reflex@latest
     just fixtures
 
-fixtures:
+fixtures: test-keys
     cd "{{ go_dir }}" && bash ./lib/fat/testdata/create.sh
     cd "{{ go_dir }}" && make -C ./lib/romfs/testdata
+
+test-keys:
+    cd "{{ go_dir }}" && GOCACHE="${GOCACHE:-$PWD/../.gocache}" go run ./cmd/testkeys testdata/prod.keys .data/prod.keys prod.keys
 
 test n *args: fixtures
     cd "{{ go_dir }}" && FAT={{ n }} go test github.com/acheronfail/nxkit/... {{ args }}
@@ -132,12 +135,14 @@ vendor: _nxkit_image
     for c in $(just --summary | xargs -n1 | grep vendor-); do just $c; done
 
 vendor-nro: _nxkit_image
-    docker run -ti --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{ nxkit_image }} bash -c '(cd /src; make clean; make all)'
+    docker run --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{ nxkit_image }} bash -c '(cd /src; make clean; make all)'
     cp vendor/Forwarder-Mod/hbl.nso go/lib/hacbrewpack/assets/main.nso
     cp vendor/Forwarder-Mod/hbl.npdm go/lib/hacbrewpack/assets/main.npdm
 
 vendor-hacbrewpack: _nxkit_image
-    docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{ nxkit_image }} bash -c '(cd /src; make clean_full; make)'
+    docker run --rm -v "$PWD/vendor/hacbrewpack:/src" {{ nxkit_image }} bash -c '(cd /src; make clean_full; make)'
+
+go-assets: vendor-nro
 
 fetch-titles:
     cd legacy && npm exec tsx ../vendor/tinfoil/update.ts

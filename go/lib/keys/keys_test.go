@@ -11,9 +11,13 @@ import (
 )
 
 func TestKeys(t *testing.T) {
-	_, err := keys.NewFromPath("../../../.data/prod.keys")
-	assert.Nil(t, err)
-	// TODO: better tests
+	keyset, err := keys.NewFromPath("../../testdata/prod.keys")
+	require.NoError(t, err)
+	require.NotNil(t, keyset)
+
+	assert.Len(t, keyset.BisKey, 4)
+	assert.Len(t, keyset.MasterKey, 18)
+	assert.Len(t, keyset.Package2Key, 18)
 }
 
 func TestPrefixedKeysUseEncodedIndex(t *testing.T) {

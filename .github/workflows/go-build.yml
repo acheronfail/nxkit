@@ -13,8 +13,34 @@ permissions:
   contents: read
 
 jobs:
+  generated-assets:
+    name: generated-assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build Go generated assets
+        run: just go-assets
+
+      - name: Upload Go generated assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: go_hacbrewpack_assets
+          path: |
+            go/lib/hacbrewpack/assets/main.npdm
+            go/lib/hacbrewpack/assets/main.nso
+          if-no-files-found: error
+
   test:
     name: test
+    needs: generated-assets
     runs-on: ubuntu-latest
 
     steps:
@@ -31,6 +57,12 @@ jobs:
         with:
           go-version: '1.24.1'
           cache-dependency-path: go/go.sum
+
+      - name: Download Go generated assets
+        uses: actions/download-artifact@v4
+        with:
+          name: go_hacbrewpack_assets
+          path: go/lib/hacbrewpack/assets
 
       - name: Install Linux dependencies
         run: |
@@ -49,7 +81,9 @@ jobs:
 
   build:
     name: build-${{ matrix.target }}
-    needs: test
+    needs:
+      - generated-assets
+      - test
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -82,6 +116,12 @@ jobs:
         with:
           go-version: '1.24.1'
           cache-dependency-path: go/go.sum
+
+      - name: Download Go generated assets
+        uses: actions/download-artifact@v4
+        with:
+          name: go_hacbrewpack_assets
+          path: go/lib/hacbrewpack/assets
 
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
@@ -140,6 +180,8 @@ jobs:
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
+          pattern: '*-*'
+          merge-multiple: true
           path: release-artifacts
 
       - name: Create GitHub release
