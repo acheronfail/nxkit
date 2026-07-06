@@ -135,6 +135,7 @@ jobs:
 
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
+        id: msys2
         uses: msys2/setup-msys2@v2
         with:
           msystem: UCRT64
@@ -149,9 +150,21 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          "C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append
-          "CC=C:\msys64\ucrt64\bin\gcc.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
-          "PKG_CONFIG=C:\msys64\ucrt64\bin\pkg-config.exe" | Out-File -FilePath $env:GITHUB_ENV -Append
+          $msys2 = '${{ steps.msys2.outputs.msys2-location }}'
+          $ucrtBin = Join-Path $msys2 'ucrt64\bin'
+          $gcc = Join-Path $ucrtBin 'gcc.exe'
+          $pkgConfig = Join-Path $ucrtBin 'pkg-config.exe'
+
+          if (!(Test-Path $gcc)) {
+            throw "MSYS2 gcc not found at $gcc"
+          }
+          if (!(Test-Path $pkgConfig)) {
+            throw "MSYS2 pkg-config not found at $pkgConfig"
+          }
+
+          $ucrtBin | Out-File -FilePath $env:GITHUB_PATH -Append
+          "CC=$gcc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PKG_CONFIG=$pkgConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Download Go modules
         working-directory: go
