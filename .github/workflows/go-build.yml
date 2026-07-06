@@ -21,10 +21,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up just
-        uses: extractions/setup-just@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
 
       - name: Build Go generated assets
         run: just go-assets
@@ -47,11 +47,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up just
-        uses: extractions/setup-just@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -67,7 +62,7 @@ jobs:
       - name: Install Linux dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc make pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+          sudo apt-get install -y gcc just make pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
 
       - name: Download Go modules
         working-directory: go
@@ -106,11 +101,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Set up just
-        uses: extractions/setup-just@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -127,11 +117,11 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+          sudo apt-get install -y gcc just pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
-        run: brew install libusb pkg-config
+        run: brew install just libusb pkg-config
 
       - name: Install Windows dependencies
         if: runner.os == 'Windows'
@@ -143,6 +133,7 @@ jobs:
           update: true
           install: >-
             mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-just
             mingw-w64-ucrt-x86_64-libusb
             mingw-w64-ucrt-x86_64-pkgconf
 
