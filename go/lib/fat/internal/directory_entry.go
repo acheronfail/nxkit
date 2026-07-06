@@ -212,7 +212,7 @@ func (fs *FileSystem) writeEntriesToParent(
 	// write back to disk
 	if parentDirCluster == nil {
 		// if root, just write it all back since it's in the dedicated root directory area
-		_, err := fs.BackendWriter.WriteAt(parentDirBytes, int64(fs.RootDirectorySectorStart*fs.BytesPerSector))
+		_, err := fs.BackendWriter.WriteAt(parentDirBytes, fs.BackendOffset+int64(fs.RootDirectorySectorStart*fs.BytesPerSector))
 		if err != nil {
 			return err
 		}
@@ -288,7 +288,7 @@ func (fs *FileSystem) writeDirectoryEntry(
 	copy(newDirectoryDataBytes[FatDirectoryEntrySize:], dotDotBytes[:])
 
 	// write . and .. into new cluster in data region
-	_, err = fs.BackendWriter.WriteAt(newDirectoryDataBytes, int64(fs.clusterToSector(newDirCluster)*fs.BytesPerSector))
+	_, err = fs.BackendWriter.WriteAt(newDirectoryDataBytes, fs.BackendOffset+int64(fs.clusterToSector(newDirCluster)*fs.BytesPerSector))
 	if err != nil {
 		return nil, err
 	}

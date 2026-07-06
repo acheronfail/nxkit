@@ -7,6 +7,7 @@ An application intended to bring some commonly needed tools for Nintendo Switch 
 - 🚀️ creating custom launchers
 - 🔎️ exploring NAND dumps
 - 🔪️ splitting/merging NSPs
+- 🗜️ compressing/decompressing NSZs
 
 Hopefully it's helpful to you!
 
@@ -20,7 +21,3 @@ If you're using macOS, be aware that this application isn't notarised (since tha
 xattr -d com.apple.quarantine /path/to/NXKit.app
 ```
 This command removes the quarantine attribute from the app, allowing it to run without being blocked by macOS's Gatekeeper.
-
-## Future ideas
-
-- support for compressing/decompressing .nsz files and the like

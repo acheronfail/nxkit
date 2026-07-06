@@ -7,8 +7,6 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/widget"
 )
 
 var (
@@ -54,15 +52,7 @@ func StartGuiApp(options Options) {
 		})
 	}
 
-	header := widget.NewLabelWithStyle("NXKit", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
-	header.TextStyle.Monospace = true
-	mainWindow.SetContent(container.NewBorder(
-		container.NewVBox(layout.NewSpacer(), header),
-		nil,
-		nil,
-		nil,
-		tabs,
-	))
+	mainWindow.SetContent(tabs)
 
 	mainWindow.ShowAndRun()
 }

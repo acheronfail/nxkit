@@ -8,6 +8,7 @@ require fyne.io/fyne/v2 v2.6.0
 
 require (
 	github.com/google/gousb v1.1.3
+	github.com/klauspost/compress v1.18.0
 	github.com/ncruces/zenity v0.10.14
 )
 

@@ -286,6 +286,14 @@ type ncaHeader struct {
 	fsHeaders          [4]ncaFsHeader // FS section headers
 }
 
+func (h *ncaHeader) MasterKeyIndex() int {
+	revision := int(max(uint8(h.cryptoType), h.cryptoType2))
+	if revision <= 0 {
+		return 0
+	}
+	return revision - 1
+}
+
 func (h *ncaHeader) GetSdkVersionParts() SdkVersion {
 	return SdkVersion{
 		Revision: uint8(h.sdkVersion),
@@ -302,6 +310,18 @@ func (h *ncaHeader) HasRightsId() bool {
 		}
 	}
 
+	return false
+}
+
+func (h *ncaHeader) needsKeyAreaKey() bool {
+	if h.HasRightsId() {
+		return false
+	}
+	for _, section := range h.fsHeaders {
+		if section.cryptType == CryptCtr || section.cryptType == CryptBktr || section.cryptType == CryptXts {
+			return true
+		}
+	}
 	return false
 }
 
@@ -421,14 +441,43 @@ func (s *NcaSection) FsType() SectionFsType {
 	return s.sectionHeader.FsType()
 }
 
+func (s *NcaSection) Offset() int64 {
+	return s.sectionOffset
+}
+
 func (s *NcaSection) Size() int64 {
 	return s.size
+}
+
+func (s *NcaSection) CryptType() SectionCryptType {
+	return s.cryptType
+}
+
+func (s *NcaSection) Key() []byte {
+	return bytes.Clone(s.key)
+}
+
+func (s *NcaSection) Counter() [0x10]byte {
+	return s.ctr
 }
 
 type Nca struct {
 	reader        NcaReader
 	header        ncaHeader
 	decryptedKeys [4][0x10]byte
+	titleKey      []byte
+}
+
+func (n *Nca) HasRightsID() bool {
+	return n.header.HasRightsId()
+}
+
+func (n *Nca) RightsID() [0x10]byte {
+	return n.header.rightsID
+}
+
+func (n *Nca) HasTitleKey() bool {
+	return len(n.titleKey) == 0x10
 }
 
 func (n *Nca) Sections() []NcaSection {
@@ -444,11 +493,12 @@ func (n *Nca) Sections() []NcaSection {
 
 		var key []byte
 		if n.header.HasRightsId() {
-			// TODO: find titlekey and use that (if not found hactool falls back to empty)
-			// `settings_get_titlekey`
-			key = make([]byte, 0x10)
+			key = bytes.Clone(n.titleKey)
+			if key == nil {
+				key = make([]byte, 0x10)
+			}
 		} else {
-			if sectionHeader.cryptType == CryptCtr {
+			if sectionHeader.cryptType == CryptCtr || sectionHeader.cryptType == CryptBktr {
 				key = n.decryptedKeys[2][:]
 			} else if sectionHeader.cryptType == CryptXts {
 				key = bytes.Join([][]byte{n.decryptedKeys[0][:], n.decryptedKeys[1][:]}, []byte{})
@@ -612,6 +662,10 @@ type NcaReader interface {
 }
 
 func NewNca(reader NcaReader, keys keys.Keys) (*Nca, error) {
+	return NewNcaWithTitleKeys(reader, keys, nil)
+}
+
+func NewNcaWithTitleKeys(reader NcaReader, keys keys.Keys, titleKeys map[[0x10]byte][]byte) (*Nca, error) {
 	data := make([]byte, 0xc00)
 	_, err := reader.ReadAt(data, 0)
 	if err != nil {
@@ -645,8 +699,14 @@ func NewNca(reader NcaReader, keys keys.Keys) (*Nca, error) {
 	nca := &Nca{reader: reader, header: header}
 
 	if header.HasRightsId() {
-		// TODO: decrypt title key
-	} else {
+		titleKey := titleKeys[header.rightsID]
+		if len(titleKey) != 0 {
+			if len(titleKey) != 0x10 {
+				return nil, fmt.Errorf("invalid title key length for rights ID %x", header.rightsID)
+			}
+			nca.titleKey = bytes.Clone(titleKey)
+		}
+	} else if header.needsKeyAreaKey() {
 		// decrypt the `encryptedKeys` in the header
 		encryptedKeysBytes := make([]byte, 0x40)
 		copy(encryptedKeysBytes, plain[0x300:0x340])

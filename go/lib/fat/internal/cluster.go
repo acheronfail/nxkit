@@ -85,7 +85,7 @@ func (fs *FileSystem) writeClusterChain(clusterStart uint32, clusterBytes []byte
 	for i, cluster := range clusterChain {
 		toWrite := make([]byte, fs.BytesPerCluster)
 		copy(toWrite, clusterBytes[int64(i)*fs.BytesPerCluster:int64(i+1)*fs.BytesPerCluster])
-		_, err := fs.BackendWriter.WriteAt(toWrite, int64(fs.clusterToSector(cluster)*fs.BytesPerSector))
+		_, err := fs.BackendWriter.WriteAt(toWrite, fs.BackendOffset+int64(fs.clusterToSector(cluster)*fs.BytesPerSector))
 		if err != nil {
 			return err
 		}

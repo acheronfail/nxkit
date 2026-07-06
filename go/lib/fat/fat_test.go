@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 
 	"github.com/acheronfail/nxkit/lib/fat"
+	fatbackend "github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/fat/backend/file"
 	"github.com/acheronfail/nxkit/lib/fat/fat12"
 	"github.com/acheronfail/nxkit/lib/fat/fat16"
@@ -33,6 +35,78 @@ func GetFatDiskFs(t *testing.T) fat.FileSystem {
 	assert.Nil(t, err)
 
 	return fs
+}
+
+func getFatFsAtOffset(t *testing.T, backend fatbackend.Storage, offset int64) fat.FileSystem {
+	t.Helper()
+
+	var fs fat.FileSystem
+	var err error
+	switch testdata.TestFatType {
+	case 12:
+		fs, err = fat12.Open(backend, offset)
+	case 16:
+		fs, err = fat16.Open(backend, offset)
+	case 32:
+		fs, err = fat32.Open(backend, offset)
+	}
+	assert.Nil(t, err)
+
+	return fs
+}
+
+func TestWriteWithBackendOffset(t *testing.T) {
+	diskBytes, err := os.ReadFile(testdata.GetFatDiskImagePath())
+	assert.Nil(t, err)
+
+	const offset = int64(4096)
+	prefix := make([]byte, offset)
+	for i := range prefix {
+		prefix[i] = 0xaa
+	}
+
+	diskPath := filepath.Join(t.TempDir(), "offset-disk.img")
+	err = os.WriteFile(diskPath, append(prefix, diskBytes...), 0o644)
+	assert.Nil(t, err)
+
+	backend, err := file.OpenFromPath(diskPath, false)
+	assert.Nil(t, err)
+	fs := getFatFsAtOffset(t, backend, offset)
+
+	writtenFile, err := fs.OpenFile("/write/offset-write.txt", os.O_CREATE|os.O_RDWR)
+	assert.Nil(t, err)
+	n, err := writtenFile.WriteAt([]byte("offset data"), 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len("offset data"), n)
+	err = writtenFile.Close()
+	assert.Nil(t, err)
+	err = fs.Mkdir("/write/offset-dir")
+	assert.Nil(t, err)
+	err = fs.Close()
+	assert.Nil(t, err)
+
+	updatedBytes, err := os.ReadFile(diskPath)
+	assert.Nil(t, err)
+	assert.Equal(t, prefix, updatedBytes[:offset])
+
+	backend, err = file.OpenFromPath(diskPath, false)
+	assert.Nil(t, err)
+	fs = getFatFsAtOffset(t, backend, offset)
+	defer fs.Close()
+
+	readFile, err := fs.OpenFile("/write/offset-write.txt", os.O_RDONLY)
+	assert.Nil(t, err)
+	data := make([]byte, len("offset data"))
+	n, err = readFile.ReadAt(data, 0)
+	assert.Nil(t, err)
+	assert.Equal(t, len(data), n)
+	assert.Equal(t, "offset data", string(data))
+
+	entries, err := fs.ReadDir("/write")
+	assert.Nil(t, err)
+	assert.True(t, slices.ContainsFunc(entries, func(entry fat.DirectoryEntry) bool {
+		return entry.LongName() == "offset-dir" && entry.IsDir()
+	}))
 }
 
 func TestReadDir(t *testing.T) {
