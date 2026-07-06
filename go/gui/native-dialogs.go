@@ -2,8 +2,12 @@ package gui
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"runtime"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/driver"
 	"github.com/ncruces/zenity"
 )
 
@@ -82,10 +86,75 @@ func nativeFileOptions(title string, filters []nativeFileFilter) []zenity.Option
 		zenity.Title(title),
 		zenity.Modal(),
 	}
+	if icon, ok := nativeDialogWindowIcon(); ok {
+		opts = append(opts, zenity.WindowIcon(icon))
+	}
+	if attach, ok := nativeDialogAttachOption(); ok {
+		opts = append(opts, attach)
+	}
 	for _, filter := range filters {
 		opts = append(opts, filter)
 	}
 	return opts
+}
+
+func nativeDialogWindowIcon() (string, bool) {
+	if runtime.GOOS != "darwin" {
+		return "", false
+	}
+
+	candidates := []string{
+		filepath.Join("go", "resources", "nxkit-icon-subtle.png"),
+		filepath.Join("resources", "nxkit-icon-subtle.png"),
+	}
+	if exe, err := os.Executable(); err == nil {
+		exeDir := filepath.Dir(exe)
+		candidates = append([]string{
+			filepath.Join(exeDir, "..", "Resources", "nxkit-icon-subtle.png"),
+			filepath.Join(exeDir, "..", "Resources", "nxkit-icon-subtle-256.png"),
+		}, candidates...)
+	}
+
+	for _, candidate := range candidates {
+		path, err := filepath.Abs(candidate)
+		if err != nil {
+			continue
+		}
+		if info, err := os.Stat(path); err == nil && !info.IsDir() {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+func nativeDialogAttachOption() (zenity.Option, bool) {
+	if runtime.GOOS == "darwin" {
+		return nil, false
+	}
+
+	nativeWindow, ok := mainWindow.(driver.NativeWindow)
+	if !ok {
+		return nil, false
+	}
+
+	var attach any
+	nativeWindow.RunNative(func(context any) {
+		switch ctx := context.(type) {
+		case driver.WindowsWindowContext:
+			if ctx.HWND != 0 {
+				attach = ctx.HWND
+			}
+		case driver.X11WindowContext:
+			if ctx.WindowHandle != 0 {
+				attach = int(ctx.WindowHandle)
+			}
+		}
+	})
+	if attach == nil {
+		return nil, false
+	}
+
+	return zenity.Attach(attach), true
 }
 
 func nativePathResult(path string, err error) (string, bool, error) {
