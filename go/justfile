@@ -8,6 +8,7 @@ setup:
 
 fixtures:
   bash ./lib/fat/testdata/create.sh
+  make -C ./lib/romfs/testdata
 
 test n *args: fixtures
   FAT={{n}} go test github.com/acheronfail/nxkit/... {{args}}

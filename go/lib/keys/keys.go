@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
-	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -68,16 +68,23 @@ type Keys struct {
 }
 
 func (keys *Keys) GetKeyAreaKey(cryptoType, kakIndex int) ([]byte, error) {
+	var keyset [][]byte
 	switch cryptoType {
 	case 0:
-		return keys.KeyAreaKeyApplication[kakIndex], nil
+		keyset = keys.KeyAreaKeyApplication
 	case 1:
-		return keys.KeyAreaKeyOcean[kakIndex], nil
+		keyset = keys.KeyAreaKeyOcean
 	case 2:
-		return keys.KeyAreaKeySystem[kakIndex], nil
+		keyset = keys.KeyAreaKeySystem
+	default:
+		return nil, fmt.Errorf("failed to find key area key for cryptoType=%d, index=%d", cryptoType, kakIndex)
 	}
 
-	return nil, fmt.Errorf("failed to find key area key for cryptoType=%d, index=%d", cryptoType, kakIndex)
+	if kakIndex < 0 || kakIndex >= len(keyset) || len(keyset[kakIndex]) == 0 {
+		return nil, fmt.Errorf("failed to find key area key for cryptoType=%d, index=%d", cryptoType, kakIndex)
+	}
+
+	return keyset[kakIndex], nil
 }
 
 func NewFromPath(path string) (*Keys, error) {
@@ -103,29 +110,27 @@ func mapToKeys(m map[string][]byte) (*Keys, error) {
 		if name != "" {
 			if val, ok := m[name]; ok {
 				v.Field(i).SetBytes(val)
-			} else {
-				return nil, fmt.Errorf("failed to find %s in keys", field.Name)
 			}
 		} else if prefix != "" {
-			// collect matchingKeys keys by prefix
-			matchingKeys := make([]string, 0)
+			indexedValues := make(map[int][]byte)
+			maxIndex := -1
 			for key := range m {
-				if strings.HasPrefix(key, prefix) && len(key)-len(prefix) == 2 {
-					matchingKeys = append(matchingKeys, key)
+				if !strings.HasPrefix(key, prefix) || len(key)-len(prefix) != 2 {
+					continue
 				}
+				index, err := strconv.ParseInt(key[len(prefix):], 16, 0)
+				if err != nil {
+					return nil, fmt.Errorf("failed to parse key index for %s: %w", key, err)
+				}
+				if index > int64(maxIndex) {
+					maxIndex = int(index)
+				}
+				indexedValues[int(index)] = m[key]
 			}
-
-			if len(matchingKeys) == 0 {
-				return nil, fmt.Errorf("failed to find keys starting with %s", prefix)
+			values := make([][]byte, maxIndex+1)
+			for index, value := range indexedValues {
+				values[index] = value
 			}
-
-			// sort keys to maintain order
-			slices.Sort(matchingKeys)
-			values := make([][]byte, len(matchingKeys))
-			for i, key := range matchingKeys {
-				values[i] = m[key]
-			}
-
 			v.Field(i).Set(reflect.ValueOf(values))
 		} else {
 			return nil, fmt.Errorf("field %s must be given a 'name' or 'prefix' tag", field.Name)

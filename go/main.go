@@ -1,17 +1,18 @@
 package main
 
 import (
+	"crypto/md5"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 
 	"github.com/acheronfail/nxkit/gui"
 	"github.com/acheronfail/nxkit/lib/fat/backend"
 	"github.com/acheronfail/nxkit/lib/fat/fat_auto"
+	"github.com/acheronfail/nxkit/lib/hacbrewpack"
 	"github.com/acheronfail/nxkit/lib/inject"
-	"github.com/acheronfail/nxkit/lib/nacp"
 	"github.com/acheronfail/nxkit/lib/nand"
-	"github.com/acheronfail/nxkit/lib/npdm"
 	"github.com/acheronfail/nxkit/lib/xtsn"
 	"github.com/diskfs/go-diskfs/partition/gpt"
 	"github.com/jpillora/sizestr"
@@ -47,27 +48,52 @@ import (
 //     - [ ] package nsp (a pfs0 filesystem with nca's inside)
 // - [ ] have a way to ship assets (*.nso, etc)
 
-func createNsp() {
-	// validate and patch npdm as needed
-	titleId, err := npdm.Process("staging", "staging.bkp", 0, false)
+func createNsp(randomPSS bool) {
+	repoRoot, err := findRepoRoot()
 	if err != nil {
 		panic(err)
 	}
 
-	// validate and patch nacp as needed
-	launcherNacp := nacp.NewNacp(nil)
-	launcherNacp.SetTitle("Test Title")
-	launcherNacp.SetAuthor("Test Author")
-	err = nacp.Process(launcherNacp, titleId)
-	if err != nil {
+	outPath := filepath.Join(mustGetwd(), "0162696bc58e0000_title=1_publisher=2_nroPath=3.nsp")
+	if err := hacbrewpack.BuildForwarderNSP(hacbrewpack.Options{
+		RepoRoot:  repoRoot,
+		OutPath:   outPath,
+		IconPath:  filepath.Join(repoRoot, ".data", "test_magenta_test.canvas.jpg"),
+		RandomPSS: randomPSS,
+	}); err != nil {
 		panic(err)
 	}
 
-	// TODO: nca_create_program
-	// TODO: nca_create_control
-	// TODO: nca_create_manual_htmldoc
-	// TODO: nca_create_manual_legalinfo
-	// TODO: nca_create_meta
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Created %s\nMD5: %x\n", outPath, md5.Sum(data))
+}
+
+func mustGetwd() string {
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+	return wd
+}
+
+func findRepoRoot() (string, error) {
+	dir, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(dir, "vendor", "hacbrewpack", "hacbrewpack")); err == nil {
+			return dir, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", fmt.Errorf("failed to locate repository root from %s", mustGetwd())
+		}
+		dir = parent
+	}
 }
 
 func openNand(path string) {
@@ -143,7 +169,7 @@ func main() {
 	} else if slices.Contains(os.Args, "--inject") {
 		inject.Inject("/home/acheronfail/.switch/payloads/hekate_ctcaer_6.2.2.bin")
 	} else if slices.Contains(os.Args, "--nsp") {
-		createNsp()
+		createNsp(slices.Contains(os.Args, "--random-pss"))
 	} else {
 		gui.StartGuiApp()
 	}
