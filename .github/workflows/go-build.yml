@@ -1,0 +1,257 @@
+name: Go Build
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generated-assets:
+    name: generated-assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install just
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
+
+      - name: Build Go generated assets
+        run: just go-assets
+
+      - name: Upload Go generated assets
+        uses: actions/upload-artifact@v6
+        with:
+          name: go_hacbrewpack_assets
+          path: |
+            go/lib/hacbrewpack/assets/main.npdm
+            go/lib/hacbrewpack/assets/main.nso
+          if-no-files-found: error
+
+  test:
+    name: test
+    needs: generated-assets
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.1'
+          cache-dependency-path: go/go.sum
+
+      - name: Download Go generated assets
+        uses: actions/download-artifact@v7
+        with:
+          name: go_hacbrewpack_assets
+          path: go/lib/hacbrewpack/assets
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc just make pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+
+      - name: Download Go modules
+        working-directory: go
+        run: go mod download
+
+      - name: Test
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+        run: just test-all
+
+  build:
+    name: build-${{ matrix.target }}
+    needs:
+      - generated-assets
+      - test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            os: ubuntu-latest
+            artifact-path: go/dist/nxkit-linux-amd64
+          - target: macos-arm64
+            os: macos-latest
+            artifact-path: go/dist/NXKit-macos-arm64.app.tar.gz
+          - target: macos-amd64
+            os: macos-15-intel
+            artifact-path: go/dist/NXKit-macos-amd64.app.tar.gz
+          - target: windows-amd64
+            os: windows-latest
+            artifact-path: go/dist/nxkit-windows-amd64/*
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.24.1'
+          cache-dependency-path: go/go.sum
+
+      - name: Download Go generated assets
+        uses: actions/download-artifact@v7
+        with:
+          name: go_hacbrewpack_assets
+          path: go/lib/hacbrewpack/assets
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc just pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install just libusb pkg-config
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        id: msys2
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-just
+            mingw-w64-ucrt-x86_64-libusb
+            mingw-w64-ucrt-x86_64-pkgconf
+
+      - name: Configure Windows cgo
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msys2 = '${{ steps.msys2.outputs.msys2-location }}'
+          $ucrtBin = Join-Path $msys2 'ucrt64\bin'
+          $gcc = Join-Path $ucrtBin 'gcc.exe'
+          $pkgConfig = Join-Path $ucrtBin 'pkg-config.exe'
+
+          if (!(Test-Path $gcc)) {
+            throw "MSYS2 gcc not found at $gcc"
+          }
+          if (!(Test-Path $pkgConfig)) {
+            throw "MSYS2 pkg-config not found at $pkgConfig"
+          }
+
+          $ucrtBin | Out-File -FilePath $env:GITHUB_PATH -Append
+          "CC=$gcc" | Out-File -FilePath $env:GITHUB_ENV -Append
+          "PKG_CONFIG=$pkgConfig" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Download Go modules
+        working-directory: go
+        run: go mod download
+
+      - name: Package
+        shell: bash
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          CGO_ENABLED: '1'
+        run: just package
+
+      - name: Bundle Windows runtime dependencies
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $msys2 = '${{ steps.msys2.outputs.msys2-location }}'
+          $dist = (Resolve-Path 'go/dist').Path
+          $exe = Join-Path $dist 'nxkit-windows-amd64.exe'
+          $bundleDir = Join-Path $dist 'nxkit-windows-amd64'
+          $ucrtBin = Join-Path $msys2 'ucrt64\bin'
+          $requiredDlls = @('libusb-1.0.dll')
+          $optionalDlls = @('libwinpthread-1.dll', 'libgcc_s_seh-1.dll')
+
+          if (!(Test-Path $exe)) {
+            throw "Windows executable not found at $exe"
+          }
+
+          New-Item -ItemType Directory -Path $bundleDir -Force | Out-Null
+          Copy-Item $exe (Join-Path $bundleDir 'nxkit-windows-amd64.exe') -Force
+
+          foreach ($dll in $requiredDlls) {
+            $source = Join-Path $ucrtBin $dll
+            if (!(Test-Path $source)) {
+              throw "MSYS2 runtime dependency not found at $source"
+            }
+
+            $destination = Join-Path $bundleDir $dll
+            Copy-Item $source $destination -Force
+          }
+
+          foreach ($dll in $optionalDlls) {
+            $source = Join-Path $ucrtBin $dll
+            if (Test-Path $source) {
+              $destination = Join-Path $bundleDir $dll
+              Copy-Item $source $destination -Force
+            }
+          }
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v7
+        with:
+          pattern: '*-*'
+          path: release-artifacts
+
+      - name: Package release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v zip >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y zip
+          fi
+
+          mkdir -p release-assets
+
+          cp release-artifacts/linux-amd64/nxkit-linux-amd64 release-assets/
+          cp release-artifacts/macos-arm64/NXKit-macos-arm64.app.tar.gz release-assets/
+          cp release-artifacts/macos-amd64/NXKit-macos-amd64.app.tar.gz release-assets/
+
+          (
+            cd release-artifacts/windows-amd64
+            zip -r ../../release-assets/nxkit-windows-amd64.zip .
+          )
+
+      - name: Create GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mapfile -t files < <(find release-assets -type f | sort)
+          gh release create "$GITHUB_REF_NAME" "${files[@]}" --title "$GITHUB_REF_NAME" --generate-notes --verify-tag

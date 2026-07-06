@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="NXKit subtle dark app icon">
+  <defs>
+    <filter id="wordShadow" x="-20%" y="-30%" width="140%" height="160%">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="2" flood-color="#000000" flood-opacity="0.45"/>
+    </filter>
+    <linearGradient id="surface" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#121821"/>
+      <stop offset="1" stop-color="#090d13"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1024" height="1024" rx="224" fill="#070a0f"/>
+  <rect x="72" y="72" width="880" height="880" rx="188" fill="url(#surface)"/>
+  <rect x="73" y="73" width="878" height="878" rx="187" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.08"/>
+
+  <text x="512" y="548"
+        text-anchor="middle"
+        dominant-baseline="middle"
+        font-family="SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace"
+        font-size="176"
+        font-weight="700"
+        letter-spacing="0"
+        filter="url(#wordShadow)">
+    <tspan fill="#00c3e3">NX</tspan><tspan fill="#ff4554">Kit</tspan>
+  </text>
+</svg>

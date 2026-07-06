@@ -68,6 +68,10 @@ type NpdmAci0 struct {
 }
 
 func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool) (uint64, error) {
+	return ProcessWithPublicKeyPath(exefsDir, backupDir, titleId, noSignNcaSignature, filepath.Join("keys", "hacbrewpack.pub.pem"))
+}
+
+func ProcessWithPublicKeyPath(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool, pubKeyPath string) (uint64, error) {
 	npdmPath := filepath.Join(exefsDir, "main.npdm")
 	f, err := os.OpenFile(npdmPath, os.O_RDWR, 0)
 	if err != nil {
@@ -112,6 +116,8 @@ func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool
 	var tid uint64
 	if titleId == 0 {
 		tid = aci0.TitleID
+	} else {
+		tid = titleId
 	}
 
 	fmt.Printf("Validating TitleID: 0x%016x\n", tid)
@@ -146,7 +152,7 @@ func Process(exefsDir, backupDir string, titleId uint64, noSignNcaSignature bool
 			return 0, fmt.Errorf("seek error while patching public key: %w", err)
 		}
 
-		pubKey, err := getPublicKeyBytes("keys/hacbrewpack.pub.pem")
+		pubKey, err := getPublicKeyBytes(pubKeyPath)
 		if err != nil {
 			return 0, fmt.Errorf("failed to get public key bytes: %w", err)
 		}
@@ -182,7 +188,10 @@ func getPublicKeyBytes(pubKeyPath string) ([]byte, error) {
 
 func parseRSAPublicKey(pemData []byte) (*rsa.PublicKey, error) {
 	block, _ := pem.Decode(pemData)
-	if block == nil || block.Type != "RSA PUBLIC KEY" {
+	if block == nil {
+		return nil, fmt.Errorf("invalid PEM block")
+	}
+	if block.Type != "RSA PUBLIC KEY" {
 		return nil, fmt.Errorf("invalid PEM block type: %s", block.Type)
 	}
 	return x509.ParsePKCS1PublicKey(block.Bytes)

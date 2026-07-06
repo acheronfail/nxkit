@@ -2,6 +2,7 @@
 *.nacp
 *.nca
 *.npdm
+*.nso
 *.romfs
 *.pfs0
 *.nsp

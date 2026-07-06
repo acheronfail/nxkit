@@ -81,7 +81,7 @@ func (fs *Pfs0Fs) Entries() []Pfs0Entry {
 
 func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	headerBytes := make([]byte, headerSize)
-	if _, err := reader.Read(headerBytes); err != nil {
+	if _, err := io.ReadFull(reader, headerBytes); err != nil {
 		return nil, fmt.Errorf("failed to read header %s", err)
 	}
 
@@ -92,7 +92,10 @@ func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 
 	entryListingSize := int(entryListSize * header.numFiles)
 	entryListingBytes := make([]byte, entryListingSize)
-	if _, err = reader.Read(entryListingBytes); err != nil {
+	if len(entryListingBytes) > 0 {
+		_, err = io.ReadFull(reader, entryListingBytes)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("failed to read entry listing %s", err)
 	}
 
@@ -102,7 +105,10 @@ func NewPfs0(reader Pfs0Reader) (*Pfs0Fs, error) {
 	}
 
 	stringTableBytes := make([]byte, header.stringTableSize)
-	if _, err = reader.Read(stringTableBytes); err != nil {
+	if len(stringTableBytes) > 0 {
+		_, err = io.ReadFull(reader, stringTableBytes)
+	}
+	if err != nil {
 		return nil, fmt.Errorf("failed to read string table %s", err)
 	}
 
@@ -155,6 +161,9 @@ func parseEntryList(data []byte) ([]pfs0EntryListing, error) {
 func parseStringTable(entries []pfs0EntryListing, data []byte) ([]string, error) {
 	table := make([]string, 0)
 	for _, entry := range entries {
+		if uint64(entry.stringTableOffset) >= uint64(len(data)) {
+			return nil, fmt.Errorf("failed to parse string table - offset %d outside table of size %d", entry.stringTableOffset, len(data))
+		}
 		sub := data[entry.stringTableOffset:]
 		end := bytes.IndexByte(sub, 0x00)
 		if end == -1 {

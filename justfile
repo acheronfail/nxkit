@@ -1,140 +1,148 @@
+go_dir := 'go'
 nxkit_image := 'nxkit'
-node_arch := if arch() == 'x86_64' { 'x64' } else { 'arm64' }
-xtsn_dir := 'src/node/nand/xtsn'
 
 _default:
-  just -l
+    just -l
 
-@_check CMD MSG="":
-    if ! command -v {{CMD}} >/dev/null 2>&1 /dev/null; then echo "{{CMD}} is required! {{MSG}}"; exit 1; fi
+#
+# Go
+#
 
-# set up the local repository for development
 setup:
-  npm install
-  cd "{{xtsn_dir}}" && npm install
+    cd "{{ go_dir }}" && go mod tidy
+    go install github.com/cespare/reflex@latest
+    just fixtures
 
-  if [ -z "${CI:-}" ]; then just setup_hooks; fi
+fixtures: test-keys
+    cd "{{ go_dir }}" && bash ./lib/fat/testdata/create.sh
+    cd "{{ go_dir }}" && make -C ./lib/romfs/testdata
 
-# set up git hooks
-setup_hooks:
-  @echo "setting up git hooks..."
-  @echo "#!/usr/bin/env bash" > .git/hooks/pre-commit
-  @echo "just pre-commit" >> .git/hooks/pre-commit
-  @chmod +x .git/hooks/pre-commit
-  @env echo -n "Do you want to create a fake nand dump? (y/N): "; read ans; if [[ $ans = y* ]]; then just create-nand; fi
+test-keys:
+    cd "{{ go_dir }}" && GOCACHE="${GOCACHE:-$PWD/../.gocache}" go run ./cmd/testkeys testdata/prod.keys .data/prod.keys prod.keys
 
-# clean up installed toolchains and installed dependencies
-clean:
-  rm -rf node_modules
+test n *args: fixtures
+    cd "{{ go_dir }}" && FAT={{ n }} go test github.com/acheronfail/nxkit/... {{ args }}
+    cd "{{ go_dir }}" && FAT={{ n }} go test github.com/acheronfail/nxkit/... {{ args }}
 
-# revert to the state after cloning the repository
-clean_all: clean
-  git clean -fdx
+testw n *args:
+    cd "{{ go_dir }}" && reflex -d none -sr '\.go$' -- sh -c 'cd .. && just test {{ n }} {{ args }}'
 
-#
-# Dev Scripts
-#
+test-all: fixtures
+    cd "{{ go_dir }}" && FAT=12 go test github.com/acheronfail/nxkit/...
+    cd "{{ go_dir }}" && FAT=12 go test github.com/acheronfail/nxkit/...
+    cd "{{ go_dir }}" && FAT=16 go test github.com/acheronfail/nxkit/...
+    cd "{{ go_dir }}" && FAT=16 go test github.com/acheronfail/nxkit/...
+    cd "{{ go_dir }}" && FAT=32 go test github.com/acheronfail/nxkit/...
+    cd "{{ go_dir }}" && FAT=32 go test github.com/acheronfail/nxkit/...
 
-# start the app in dev mode
-dev *args: rebuild-electron
-  npm start -- -- -- {{args}}
+bench:
+    cd "{{ go_dir }}" && go test -bench=. github.com/acheronfail/nxkit/...
 
-# package the app and start it
-dev-packaged *args:
-  rm -rf out
-  npm run package
-  ./out/NXKit-{{os()}}-{{node_arch}}/nxkit {{args}}
+build:
+    cd "{{ go_dir }}" && go build -o nxkit main.go
 
-# rebuild native modules to work with electron
-rebuild-electron:
-  cd "{{xtsn_dir}}" && npm exec electron-rebuild
+package:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    cd go
 
-# rebuild native modules to work with node
-rebuild-node:
-  cd "{{xtsn_dir}}" && npm rebuild
+    os="$(go env GOOS)"
+    arch="$(go env GOARCH)"
+    platform="$os"
+    if [[ "$os" == "darwin" ]]; then
+      platform="macos"
+    fi
 
-# runs all tests and checks
-test-all: rebuild-node
-  npm run test
+    binary="nxkit-${platform}-${arch}"
+    if [[ "$os" == "windows" ]]; then
+      binary="${binary}.exe"
+    fi
 
-# runs vitest in watch mode
-test *ARGS: rebuild-node
-  npm run test:vitest -- {{ARGS}}
+    mkdir -p dist
+    go build -trimpath -o "dist/${binary}" main.go
 
-# runs benchmarks; outputs a .cpuprofile file and creates bench.json if title was passed
-bench TITLE='': rebuild-node
-  @mkdir -p scripts/build/Release
-  @cp "{{xtsn_dir}}"/build/Release/xtsn.node scripts/build/Release/xtsn.node
-  @cp node_modules/js-fatfs/dist/fatfs.wasm scripts/
-  npx esbuild --bundle --platform=node --format=esm scripts/bench100m.ts --outfile=scripts/bench100m.js
-  node --cpu-prof scripts/bench100m.js {{TITLE}}
+    if [[ "$os" != "darwin" ]]; then
+      echo "Built dist/${binary}"
+      exit 0
+    fi
 
-# formats all code
-format:
-  npm run format
+    app_dir="dist/NXKit.app"
+    plist="${app_dir}/Contents/Info.plist"
+    resources_dir="${app_dir}/Contents/Resources"
+    icon_source="resources/nxkit-icon-subtle.png"
+    icon_source_256="resources/nxkit-icon-subtle-256.png"
+    icon_source_svg="resources/nxkit-icon-subtle.svg"
+    iconset="${resources_dir}/NXKit.iconset"
 
-# creates a fake NAND dump for testing
-create-nand *ARGS: rebuild-node
-  npm exec tsx scripts/create-fake-nand.ts -- {{ARGS}}
+    rm -rf "$app_dir"
+    mkdir -p "${app_dir}/Contents/MacOS" "$resources_dir" "$iconset"
+    cp "dist/${binary}" "${app_dir}/Contents/MacOS/${binary}"
+    chmod +x "${app_dir}/Contents/MacOS/${binary}"
+
+    cp "$icon_source" "${resources_dir}/nxkit-icon-subtle.png"
+    cp "$icon_source_256" "${resources_dir}/nxkit-icon-subtle-256.png"
+    cp "$icon_source_svg" "${resources_dir}/nxkit-icon-subtle.svg"
+    sips -z 16 16 "$icon_source" --out "${iconset}/icon_16x16.png" >/dev/null
+    sips -z 32 32 "$icon_source" --out "${iconset}/icon_16x16@2x.png" >/dev/null
+    sips -z 32 32 "$icon_source" --out "${iconset}/icon_32x32.png" >/dev/null
+    sips -z 64 64 "$icon_source" --out "${iconset}/icon_32x32@2x.png" >/dev/null
+    sips -z 128 128 "$icon_source" --out "${iconset}/icon_128x128.png" >/dev/null
+    cp "$icon_source_256" "${iconset}/icon_128x128@2x.png"
+    cp "$icon_source_256" "${iconset}/icon_256x256.png"
+    sips -z 512 512 "$icon_source" --out "${iconset}/icon_256x256@2x.png" >/dev/null
+    sips -z 512 512 "$icon_source" --out "${iconset}/icon_512x512.png" >/dev/null
+    cp "$icon_source" "${iconset}/icon_512x512@2x.png"
+    icon_file=""
+    if iconutil --convert icns "$iconset" --output "${resources_dir}/NXKit.icns"; then
+      icon_file="NXKit.icns"
+    else
+      echo "warning: failed to create NXKit.icns; packaging app without a bundle icon" >&2
+    fi
+    rm -rf "$iconset"
+
+    plutil -create xml1 "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleName string NXKit" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string NXKit" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${binary}" "$plist"
+    if [[ -n "$icon_file" ]]; then
+      /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string ${icon_file}" "$plist"
+    fi
+    /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string fail.acheron.nxkit" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string 0.0.1" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${BUILD_NUMBER:-1}" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.utilities" "$plist"
+    /usr/libexec/PlistBuddy -c "Add :NSHighResolutionCapable bool true" "$plist"
+
+    tar -czf "dist/NXKit-${platform}-${arch}.app.tar.gz" -C dist NXKit.app
+    echo "Packaged dist/NXKit-${platform}-${arch}.app.tar.gz"
+
+run *args:
+    cd "{{ go_dir }}" && go run main.go {{ args }}
+
+dev *args:
+    cd "{{ go_dir }}" && reflex -d none -sr '\.go$' -- sh -c 'cd .. && just run {{ args }}'
 
 #
 # Vendor
 #
 
 _nxkit_image:
-  docker build --platform linux/amd64 --tag {{nxkit_image}} vendor/docker
+    docker build --platform linux/amd64 --tag {{ nxkit_image }} vendor/docker
 
 # rebuilds all vendor dependencies
 vendor: _nxkit_image
-  for c in $(just --summary | xargs -n1 | grep vendor-); do just $c; done
+    for c in $(just --summary | xargs -n1 | grep vendor-); do just $c; done
 
 vendor-nro: _nxkit_image
-  docker run -ti --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{nxkit_image}} bash -c '(cd /src; make clean; make all)'
+    docker run --rm -v "$PWD/vendor/Forwarder-Mod:/src" {{ nxkit_image }} bash -c '(cd /src; make clean; make all)'
+    cp vendor/Forwarder-Mod/hbl.nso go/lib/hacbrewpack/assets/main.nso
+    cp vendor/Forwarder-Mod/hbl.npdm go/lib/hacbrewpack/assets/main.npdm
+
 vendor-hacbrewpack: _nxkit_image
-  docker run -ti --rm -v "$PWD/vendor/hacbrewpack:/src" {{nxkit_image}} bash -c '(cd /src; make clean_full; make)'
+    docker run --rm -v "$PWD/vendor/hacbrewpack:/src" {{ nxkit_image }} bash -c '(cd /src; make clean_full; make)'
+
+go-assets: vendor-nro
 
 fetch-titles:
-  npm exec tsx vendor/tinfoil/update.ts
-
-#
-# Release
-#
-
-publish-xtsn:
-  cd "{{xtsn_dir}}" && npm run prepare && npm publish
-
-package:
-  npm run make
-
-publish:
-  #!/usr/bin/env bash
-  set -euo pipefail
-
-  just rebuild-electron
-  npm run publish
-
-#
-# Hooks
-#
-
-# hook that's run pre-commit
-pre-commit:
-  #!/usr/bin/env bash
-  set -uo pipefail
-
-  git diff --exit-code >/dev/null
-  needs_save=$?
-
-  set -e
-
-  saved="precommit.diff"
-  if [ $needs_save -ne 0 ]; then
-    git diff > "$saved"
-    git apply -R "$saved"
-  fi
-  just format
-  just test-all
-  if [ -f "$saved" ]; then
-    git apply "$saved"
-    rm "$saved"
-  fi
+    cd legacy && npm exec tsx ../vendor/tinfoil/update.ts

@@ -6,6 +6,7 @@ LDFLAGS = -lmbedtls -lmbedx509 -lmbedcrypto
 # options for enscripten
 # https://emsettings.surma.technology/
 CC = emcc
+CFLAGS += -DNXKIT_DETERMINISTIC_RSA_PSS=1
 CFLAGS += -flto -Os
 LDFLAGS += -s ENVIRONMENT='web,webview,worker,node'
 LDFLAGS += -s MODULARIZE=1 -s "EXPORT_NAME='hacbrewpack'"

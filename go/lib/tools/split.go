@@ -1,6 +1,7 @@
 package tools
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,11 +9,21 @@ import (
 	"strings"
 )
 
+type ProgressFunc func(done, total int64)
+
 // Split splits a file into multiple parts
 // If asArchive is true, creates a directory structure, otherwise splits into files
 // If inPlace is true, modifies the original file
 // If splitSize is 0, it will be set automatically
 func Split(filePath string, asArchive, inPlace bool, splitSize int64) (string, error) {
+	return SplitWithProgress(filePath, asArchive, inPlace, splitSize, nil)
+}
+
+func SplitWithProgress(filePath string, asArchive, inPlace bool, splitSize int64, progress ProgressFunc) (string, error) {
+	return SplitWithProgressContext(context.Background(), filePath, asArchive, inPlace, splitSize, progress)
+}
+
+func SplitWithProgressContext(ctx context.Context, filePath string, asArchive, inPlace bool, splitSize int64, progress ProgressFunc) (string, error) {
 	if splitSize == 0 {
 		if asArchive {
 			splitSize = 0xffff0000
@@ -62,8 +73,21 @@ func Split(filePath string, asArchive, inPlace bool, splitSize int64) (string, e
 		limit = -1
 	}
 
+	totalBytes := fileSize
+	if inPlace {
+		totalBytes = max(fileSize-splitSize, 0)
+	}
+	var copiedBytes int64
+	if progress != nil {
+		progress(0, totalBytes)
+	}
+
 	// Process chunks from the end of the file towards the beginning
 	for offset > limit {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
 		splitPath := getSplitPath()
 
 		if asArchive {
@@ -86,7 +110,7 @@ func Split(filePath string, asArchive, inPlace bool, splitSize int64) (string, e
 		}
 
 		bytesToCopy := end - start
-		if _, err := io.CopyN(splitFile, file, bytesToCopy); err != nil {
+		if err := copyNWithProgress(ctx, splitFile, file, bytesToCopy, &copiedBytes, totalBytes, progress); err != nil {
 			splitFile.Close()
 			return "", fmt.Errorf("failed to copy data: %w", err)
 		}
@@ -117,6 +141,53 @@ func Split(filePath string, asArchive, inPlace bool, splitSize int64) (string, e
 		}
 	}
 
+	if progress != nil {
+		progress(totalBytes, totalBytes)
+	}
+
 	outputPath := filepath.Dir(getSplitPath())
 	return outputPath, nil
+}
+
+func copyNWithProgress(ctx context.Context, dst io.Writer, src io.Reader, bytesToCopy int64, copiedBytes *int64, totalBytes int64, progress ProgressFunc) error {
+	if bytesToCopy == 0 {
+		return nil
+	}
+
+	buf := make([]byte, 1024*1024)
+	remaining := bytesToCopy
+	for remaining > 0 {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+
+		readSize := int64(len(buf))
+		if remaining < readSize {
+			readSize = remaining
+		}
+
+		nr, readErr := src.Read(buf[:readSize])
+		if nr > 0 {
+			nw, writeErr := dst.Write(buf[:nr])
+			if writeErr != nil {
+				return writeErr
+			}
+			if nw != nr {
+				return io.ErrShortWrite
+			}
+			remaining -= int64(nw)
+			*copiedBytes += int64(nw)
+			if progress != nil {
+				progress(*copiedBytes, totalBytes)
+			}
+		}
+		if readErr != nil {
+			if readErr == io.EOF && remaining == 0 {
+				return nil
+			}
+			return readErr
+		}
+	}
+
+	return nil
 }

@@ -398,7 +398,7 @@ const systemTitleIds = {
 };
 
 export const titleIdsPromise = (async function getAllTitleIds(): Promise<Set<string>> {
-  const GameTitles = (await import('../../../vendor/tinfoil/titles.json')) as unknown as TinfoilResponse;
+  const GameTitles = (await import('../../../../vendor/tinfoil/titles.json')) as unknown as TinfoilResponse;
 
   const values = new Set(
     Object.values(systemTitleIds)

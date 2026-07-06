@@ -1,4 +1,4 @@
-/// <reference types="../../src/typings.d.ts" />
+/// <reference types="../../legacy/src/typings.d.ts" />
 
 import fs from 'node:fs/promises';
 import path from 'node:path';
