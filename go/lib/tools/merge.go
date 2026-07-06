@@ -1,9 +1,9 @@
 package tools
 
 import (
+	"context"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -12,6 +12,14 @@ import (
 )
 
 func Merge(path string, inPlace bool) (string, error) {
+	return MergeWithProgress(path, inPlace, nil)
+}
+
+func MergeWithProgress(path string, inPlace bool, progress ProgressFunc) (string, error) {
+	return MergeWithProgressContext(context.Background(), path, inPlace, progress)
+}
+
+func MergeWithProgressContext(ctx context.Context, path string, inPlace bool, progress ProgressFunc) (string, error) {
 	firstFileName := filepath.Base(path)
 	matched, err := regexp.MatchString(`^00$|.*\.00$`, firstFileName)
 	if err != nil {
@@ -45,6 +53,19 @@ func Merge(path string, inPlace bool) (string, error) {
 
 	sort.Strings(splitFiles)
 
+	var totalBytes int64
+	for _, splitFile := range splitFiles {
+		stat, err := os.Stat(splitFile)
+		if err != nil {
+			return "", err
+		}
+		totalBytes += stat.Size()
+	}
+	var copiedBytes int64
+	if progress != nil {
+		progress(0, totalBytes)
+	}
+
 	var mergedFileName string
 	if isArchive {
 		parsed := filepath.Base(dir)
@@ -72,13 +93,23 @@ func Merge(path string, inPlace bool) (string, error) {
 	defer mergedFile.Close()
 
 	for _, splitFile := range splitFiles {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
 		fmt.Printf("Merging %s...\n", splitFile)
 		splitFileHandle, err := os.Open(splitFile)
 		if err != nil {
 			return "", err
 		}
 
-		_, err = io.Copy(mergedFile, splitFileHandle)
+		stat, statErr := splitFileHandle.Stat()
+		if statErr != nil {
+			splitFileHandle.Close()
+			return "", statErr
+		}
+
+		err = copyNWithProgress(ctx, mergedFile, splitFileHandle, stat.Size(), &copiedBytes, totalBytes, progress)
 		splitFileHandle.Close()
 		if err != nil {
 			return "", err
@@ -95,6 +126,10 @@ func Merge(path string, inPlace bool) (string, error) {
 		if err := os.Remove(dir); err != nil {
 			fmt.Printf("Warning: %v\n", err)
 		}
+	}
+
+	if progress != nil {
+		progress(totalBytes, totalBytes)
 	}
 
 	return mergedFilePath, nil

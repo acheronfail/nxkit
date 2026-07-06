@@ -7,8 +7,7 @@ import (
 )
 
 func TestOptionsSetDefaults(t *testing.T) {
-	root := t.TempDir()
-	opt := Options{RepoRoot: root}
+	opt := Options{KeysPath: filepath.Join(t.TempDir(), "prod.keys")}
 
 	if err := opt.setDefaults(); err != nil {
 		t.Fatalf("setDefaults failed: %v", err)
@@ -26,19 +25,24 @@ func TestOptionsSetDefaults(t *testing.T) {
 	if !bytes.Equal(opt.KeyAreaKey, bytes.Repeat([]byte{0x04}, 16)) {
 		t.Fatalf("unexpected default KeyAreaKey: %x", opt.KeyAreaKey)
 	}
-	if opt.KeysPath != filepath.Join(root, ".data", "prod.keys") {
-		t.Fatalf("KeysPath = %s", opt.KeysPath)
+	if opt.OutPath != "0162696bc58e0000_title=1_publisher=2_nroPath=3.nsp" {
+		t.Fatalf("OutPath = %s", opt.OutPath)
+	}
+	if opt.ExefsMainPath != "" {
+		t.Fatalf("ExefsMainPath = %s, want embedded default", opt.ExefsMainPath)
+	}
+	if opt.NintendoLogoPath != "" {
+		t.Fatalf("NintendoLogoPath = %s, want embedded default", opt.NintendoLogoPath)
 	}
 }
 
 func TestOptionsSetDefaultsValidation(t *testing.T) {
 	for name, opt := range map[string]Options{
-		"missing repo root":     {},
-		"old sdk version":       {RepoRoot: t.TempDir(), SDKVersion: 0x000a0000},
-		"low keygeneration":     {RepoRoot: t.TempDir(), KeyGeneration: -1},
-		"high keygeneration":    {RepoRoot: t.TempDir(), KeyGeneration: 33},
-		"short key area key":    {RepoRoot: t.TempDir(), KeyAreaKey: []byte{0x04}},
-		"oversize key area key": {RepoRoot: t.TempDir(), KeyAreaKey: bytes.Repeat([]byte{0x04}, 17)},
+		"old sdk version":       {SDKVersion: 0x000a0000},
+		"low keygeneration":     {KeyGeneration: -1},
+		"high keygeneration":    {KeyGeneration: 33},
+		"short key area key":    {KeyAreaKey: []byte{0x04}},
+		"oversize key area key": {KeyAreaKey: bytes.Repeat([]byte{0x04}, 17)},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := opt.setDefaults(); err == nil {

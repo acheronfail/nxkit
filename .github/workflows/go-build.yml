@@ -1,0 +1,129 @@
+name: Go Build
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+          cache-dependency-path: go/go.sum
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc make pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+
+      - name: Download Go modules
+        working-directory: go
+        run: go mod download
+
+      - name: Test
+        working-directory: go
+        shell: bash
+        env:
+          CGO_ENABLED: '1'
+        run: just test-all
+
+  build:
+    name: build-${{ matrix.target }}
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            os: ubuntu-latest
+            artifact-path: go/dist/nxkit-linux-amd64
+          - target: macos-arm64
+            os: macos-latest
+            artifact-path: go/dist/NXKit-macos-arm64.app.tar.gz
+          - target: macos-amd64
+            os: macos-15-intel
+            artifact-path: go/dist/NXKit-macos-amd64.app.tar.gz
+          - target: windows-amd64
+            os: windows-latest
+            artifact-path: go/dist/nxkit-windows-amd64.exe
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up just
+        uses: extractions/setup-just@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.1'
+          cache-dependency-path: go/go.sum
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+
+      - name: Install macOS dependencies
+        if: runner.os == 'macOS'
+        run: brew install libusb pkg-config
+
+      - name: Install Windows dependencies
+        if: runner.os == 'Windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          path-type: inherit
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-libusb
+            mingw-w64-ucrt-x86_64-pkgconf
+
+      - name: Add MSYS2 to PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: '"C:\msys64\ucrt64\bin" | Out-File -FilePath $env:GITHUB_PATH -Append'
+
+      - name: Download Go modules
+        working-directory: go
+        run: go mod download
+
+      - name: Package
+        working-directory: go
+        shell: bash
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
+          CGO_ENABLED: '1'
+        run: just package
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: ${{ matrix.artifact-path }}
+          if-no-files-found: error

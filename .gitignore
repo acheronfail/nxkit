@@ -104,5 +104,6 @@ scripts/build/
 scripts/bench100m.js
 .bin/
 .tmp/
+go/dist/
 resources.json
 *.nacp

@@ -16,6 +16,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/acheronfail/nxkit/lib/cnmt"
 	"github.com/acheronfail/nxkit/lib/keys"
@@ -38,7 +39,6 @@ const (
 )
 
 type Options struct {
-	RepoRoot         string
 	OutPath          string
 	KeysPath         string
 	ExefsMainPath    string
@@ -56,6 +56,7 @@ type Options struct {
 	TitlePublisher   string
 	Version          string
 	NROPath          string
+	NROArgv          []string
 	SDKVersion       uint32
 	KeyGeneration    int
 	KeyAreaKey       []byte
@@ -104,8 +105,8 @@ func BuildForwarderNSP(opt Options) error {
 		sdkVersion:    opt.SDKVersion,
 		keyGeneration: opt.KeyGeneration,
 	}
-	if ctx.opt.RepoRoot == "" {
-		return fmt.Errorf("RepoRoot is required")
+	if ctx.opt.KeysPath == "" {
+		return fmt.Errorf("KeysPath is required")
 	}
 
 	keyset, err := keys.NewFromPath(ctx.opt.KeysPath)
@@ -123,7 +124,7 @@ func BuildForwarderNSP(opt Options) error {
 		return fmt.Errorf("key_area_key_application_%02x must be 16 bytes, got %d", ctx.keyGeneration-1, len(keyAreaKey))
 	}
 	ctx.header = keyset.HeaderKey
-	ctx.priv, err = readPrivateKey(filepath.Join(ctx.opt.RepoRoot, "go", "keys", "hacbrewpack.priv.pem"))
+	ctx.priv, err = parsePrivateKey(defaultPrivateKeyPEM)
 	if err != nil {
 		return err
 	}
@@ -173,9 +174,6 @@ func BuildForwarderNSP(opt Options) error {
 }
 
 func (opt *Options) setDefaults() error {
-	if opt.RepoRoot == "" {
-		return fmt.Errorf("RepoRoot is required")
-	}
 	if opt.TitleID == 0 {
 		opt.TitleID = defaultTitleID
 	}
@@ -192,25 +190,7 @@ func (opt *Options) setDefaults() error {
 		return fmt.Errorf("KeyGeneration must be in range 1-32, got %d", opt.KeyGeneration)
 	}
 	if opt.OutPath == "" {
-		opt.OutPath = filepath.Join(opt.RepoRoot, "go", "0162696bc58e0000_title=1_publisher=2_nroPath=3.nsp")
-	}
-	if opt.KeysPath == "" {
-		opt.KeysPath = filepath.Join(opt.RepoRoot, ".data", "prod.keys")
-	}
-	if opt.ExefsMainPath == "" {
-		opt.ExefsMainPath = filepath.Join(opt.RepoRoot, "src/public/exefs/main.nso")
-	}
-	if opt.ExefsNPDMPath == "" {
-		opt.ExefsNPDMPath = filepath.Join(opt.RepoRoot, "src/public/exefs/main.npdm")
-	}
-	if opt.NintendoLogoPath == "" {
-		opt.NintendoLogoPath = filepath.Join(opt.RepoRoot, "src/public/NintendoLogo.png")
-	}
-	if opt.StartupMoviePath == "" {
-		opt.StartupMoviePath = filepath.Join(opt.RepoRoot, "src/public/StartupMovie.gif")
-	}
-	if opt.IconPath == "" {
-		opt.IconPath = filepath.Join(opt.RepoRoot, ".data", "test_magenta_test.canvas.jpg")
+		opt.OutPath = "0162696bc58e0000_title=1_publisher=2_nroPath=3.nsp"
 	}
 	if opt.TitleName == "" {
 		opt.TitleName = "1"
@@ -265,11 +245,17 @@ func (ctx *buildContext) stageInputs() error {
 		if err := copyFile(ctx.opt.IconPath, filepath.Join(ctx.tmpDir, "control", "icon_AmericanEnglish.dat")); err != nil {
 			return err
 		}
-	}
-	if err := copyFile(ctx.opt.ExefsMainPath, filepath.Join(ctx.tmpDir, "exefs", "main")); err != nil {
+	} else if err := os.WriteFile(filepath.Join(ctx.tmpDir, "control", "icon_AmericanEnglish.dat"), defaultIcon, 0o644); err != nil {
 		return err
 	}
-	if err := copyFile(ctx.opt.ExefsNPDMPath, filepath.Join(ctx.tmpDir, "exefs", "main.npdm")); err != nil {
+	if err := copyPathOrBytes(ctx.opt.ExefsMainPath, defaultExefsMain, filepath.Join(ctx.tmpDir, "exefs", "main")); err != nil {
+		return err
+	}
+	if err := copyPathOrBytes(ctx.opt.ExefsNPDMPath, defaultExefsNPDM, filepath.Join(ctx.tmpDir, "exefs", "main.npdm")); err != nil {
+		return err
+	}
+	pubKeyPath := filepath.Join(ctx.tmpDir, "hacbrewpack.pub.pem")
+	if err := os.WriteFile(pubKeyPath, defaultPublicKeyPEM, 0o644); err != nil {
 		return err
 	}
 	if _, err := npdm.ProcessWithPublicKeyPath(
@@ -277,7 +263,7 @@ func (ctx *buildContext) stageInputs() error {
 		filepath.Join(ctx.tmpDir, "backup"),
 		ctx.titleID,
 		ctx.opt.NoSignNCASig2,
-		filepath.Join(ctx.opt.RepoRoot, "go", "keys", "hacbrewpack.pub.pem"),
+		pubKeyPath,
 	); err != nil {
 		return err
 	}
@@ -287,10 +273,10 @@ func (ctx *buildContext) stageInputs() error {
 				return err
 			}
 		} else {
-			if err := copyFile(ctx.opt.NintendoLogoPath, filepath.Join(ctx.tmpDir, "logo", "NintendoLogo.png")); err != nil {
+			if err := copyPathOrBytes(ctx.opt.NintendoLogoPath, defaultNintendoLogo, filepath.Join(ctx.tmpDir, "logo", "NintendoLogo.png")); err != nil {
 				return err
 			}
-			if err := copyFile(ctx.opt.StartupMoviePath, filepath.Join(ctx.tmpDir, "logo", "StartupMovie.gif")); err != nil {
+			if err := copyPathOrBytes(ctx.opt.StartupMoviePath, defaultStartupMovie, filepath.Join(ctx.tmpDir, "logo", "StartupMovie.gif")); err != nil {
 				return err
 			}
 		}
@@ -301,7 +287,8 @@ func (ctx *buildContext) stageInputs() error {
 				return err
 			}
 		} else {
-			if err := os.WriteFile(filepath.Join(ctx.tmpDir, "romfs", "nextArgv"), []byte(ctx.opt.NROPath), 0o644); err != nil {
+			nextArgv := strings.Join(append([]string{ctx.opt.NROPath}, ctx.opt.NROArgv...), " ")
+			if err := os.WriteFile(filepath.Join(ctx.tmpDir, "romfs", "nextArgv"), []byte(nextArgv), 0o644); err != nil {
 				return err
 			}
 			if err := os.WriteFile(filepath.Join(ctx.tmpDir, "romfs", "nextNroPath"), []byte(ctx.opt.NROPath), 0o644); err != nil {
@@ -835,16 +822,19 @@ func putUint48(dst []byte, v uint64) {
 	}
 }
 
-func readPrivateKey(path string) (*rsa.PrivateKey, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
+func parsePrivateKey(data []byte) (*rsa.PrivateKey, error) {
 	block, _ := pem.Decode(data)
 	if block == nil {
 		return nil, fmt.Errorf("invalid private key PEM")
 	}
 	return x509.ParsePKCS1PrivateKey(block.Bytes)
+}
+
+func copyPathOrBytes(src string, data []byte, dst string) error {
+	if src != "" {
+		return copyFile(src, dst)
+	}
+	return os.WriteFile(dst, data, 0o644)
 }
 
 func copyFile(src, dst string) error {

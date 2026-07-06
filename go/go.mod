@@ -6,28 +6,28 @@ toolchain go1.24.1
 
 require fyne.io/fyne/v2 v2.6.0
 
-require github.com/google/gousb v1.1.3
+require (
+	github.com/google/gousb v1.1.3
+	github.com/ncruces/zenity v0.10.14
+)
 
 require (
 	fyne.io/systray v1.11.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/fatih/color v1.18.0 // indirect
+	github.com/akavel/rsrc v0.10.2 // indirect
+	github.com/dchest/jsmin v0.0.0-20220218165748-59f39799265f // indirect
 	github.com/fyne-io/glfw-js v0.2.0 // indirect
 	github.com/fyne-io/image v0.1.1 // indirect
 	github.com/hack-pad/go-indexeddb v0.3.2 // indirect
 	github.com/hack-pad/safejs v0.1.0 // indirect
+	github.com/josephspurrier/goversioninfo v1.4.1 // indirect
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
-	github.com/mattn/go-colorable v0.1.13 // indirect
-	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
+	github.com/randall77/makefat v0.0.0-20210315173500-7ddd0e42c844 // indirect
 	github.com/rymdport/portal v0.4.1 // indirect
 )
 
-require (
-	github.com/elliotwutingfeng/asciiset v0.0.0-20230602022725-51bbb787efab // indirect
-	github.com/google/uuid v1.3.0 // indirect
-	github.com/jpillora/sizestr v1.0.0
-)
+require github.com/google/uuid v1.3.0 // indirect
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
