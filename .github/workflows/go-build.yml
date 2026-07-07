@@ -86,7 +86,7 @@ jobs:
         include:
           - target: linux-amd64
             os: ubuntu-latest
-            artifact-path: go/dist/nxkit-linux-amd64
+            artifact-path: go/dist/nxkit-linux-amd64.zip
           - target: macos-arm64
             os: macos-latest
             artifact-path: go/dist/NXKit-macos-arm64.app.tar.gz
@@ -117,7 +117,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc just pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev
+          sudo apt-get install -y gcc just pkg-config libgl1-mesa-dev xorg-dev libusb-1.0-0-dev zip
 
       - name: Install macOS dependencies
         if: runner.os == 'macOS'
@@ -246,7 +246,7 @@ jobs:
           version="${GITHUB_REF_NAME#v}"
           mkdir -p release-assets
 
-          cp release-artifacts/linux-amd64/nxkit-linux-amd64 "release-assets/nxkit-${version}-linux-amd64"
+          cp release-artifacts/linux-amd64/nxkit-linux-amd64.zip "release-assets/nxkit-${version}-linux-amd64.zip"
           cp release-artifacts/macos-arm64/NXKit-macos-arm64.app.tar.gz "release-assets/NXKit-${version}-macos-arm64.app.tar.gz"
           cp release-artifacts/macos-amd64/NXKit-macos-amd64.app.tar.gz "release-assets/NXKit-${version}-macos-amd64.app.tar.gz"
 
