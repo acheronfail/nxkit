@@ -24,5 +24,5 @@ nxkit_binary_name() {
 
 nxkit_build_binary() {
   local binary="$1"
-  go build -trimpath -ldflags "-X github.com/acheronfail/nxkit/gui.packagedBuild=true" -o "dist/${binary}" main.go
+  go build -trimpath -ldflags "${NXKIT_GO_PACKAGE_LDFLAGS:?NXKIT_GO_PACKAGE_LDFLAGS must be set by the justfile}" -o "dist/${binary}" main.go
 }

@@ -138,6 +138,7 @@ func NandExplorerTab() fyne.CanvasObject {
 	selectedPath := widget.NewLabel("No entry selected")
 	selectedPath.Wrapping = fyne.TextWrapBreak
 	selectedPath.TextStyle = fyne.TextStyle{Monospace: true}
+	selectedPath.Selectable = true
 
 	var rebuildPartitions func()
 	var rebuildMounted func()

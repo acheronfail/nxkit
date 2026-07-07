@@ -12,8 +12,11 @@ fi
 `
 version := env_var_or_default("NXKIT_VERSION", git_version)
 buildVersion := env_var_or_default("NXKIT_BUILD_VERSION", "1")
+goLdflags := "-X github.com/acheronfail/nxkit/gui.packageVersion=" + version
+goPackageLdflags := goLdflags + " -X github.com/acheronfail/nxkit/gui.packagedBuild=true"
 export NXKIT_PACKAGE_VERSION := version
 export NXKIT_BUILD_VERSION := buildVersion
+export NXKIT_GO_PACKAGE_LDFLAGS := goPackageLdflags
 
 _default:
     just -l
@@ -56,7 +59,7 @@ bench:
     cd "{{ go_dir }}" && go test -bench=. github.com/acheronfail/nxkit/...
 
 build:
-    cd "{{ go_dir }}" && go build -o nxkit main.go
+    cd "{{ go_dir }}" && go build -ldflags '{{ goLdflags }}' -o nxkit main.go
 
 [linux]
 package:
@@ -71,7 +74,7 @@ package:
     cd "{{ go_dir }}" && bash ./scripts/package-windows.sh
 
 run *args:
-    cd "{{ go_dir }}" && go run main.go {{ args }}
+    cd "{{ go_dir }}" && go run -ldflags '{{ goLdflags }}' main.go {{ args }}
 
 dev *args:
     cd "{{ go_dir }}" && reflex -d none -sr '\.go$' -- sh -c 'cd .. && just run {{ args }}'

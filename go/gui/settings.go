@@ -7,6 +7,7 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 )
 
@@ -21,6 +22,10 @@ func SettingsTab() fyne.CanvasObject {
 		state.SetShowAdvanced(checked)
 	})
 	advanced.SetChecked(state.ShowAdvanced)
+	version := widget.NewLabelWithStyle(fmt.Sprintf("Version %s", packageVersion), fyne.TextAlignTrailing, fyne.TextStyle{Monospace: true})
+	version.Importance = widget.LowImportance
+	version.Selectable = true
+	version.SizeName = theme.SizeNameCaptionText
 
 	var clearKeys *widget.Button
 	refreshStatus := func() {
@@ -65,7 +70,7 @@ func SettingsTab() fyne.CanvasObject {
 		refreshStatus()
 	})
 
-	return container.NewVBox(
+	content := container.NewVBox(
 		widget.NewLabelWithStyle("Select Prod Keys", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		status,
 		container.NewHBox(chooseKeys, clearKeys, reloadKeys, layout.NewSpacer()),
@@ -75,4 +80,7 @@ func SettingsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("Other toggles", fyne.TextAlignLeading, fyne.TextStyle{Bold: true}),
 		advanced,
 	)
+	footer := container.NewHBox(layout.NewSpacer(), version)
+
+	return container.NewBorder(nil, footer, nil, nil, content)
 }

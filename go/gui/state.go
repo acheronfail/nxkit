@@ -30,7 +30,10 @@ type appState struct {
 	advancedListeners   []func(bool)
 }
 
-var packagedBuild = "false"
+var (
+	packagedBuild  = "false"
+	packageVersion = "0.0.0"
+)
 
 func newAppState(options Options) (*appState, error) {
 	payloadDir, err := payloadDirectory()
