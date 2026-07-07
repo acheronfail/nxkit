@@ -12,6 +12,8 @@ fi
 `
 version := env_var_or_default("NXKIT_VERSION", git_version)
 buildVersion := env_var_or_default("NXKIT_BUILD_VERSION", "1")
+export NXKIT_PACKAGE_VERSION := version
+export NXKIT_BUILD_VERSION := buildVersion
 
 _default:
     just -l
@@ -56,133 +58,17 @@ bench:
 build:
     cd "{{ go_dir }}" && go build -o nxkit main.go
 
+[linux]
 package:
-    #!/usr/bin/env bash
-    set -euo pipefail
-    cd go
-    export GOCACHE="${GOCACHE:-$PWD/../.gocache}"
-    trap 'rm -f resource_windows_*.syso' EXIT
+    cd "{{ go_dir }}" && bash ./scripts/package-linux.sh
 
-    os="$(go env GOOS)"
-    arch="$(go env GOARCH)"
-    platform="$os"
-    version="{{ version }}"
-    build_version="{{ buildVersion }}"
-    if ! [[ "$build_version" =~ ^[0-9]+$ ]]; then
-      build_version="1"
-    fi
-    if [[ "$os" == "darwin" ]]; then
-      platform="macos"
-    fi
+[macos]
+package:
+    cd "{{ go_dir }}" && bash ./scripts/package-macos.sh
 
-    binary="nxkit-${platform}-${arch}"
-    if [[ "$os" == "windows" ]]; then
-      binary="${binary}.exe"
-    fi
-
-    mkdir -p dist
-    rm -f resource_windows_*.syso
-    if [[ "$os" == "windows" ]]; then
-      icon_path="resources/NXKit.ico"
-
-      version_core="${version%%[-+]*}"
-      IFS=. read -r ver_major ver_minor ver_patch <<< "$version_core"
-      for part in ver_major ver_minor ver_patch; do
-        if ! [[ "${!part:-}" =~ ^[0-9]+$ ]]; then
-          printf -v "$part" '%s' "0"
-        fi
-      done
-
-      arch_flag=()
-      case "$arch" in
-        amd64)
-          arch_flag=(-64)
-          ;;
-        arm)
-          arch_flag=(-arm)
-          ;;
-        arm64)
-          arch_flag=(-arm -64)
-          ;;
-      esac
-
-      (unset GOOS GOARCH; go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo \
-        -skip-versioninfo \
-        -icon "$icon_path" \
-        -o "resource_windows_${arch}.syso" \
-        "${arch_flag[@]}" \
-        -description "NXKit" \
-        -product-name "NXKit" \
-        -internal-name "${binary}" \
-        -original-name "${binary}" \
-        -file-version "$version" \
-        -product-version "$version" \
-        -ver-major "$ver_major" \
-        -ver-minor "$ver_minor" \
-        -ver-patch "$ver_patch" \
-        -ver-build "$build_version" \
-        -product-ver-major "$ver_major" \
-        -product-ver-minor "$ver_minor" \
-        -product-ver-patch "$ver_patch" \
-        -product-ver-build "$build_version")
-    fi
-    go build -trimpath -ldflags "-X github.com/acheronfail/nxkit/gui.packagedBuild=true" -o "dist/${binary}" main.go
-
-    if [[ "$os" != "darwin" ]]; then
-      echo "Built dist/${binary}"
-      exit 0
-    fi
-
-    app_dir="dist/NXKit.app"
-    plist="${app_dir}/Contents/Info.plist"
-    resources_dir="${app_dir}/Contents/Resources"
-    icon_source="resources/nxkit-icon-subtle.png"
-    icon_source_256="resources/nxkit-icon-subtle-256.png"
-    icon_source_svg="resources/nxkit-icon-subtle.svg"
-    iconset="${resources_dir}/NXKit.iconset"
-
-    rm -rf "$app_dir"
-    mkdir -p "${app_dir}/Contents/MacOS" "$resources_dir" "$iconset"
-    cp "dist/${binary}" "${app_dir}/Contents/MacOS/${binary}"
-    chmod +x "${app_dir}/Contents/MacOS/${binary}"
-
-    cp "$icon_source" "${resources_dir}/nxkit-icon-subtle.png"
-    cp "$icon_source_256" "${resources_dir}/nxkit-icon-subtle-256.png"
-    cp "$icon_source_svg" "${resources_dir}/nxkit-icon-subtle.svg"
-    sips -z 16 16 "$icon_source" --out "${iconset}/icon_16x16.png" >/dev/null
-    sips -z 32 32 "$icon_source" --out "${iconset}/icon_16x16@2x.png" >/dev/null
-    sips -z 32 32 "$icon_source" --out "${iconset}/icon_32x32.png" >/dev/null
-    sips -z 64 64 "$icon_source" --out "${iconset}/icon_32x32@2x.png" >/dev/null
-    sips -z 128 128 "$icon_source" --out "${iconset}/icon_128x128.png" >/dev/null
-    cp "$icon_source_256" "${iconset}/icon_128x128@2x.png"
-    cp "$icon_source_256" "${iconset}/icon_256x256.png"
-    sips -z 512 512 "$icon_source" --out "${iconset}/icon_256x256@2x.png" >/dev/null
-    sips -z 512 512 "$icon_source" --out "${iconset}/icon_512x512.png" >/dev/null
-    cp "$icon_source" "${iconset}/icon_512x512@2x.png"
-    icon_file=""
-    if iconutil --convert icns "$iconset" --output "${resources_dir}/NXKit.icns"; then
-      icon_file="NXKit.icns"
-    else
-      echo "warning: failed to create NXKit.icns; packaging app without a bundle icon" >&2
-    fi
-    rm -rf "$iconset"
-
-    plutil -create xml1 "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleName string NXKit" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string NXKit" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${binary}" "$plist"
-    if [[ -n "$icon_file" ]]; then
-      /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string ${icon_file}" "$plist"
-    fi
-    /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string fail.acheron.nxkit" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundlePackageType string APPL" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleShortVersionString string ${version}" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :CFBundleVersion string ${build_version}" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :LSApplicationCategoryType string public.app-category.utilities" "$plist"
-    /usr/libexec/PlistBuddy -c "Add :NSHighResolutionCapable bool true" "$plist"
-
-    tar -czf "dist/NXKit-${platform}-${arch}.app.tar.gz" -C dist NXKit.app
-    echo "Packaged dist/NXKit-${platform}-${arch}.app.tar.gz"
+[windows]
+package:
+    cd "{{ go_dir }}" && bash ./scripts/package-windows.sh
 
 run *args:
     cd "{{ go_dir }}" && go run main.go {{ args }}

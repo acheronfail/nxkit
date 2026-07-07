@@ -3,6 +3,8 @@ package gui
 import (
 	"fmt"
 
+	"github.com/acheronfail/nxkit/resources"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
@@ -23,8 +25,10 @@ func StartGuiApp(options Options) {
 	}
 
 	nxkitApp = app.NewWithID("fail.acheron.nxkit")
+	nxkitApp.SetIcon(resources.NXKitIcon)
 	nxkitApp.Settings().SetTheme(newNXKitTheme())
 	mainWindow = nxkitApp.NewWindow("NXKit")
+	mainWindow.SetIcon(resources.NXKitIcon)
 	mainWindow.Resize(fyne.NewSize(960, 720))
 
 	shortcutQuit := &desktop.CustomShortcut{KeyName: fyne.KeyQ, Modifier: fyne.KeyModifierControl}
