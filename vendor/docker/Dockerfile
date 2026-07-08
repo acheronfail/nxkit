@@ -1,5 +1,5 @@
 # This dockerfile is used to build the Switch native binaries
-FROM devkitpro/devkita64@sha256:241527399a65d16aaffb9f79b5453f03c0a068413c48b35277e503bb5525e2c0
+FROM devkitpro/devkita64@sha256:1fc388c3a0d34bd2045a6dadcb1020e069d5f876a187fd705de14b4440c00282
 
 # Install build tools
 RUN sudo apt update && sudo apt install -y build-essential
