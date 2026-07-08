@@ -2,15 +2,16 @@ package gui
 
 import (
 	"errors"
-	"os"
-	"path/filepath"
-	"runtime"
+	"strings"
 
 	"fyne.io/fyne/v2"
-	"github.com/ncruces/zenity"
+	"github.com/sqweek/dialog"
 )
 
-type nativeFileFilter = zenity.FileFilter
+type nativeFileFilter struct {
+	name       string
+	extensions []string
+}
 
 func chooseNativeFile(title string, filters []nativeFileFilter, onChosen func(string)) {
 	go func() {
@@ -58,73 +59,35 @@ func saveNativeFile(title string, defaultName string, filters []nativeFileFilter
 }
 
 func nativeOpenFile(title string, filters []nativeFileFilter) (string, bool, error) {
-	opts := nativeFileOptions(title, filters)
-	path, err := zenity.SelectFile(opts...)
+	builder := nativeFileDialog(title, filters)
+	path, err := builder.Load()
 	return nativePathResult(path, err)
 }
 
 func nativeOpenDirectory(title string) (string, bool, error) {
-	opts := nativeFileOptions(title, nil)
-	opts = append(opts, zenity.Directory())
-	path, err := zenity.SelectFile(opts...)
+	path, err := dialog.Directory().Title(title).Browse()
 	return nativePathResult(path, err)
 }
 
 func nativeSaveFile(title string, defaultName string, filters []nativeFileFilter) (string, bool, error) {
-	opts := nativeFileOptions(title, filters)
+	builder := nativeFileDialog(title, filters)
 	if defaultName != "" {
-		opts = append(opts, zenity.Filename(defaultName))
+		builder = builder.SetStartFile(defaultName)
 	}
-	opts = append(opts, zenity.ConfirmOverwrite())
-	path, err := zenity.SelectFileSave(opts...)
+	path, err := builder.Save()
 	return nativePathResult(path, err)
 }
 
-func nativeFileOptions(title string, filters []nativeFileFilter) []zenity.Option {
-	opts := []zenity.Option{
-		zenity.Title(title),
-		zenity.Modal(),
-	}
-	if icon, ok := nativeDialogWindowIcon(); ok {
-		opts = append(opts, zenity.WindowIcon(icon))
-	}
+func nativeFileDialog(title string, filters []nativeFileFilter) *dialog.FileBuilder {
+	builder := dialog.File().Title(title)
 	for _, filter := range filters {
-		opts = append(opts, filter)
+		builder = builder.Filter(filter.name, filter.extensions...)
 	}
-	return opts
-}
-
-func nativeDialogWindowIcon() (string, bool) {
-	if runtime.GOOS != "darwin" {
-		return "", false
-	}
-
-	candidates := []string{
-		filepath.Join("go", "resources", "nxkit-icon-subtle.png"),
-		filepath.Join("resources", "nxkit-icon-subtle.png"),
-	}
-	if exe, err := os.Executable(); err == nil {
-		exeDir := filepath.Dir(exe)
-		candidates = append([]string{
-			filepath.Join(exeDir, "..", "Resources", "nxkit-icon-subtle.png"),
-			filepath.Join(exeDir, "..", "Resources", "nxkit-icon-subtle-256.png"),
-		}, candidates...)
-	}
-
-	for _, candidate := range candidates {
-		path, err := filepath.Abs(candidate)
-		if err != nil {
-			continue
-		}
-		if info, err := os.Stat(path); err == nil && !info.IsDir() {
-			return path, true
-		}
-	}
-	return "", false
+	return builder
 }
 
 func nativePathResult(path string, err error) (string, bool, error) {
-	if errors.Is(err, zenity.ErrCanceled) {
+	if errors.Is(err, dialog.ErrCancelled) {
 		return "", false, nil
 	}
 	if err != nil {
@@ -134,9 +97,9 @@ func nativePathResult(path string, err error) (string, bool, error) {
 }
 
 func extensionFilter(name string, extensions ...string) nativeFileFilter {
-	patterns := make([]string, len(extensions))
+	cleaned := make([]string, len(extensions))
 	for i, extension := range extensions {
-		patterns[i] = "*" + extension
+		cleaned[i] = strings.TrimPrefix(extension, ".")
 	}
-	return nativeFileFilter{Name: name, Patterns: patterns, CaseFold: true}
+	return nativeFileFilter{name: name, extensions: cleaned}
 }

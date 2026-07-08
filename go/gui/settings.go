@@ -47,7 +47,7 @@ func SettingsTab() fyne.CanvasObject {
 
 	chooseKeys := widget.NewButton("Manually select keys", func() {
 		chooseNativeFile("Choose prod.keys", []nativeFileFilter{
-			{Name: "prod.keys", Patterns: []string{"prod.keys", "*.keys"}, CaseFold: true},
+			extensionFilter("prod.keys", ".keys"),
 		}, func(path string) {
 			if err := state.SetKeysPath(path); err != nil {
 				showError(err)

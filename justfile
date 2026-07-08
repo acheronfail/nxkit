@@ -17,6 +17,7 @@ goPackageLdflags := goLdflags + " -X github.com/acheronfail/nxkit/gui.packagedBu
 export NXKIT_PACKAGE_VERSION := version
 export NXKIT_BUILD_VERSION := buildVersion
 export NXKIT_GO_PACKAGE_LDFLAGS := goPackageLdflags
+export CGO_CFLAGS := env_var_or_default("CGO_CFLAGS", "-Wno-deprecated-declarations")
 
 _default:
     just -l

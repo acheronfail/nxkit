@@ -7,7 +7,7 @@ require fyne.io/fyne/v2 v2.7.4
 require (
 	github.com/google/gousb v1.1.3
 	github.com/klauspost/compress v1.19.0
-	github.com/ncruces/zenity v0.10.14
+	github.com/sqweek/dialog v0.0.0-20260123140253-64c163d53aac
 )
 
 require (
@@ -27,6 +27,7 @@ require (
 )
 
 require (
+	github.com/TheTitanrain/w32 v0.0.0-20180517000239-4f5cfb03fabf // indirect
 	github.com/clipperhouse/uax29/v2 v2.7.0 // indirect
 	github.com/go-gl/glfw/v3.4/glfw v0.1.0-pre.1 // indirect
 	github.com/google/uuid v1.6.0 // indirect
