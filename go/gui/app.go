@@ -9,7 +9,10 @@ import (
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
+	"fyne.io/fyne/v2/layout"
 )
+
+const tabContentPadding = 12
 
 var (
 	nxkitApp   fyne.App
@@ -77,5 +80,9 @@ func StartGuiApp(options Options) {
 }
 
 func newScrollableTabItem(text string, content fyne.CanvasObject) *container.TabItem {
-	return container.NewTabItem(text, container.NewVScroll(content))
+	paddedContent := container.New(
+		layout.NewCustomPaddedLayout(tabContentPadding, tabContentPadding, tabContentPadding, tabContentPadding),
+		content,
+	)
+	return container.NewTabItem(text, container.NewVScroll(paddedContent))
 }

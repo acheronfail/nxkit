@@ -3,6 +3,7 @@ package gui
 import (
 	"fmt"
 	"image"
+	"image/color"
 	"image/jpeg"
 	_ "image/png"
 	"os"
@@ -14,14 +15,24 @@ import (
 	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
+	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
 	"github.com/acheronfail/nxkit/lib/hacbrewpack"
 )
 
-func NroForwarderTab() fyne.CanvasObject {
-	mode := widget.NewSelect([]string{"Application", "RetroArch ROM"}, nil)
-	mode.SetSelected("Application")
+const (
+	forwarderApplicationMode = "Application"
+	forwarderRetroArchMode   = "RetroArch ROM"
+	forwarderPreviewSize     = 260
+)
 
+var (
+	forwarderPreviewBackgroundColor = color.NRGBA{R: 0x0a, G: 0x0b, B: 0x0e, A: 0xff}
+	forwarderPreviewBorderColor     = color.NRGBA{R: 0x3e, G: 0x42, B: 0x4a, A: 0xff}
+)
+
+func NroForwarderTab() fyne.CanvasObject {
+	selectedMode := forwarderApplicationMode
 	id := widget.NewEntry()
 	id.SetPlaceHolder("01..........0000")
 	if generated, err := generateTitleID(); err == nil {
@@ -37,51 +48,116 @@ func NroForwarderTab() fyne.CanvasObject {
 	romPath.SetPlaceHolder("/roms/nes/Kirby's Adventure.zip")
 	imagePath := widget.NewEntry()
 	imagePath.Disable()
+
+	var chooseForwarderImage func()
+	emptyPreview := widget.NewLabelWithStyle("Please select an NRO file or\nan image", fyne.TextAlignCenter, fyne.TextStyle{Bold: true})
 	imagePreview := canvas.NewImageFromFile("")
 	imagePreview.FillMode = canvas.ImageFillContain
-	imagePreview.SetMinSize(fyne.NewSize(180, 180))
-	imagePreviewContainer := container.NewVBox(widget.NewLabel("Image preview"), imagePreview)
-	imagePreviewContainer.Hide()
+	imagePreview.SetMinSize(fyne.NewSquareSize(forwarderPreviewSize))
+	imagePreview.Hide()
+	previewContent := newForwarderPreviewButton(container.NewStack(container.NewCenter(emptyPreview), imagePreview), func() {
+		if chooseForwarderImage != nil {
+			chooseForwarderImage()
+		}
+	})
+	preview := container.NewCenter(container.NewGridWrap(
+		fyne.NewSquareSize(forwarderPreviewSize),
+		newForwarderPreviewPanel(previewContent),
+	))
+
 	status := widget.NewMultiLineEntry()
 	status.Disable()
 	status.Hide()
-	romPathRow := container.NewBorder(nil, nil, widget.NewLabel("ROM Path"), nil, romPath)
-	romPathRow.Hide()
+
+	romPathLabel := widget.NewLabel("ROM Path:")
+	romPathLabel.Hide()
+	romPath.Hide()
 
 	var clearImage *widget.Button
-	mode.OnChanged = func(value string) {
-		if value == "RetroArch ROM" {
+	var applicationMode *widget.Button
+	var retroArchMode *widget.Button
+	var imageCleanup func()
+
+	setMode := func(value string) {
+		selectedMode = value
+		if value == forwarderRetroArchMode {
 			title.SetPlaceHolder("Kirby's Adventure")
 			publisher.SetPlaceHolder("Nintendo")
 			nroPath.SetPlaceHolder("/retroarch/cores/nestopia_libretro_libnx.nro")
-			romPathRow.Show()
+			romPathLabel.Show()
+			romPath.Show()
 		} else {
 			title.SetPlaceHolder("NX Shell")
 			publisher.SetPlaceHolder("joel16")
 			nroPath.SetPlaceHolder("/switch/NX-Shell.nro")
-			romPathRow.Hide()
+			romPathLabel.Hide()
+			romPath.Hide()
+		}
+		if applicationMode != nil && retroArchMode != nil {
+			applicationMode.Importance = widget.MediumImportance
+			retroArchMode.Importance = widget.MediumImportance
+			if value == forwarderRetroArchMode {
+				retroArchMode.Importance = widget.HighImportance
+			} else {
+				applicationMode.Importance = widget.HighImportance
+			}
+			applicationMode.Refresh()
+			retroArchMode.Refresh()
 		}
 	}
+	applicationMode = widget.NewButton(forwarderApplicationMode, func() {
+		setMode(forwarderApplicationMode)
+	})
+	retroArchMode = widget.NewButton(forwarderRetroArchMode, func() {
+		setMode(forwarderRetroArchMode)
+	})
+	modeSelector := container.NewGridWithColumns(2, applicationMode, retroArchMode)
 
 	clearForwarderImage := func() {
+		if imageCleanup != nil {
+			imageCleanup()
+			imageCleanup = nil
+		}
 		imagePath.SetText("")
 		imagePreview.File = ""
+		imagePreview.Hide()
+		emptyPreview.Show()
 		imagePreview.Refresh()
-		imagePreviewContainer.Hide()
 		clearImage.Disable()
 	}
 
-	chooseImage := widget.NewButton("Choose image", func() {
-		chooseNativeFile("Choose NSP image", []nativeFileFilter{
+	setForwarderImage := func(path string, cleanup func()) {
+		if imageCleanup != nil {
+			imageCleanup()
+		}
+		imageCleanup = cleanup
+		imagePath.SetText(path)
+		imagePreview.File = path
+		emptyPreview.Hide()
+		imagePreview.Show()
+		imagePreview.Refresh()
+		clearImage.Enable()
+	}
+
+	chooseForwarderImage = func() {
+		chooseNativeFile("Choose NRO or image", []nativeFileFilter{
+			extensionFilter("NRO files and images", ".nro", ".jpg", ".jpeg", ".png"),
+			extensionFilter("NRO files", ".nro"),
 			extensionFilter("Images", ".jpg", ".jpeg", ".png"),
 		}, func(path string) {
-			imagePath.SetText(path)
-			imagePreview.File = path
-			imagePreview.Refresh()
-			imagePreviewContainer.Show()
-			clearImage.Enable()
+			if strings.EqualFold(filepath.Ext(path), ".nro") {
+				iconPath, cleanup, err := extractNROIcon(path)
+				if err != nil {
+					showError(err)
+					return
+				}
+				setForwarderImage(iconPath, cleanup)
+				return
+			}
+			setForwarderImage(path, nil)
 		})
-	})
+	}
+	chooseImage := widget.NewButton("Choose image or NRO", chooseForwarderImage)
 	clearImage = widget.NewButton("Clear image", clearForwarderImage)
 	clearImage.Importance = widget.DangerImportance
 	clearImage.Disable()
@@ -94,6 +170,7 @@ func NroForwarderTab() fyne.CanvasObject {
 		}
 		id.SetText(generated)
 	})
+	regenerate.SetIcon(theme.ViewRefreshIcon())
 
 	build := func(outPath string) error {
 		if state.Keys == nil || state.KeysPath == "" {
@@ -114,7 +191,7 @@ func NroForwarderTab() fyne.CanvasObject {
 
 		nro := "sdmc:" + cleanSwitchPath(nroPath.Text)
 		var argv []string
-		if mode.Selected == "RetroArch ROM" && strings.TrimSpace(romPath.Text) != "" {
+		if selectedMode == forwarderRetroArchMode && strings.TrimSpace(romPath.Text) != "" {
 			argv = append(argv, "sdmc:"+cleanSwitchPath(romPath.Text))
 		}
 
@@ -153,23 +230,59 @@ func NroForwarderTab() fyne.CanvasObject {
 	})
 	generate.Importance = widget.HighImportance
 
-	form := container.NewVBox(
-		widget.NewRichTextFromMarkdown("Create a Nintendo Switch NSP that forwards to an NRO on the SD card."),
-		container.NewGridWithColumns(2,
-			widget.NewLabel("Mode"), mode,
-			widget.NewLabel("App ID"), container.NewBorder(nil, nil, nil, regenerate, id),
-			widget.NewLabel("Title"), title,
-			widget.NewLabel("Publisher"), publisher,
-			widget.NewLabel("NRO Path"), nroPath,
-		),
-		romPathRow,
-		container.NewBorder(nil, nil, widget.NewLabel("Image"), container.NewHBox(chooseImage, clearImage), imagePath),
-		imagePreviewContainer,
-		container.NewHBox(layout.NewSpacer(), generate),
-		status,
+	form := container.New(layout.NewFormLayout(),
+		widget.NewLabel("App ID:"), container.NewBorder(nil, nil, regenerate, nil, id),
+		widget.NewLabel("App Title:"), title,
+		widget.NewLabel("App Publisher:"), publisher,
+		widget.NewLabel("NRO Path:"), nroPath,
+		romPathLabel, romPath,
 	)
 
-	return form
+	setMode(selectedMode)
+
+	return container.NewVBox(
+		modeSelector,
+		container.NewCenter(container.NewVBox(
+			preview,
+			container.NewCenter(container.NewHBox(chooseImage, clearImage)),
+		)),
+		form,
+		generate,
+		status,
+	)
+}
+
+func newForwarderPreviewPanel(content fyne.CanvasObject) fyne.CanvasObject {
+	background := canvas.NewRectangle(forwarderPreviewBackgroundColor)
+	border := canvas.NewRectangle(color.NRGBA{A: 0})
+	border.StrokeColor = forwarderPreviewBorderColor
+	border.StrokeWidth = 1
+	return container.NewMax(background, content, border)
+}
+
+type forwarderPreviewButton struct {
+	widget.BaseWidget
+	content fyne.CanvasObject
+	tapped  func()
+}
+
+func newForwarderPreviewButton(content fyne.CanvasObject, tapped func()) *forwarderPreviewButton {
+	button := &forwarderPreviewButton{
+		content: content,
+		tapped:  tapped,
+	}
+	button.ExtendBaseWidget(button)
+	return button
+}
+
+func (b *forwarderPreviewButton) CreateRenderer() fyne.WidgetRenderer {
+	return widget.NewSimpleRenderer(b.content)
+}
+
+func (b *forwarderPreviewButton) Tapped(*fyne.PointEvent) {
+	if b.tapped != nil {
+		b.tapped()
+	}
 }
 
 func prepareForwarderIcon(path string) (string, func(), error) {

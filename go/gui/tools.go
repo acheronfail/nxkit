@@ -382,7 +382,7 @@ func ToolsTab() fyne.CanvasObject {
 		decompressProgressContainer,
 	)
 
-	return container.NewPadded(container.New(
+	return container.New(
 		toolsGridLayout{},
 		container.NewPadded(splitPanel),
 		widget.NewSeparator(),
@@ -392,7 +392,7 @@ func ToolsTab() fyne.CanvasObject {
 		widget.NewSeparator(),
 		container.NewPadded(decompressPanel),
 		widget.NewSeparator(),
-	))
+	)
 }
 
 type toolsGridLayout struct{}
