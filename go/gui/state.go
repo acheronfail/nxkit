@@ -153,6 +153,9 @@ func runAsync(setLoading func(bool), work func() error, done func()) {
 }
 
 func openPath(path string) error {
+	if runtime.GOOS == "windows" {
+		return exec.Command("explorer.exe", path).Start()
+	}
 	u := url.URL{Scheme: "file", Path: path}
 	return nxkitApp.OpenURL(&u)
 }
@@ -162,7 +165,7 @@ func revealPath(path string) error {
 	case "darwin":
 		return exec.Command("open", "-R", path).Start()
 	case "windows":
-		return exec.Command("explorer", "/select,", path).Start()
+		return exec.Command("explorer.exe", "/select,", path).Start()
 	default:
 		stat, err := os.Stat(path)
 		if err != nil {

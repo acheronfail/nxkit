@@ -58,5 +58,5 @@ rm -f resource_windows_*.syso
   -product-ver-patch "$ver_patch" \
   -product-ver-build "$build_version")
 
-nxkit_build_binary "$binary"
+NXKIT_GO_PACKAGE_LDFLAGS="${NXKIT_GO_PACKAGE_LDFLAGS} -H=windowsgui" nxkit_build_binary "$binary"
 echo "Built dist/${binary}"
