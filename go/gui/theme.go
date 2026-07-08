@@ -34,3 +34,24 @@ func (t nxkitTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) c
 		return t.Theme.Color(name, variant)
 	}
 }
+
+func (t nxkitTheme) Size(name fyne.ThemeSizeName) float32 {
+	switch name {
+	case theme.SizeNameInnerPadding:
+		return 5
+	case theme.SizeNamePadding:
+		return 3
+	case theme.SizeNameText:
+		return 13
+	case theme.SizeNameHeadingText:
+		return 22
+	case theme.SizeNameSubHeadingText:
+		return 17
+	case theme.SizeNameCaptionText:
+		return 10
+	case theme.SizeNameLineSpacing:
+		return 3
+	default:
+		return t.Theme.Size(name)
+	}
+}
