@@ -6,8 +6,14 @@ tag="$(git describe --tags --exact-match --match 'v*' 2>/dev/null || true)"
 if printf '%s\n' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
   printf '%s' "${tag#v}"
 else
+  latest_tag="$(git describe --tags --abbrev=0 --match 'v[0-9]*.[0-9]*.[0-9]*' 2>/dev/null || true)"
+  if printf '%s\n' "$latest_tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$'; then
+    base_version="${latest_tag#v}"
+  else
+    base_version="0.0.0"
+  fi
   sha="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
-  printf '0.0.0+%s' "$sha"
+  printf '%s-dev-%s' "$base_version" "$sha"
 fi
 `
 version := env_var_or_default("NXKIT_VERSION", git_version)
