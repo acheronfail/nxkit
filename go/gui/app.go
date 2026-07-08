@@ -37,13 +37,13 @@ func StartGuiApp(options Options) {
 	})
 
 	payloadInjector := newPayloadInjectorTab()
-	payloadInjectorItem := container.NewTabItem("Payload Injector", payloadInjector.content)
+	payloadInjectorItem := newScrollableTabItem("Payload Injector", payloadInjector.content)
 	tabs := container.NewAppTabs(
 		payloadInjectorItem,
-		container.NewTabItem("NRO Forwarder", NroForwarderTab()),
-		container.NewTabItem("NAND Explorer", NandExplorerTab()),
-		container.NewTabItem("Tools", ToolsTab()),
-		container.NewTabItem("Settings", SettingsTab()),
+		newScrollableTabItem("NRO Forwarder", NroForwarderTab()),
+		newScrollableTabItem("NAND Explorer", NandExplorerTab()),
+		newScrollableTabItem("Tools", ToolsTab()),
+		newScrollableTabItem("Settings", SettingsTab()),
 	)
 
 	tabs.SetTabLocation(container.TabLocationTop)
@@ -74,4 +74,8 @@ func StartGuiApp(options Options) {
 	payloadInjector.startWatching()
 
 	mainWindow.ShowAndRun()
+}
+
+func newScrollableTabItem(text string, content fyne.CanvasObject) *container.TabItem {
+	return container.NewTabItem(text, container.NewVScroll(content))
 }
