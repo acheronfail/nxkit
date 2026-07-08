@@ -37,7 +37,7 @@ case "$arch" in
 esac
 
 rm -f resource_windows_*.syso
-(unset GOOS GOARCH; go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo \
+(unset GOOS GOARCH; go run github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.7.0 \
   -skip-versioninfo \
   -icon "$icon_path" \
   -application-icon "$icon_path" \
