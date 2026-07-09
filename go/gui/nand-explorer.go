@@ -375,6 +375,7 @@ func NandExplorerTab() fyne.CanvasObject {
 		var renderedRows []*nandFileListRow
 		var refreshFileList func()
 		var dragPopup *widget.PopUp
+		var dragPopupIcon *widget.Icon
 		var dragPopupLabel *widget.Label
 		var dragTargetPath string
 
@@ -423,7 +424,7 @@ func NandExplorerTab() fyne.CanvasObject {
 		rowAtAbsolute := func(position fyne.Position, sourcePath string) (nandNode, bool) {
 			driver := fyne.CurrentApp().Driver()
 			for _, row := range renderedRows {
-				if row.node.path == sourcePath || !row.node.isDir || row.node.isParent {
+				if row.node.path == sourcePath || !row.node.isDir {
 					continue
 				}
 				if sourcePath != "" && isSameOrDescendantNandPath(row.node.path, sourcePath) {
@@ -502,13 +503,21 @@ func NandExplorerTab() fyne.CanvasObject {
 			if dragPopupLabel == nil {
 				dragPopupLabel = widget.NewLabel("")
 			}
-			dragPopupLabel.SetText("Move " + filepath.Base(sourcePath))
+			if dragPopupIcon == nil {
+				dragPopupIcon = widget.NewIcon(nil)
+			}
+			if row, ok := rowForPath(sourcePath); ok && row.node.isDir {
+				dragPopupIcon.SetResource(theme.FolderIcon())
+			} else {
+				dragPopupIcon.SetResource(theme.FileIcon())
+			}
+			dragPopupLabel.SetText(truncateNandDragPreviewName(filepath.Base(sourcePath)))
 			if dragPopup == nil {
 				canvas := fyne.CurrentApp().Driver().CanvasForObject(fileList)
 				if canvas == nil {
 					return
 				}
-				dragPopup = widget.NewPopUp(newNandDragPreview(dragPopupLabel), canvas)
+				dragPopup = widget.NewPopUp(newNandDragPreview(dragPopupIcon, dragPopupLabel), canvas)
 			}
 			dragPopup.ShowAtPosition(position.Add(fyne.NewPos(14, 14)))
 		}
@@ -830,11 +839,13 @@ func newNandListPanel(content fyne.CanvasObject) fyne.CanvasObject {
 	return container.NewMax(background, content, border)
 }
 
-func newNandDragPreview(label *widget.Label) fyne.CanvasObject {
+func newNandDragPreview(icon *widget.Icon, label *widget.Label) fyne.CanvasObject {
 	background := canvas.NewRectangle(nxkitListColor(nxkitListColorDrag))
 	background.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	background.StrokeWidth = 1
-	return container.NewMax(background, container.NewPadded(label))
+	content := container.New(layout.NewCustomPaddedHBoxLayout(4), icon, label)
+	paddedContent := container.New(layout.NewCustomPaddedLayout(3, 3, 6, 8), content)
+	return container.NewMax(background, paddedContent)
 }
 
 func countHostCopyBytes(hostPaths []string) (int64, error) {
@@ -1375,6 +1386,15 @@ func truncateTextToWidth(text string, maxWidth float32, textSize float32, textSt
 		}
 	}
 	return string(runes[:low]) + suffix
+}
+
+func truncateNandDragPreviewName(name string) string {
+	const maxRunes = 80
+	runes := []rune(name)
+	if len(runes) <= maxRunes {
+		return name
+	}
+	return string(runes[:maxRunes-3]) + "..."
 }
 
 func (n *nandExplorerState) delete(pathInNand string) error {
