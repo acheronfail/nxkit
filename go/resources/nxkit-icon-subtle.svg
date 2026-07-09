@@ -8,13 +8,33 @@
       <stop offset="0" stop-color="#121821"/>
       <stop offset="1" stop-color="#090d13"/>
     </linearGradient>
+    <linearGradient id="borderBlendTop" gradientUnits="userSpaceOnUse" x1="610.33" y1="73" x2="706.33" y2="73">
+      <stop offset="0" stop-color="#00c3e3"/>
+      <stop offset="1" stop-color="#ff4554"/>
+    </linearGradient>
+    <linearGradient id="borderBlendBottom" gradientUnits="userSpaceOnUse" x1="317.67" y1="951" x2="413.67" y2="951">
+      <stop offset="0" stop-color="#00c3e3"/>
+      <stop offset="1" stop-color="#ff4554"/>
+    </linearGradient>
   </defs>
 
-  <rect width="1024" height="1024" rx="224" fill="#070a0f"/>
   <rect x="72" y="72" width="880" height="880" rx="188" fill="url(#surface)"/>
-  <rect x="73" y="73" width="878" height="878" rx="187" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.08"/>
+  <g fill="none" stroke-width="4" stroke-linecap="butt" stroke-linejoin="round">
+    <path d="M 610.33 73 H 260 A 187 187 0 0 0 73 260 V 764 A 187 187 0 0 0 260 951 H 317.67"
+          stroke="#00c3e3"
+          opacity="0.72"/>
+    <path d="M 610.33 73 H 706.33"
+          stroke="url(#borderBlendTop)"
+          opacity="0.72"/>
+    <path d="M 706.33 73 H 764 A 187 187 0 0 1 951 260 V 764 A 187 187 0 0 1 764 951 H 413.67"
+          stroke="#ff4554"
+          opacity="0.72"/>
+    <path d="M 317.67 951 H 413.67"
+          stroke="url(#borderBlendBottom)"
+          opacity="0.72"/>
+  </g>
 
-  <text x="512" y="548"
+  <text x="514" y="525"
         text-anchor="middle"
         dominant-baseline="middle"
         font-family="SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace"
