@@ -76,16 +76,16 @@ func (r *actionListRow) Cursor() desktop.Cursor {
 }
 
 func (r *actionListRow) CreateRenderer() fyne.WidgetRenderer {
-	background := canvas.NewRectangle(nandListRowEvenColor)
+	background := canvas.NewRectangle(nxkitListColor(nxkitListColorRowEven))
 	icon := widget.NewIcon(r.icon)
-	titleText := canvas.NewText("", theme.Color(theme.ColorNameForeground))
+	titleText := canvas.NewText("", nxkitThemeColor(theme.ColorNameForeground))
 	titleText.TextStyle = fyne.TextStyle{Monospace: true}
 	titleText.TextSize = theme.Size(theme.SizeNameText)
 	actionButton := canvas.NewRectangle(theme.Color(theme.ColorNameButton))
 	actionButton.CornerRadius = 4
-	actionButton.StrokeColor = nandListBorderColor
+	actionButton.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	actionButton.StrokeWidth = 1
-	actionText := canvas.NewText(r.actionText, theme.Color(theme.ColorNameForeground))
+	actionText := canvas.NewText(r.actionText, nxkitThemeColor(theme.ColorNameForeground))
 	actionText.Alignment = fyne.TextAlignCenter
 	actionText.TextStyle = fyne.TextStyle{Bold: true}
 	actionText.TextSize = theme.Size(theme.SizeNameCaptionText)
@@ -160,31 +160,32 @@ func (r *actionListRowRenderer) MinSize() fyne.Size {
 
 func (r *actionListRowRenderer) Refresh() {
 	if r.row.index%2 == 0 {
-		r.background.FillColor = nandListRowEvenColor
+		r.background.FillColor = nxkitListColor(nxkitListColorRowEven)
 	} else {
-		r.background.FillColor = nandListRowOddColor
+		r.background.FillColor = nxkitListColor(nxkitListColorRowOdd)
 	}
 	r.background.Refresh()
 
 	r.icon.SetResource(r.row.icon)
-	r.titleText.Color = theme.Color(theme.ColorNameForeground)
+	r.titleText.Color = nxkitThemeColor(theme.ColorNameForeground)
 	r.titleText.TextSize = theme.Size(theme.SizeNameText)
 	r.titleText.Refresh()
 
+	r.actionButton.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	if r.row.actionDisabled {
-		r.actionButton.FillColor = theme.Color(theme.ColorNameDisabledButton)
-		r.actionText.Color = theme.Color(theme.ColorNameDisabled)
+		r.actionButton.FillColor = nxkitThemeColor(theme.ColorNameDisabledButton)
+		r.actionText.Color = nxkitThemeColor(theme.ColorNameDisabled)
 	} else {
 		switch r.row.actionImportance {
 		case widget.HighImportance:
-			r.actionButton.FillColor = theme.Color(theme.ColorNamePrimary)
-			r.actionText.Color = theme.Color(theme.ColorNameForegroundOnPrimary)
+			r.actionButton.FillColor = nxkitThemeColor(theme.ColorNamePrimary)
+			r.actionText.Color = nxkitThemeColor(theme.ColorNameForegroundOnPrimary)
 		case widget.DangerImportance:
-			r.actionButton.FillColor = theme.Color(theme.ColorNameError)
-			r.actionText.Color = theme.Color(theme.ColorNameForegroundOnError)
+			r.actionButton.FillColor = nxkitThemeColor(theme.ColorNameError)
+			r.actionText.Color = nxkitThemeColor(theme.ColorNameForegroundOnError)
 		default:
-			r.actionButton.FillColor = theme.Color(theme.ColorNameButton)
-			r.actionText.Color = theme.Color(theme.ColorNameForeground)
+			r.actionButton.FillColor = nxkitThemeColor(theme.ColorNameButton)
+			r.actionText.Color = nxkitThemeColor(theme.ColorNameForeground)
 		}
 	}
 	r.actionButton.Refresh()

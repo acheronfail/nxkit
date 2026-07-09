@@ -26,11 +26,6 @@ const (
 	forwarderPreviewSize     = 260
 )
 
-var (
-	forwarderPreviewBackgroundColor = color.NRGBA{R: 0x0a, G: 0x0b, B: 0x0e, A: 0xff}
-	forwarderPreviewBorderColor     = color.NRGBA{R: 0x3e, G: 0x42, B: 0x4a, A: 0xff}
-)
-
 func NroForwarderTab() fyne.CanvasObject {
 	selectedMode := forwarderApplicationMode
 	id := widget.NewEntry()
@@ -253,9 +248,9 @@ func NroForwarderTab() fyne.CanvasObject {
 }
 
 func newForwarderPreviewPanel(content fyne.CanvasObject) fyne.CanvasObject {
-	background := canvas.NewRectangle(forwarderPreviewBackgroundColor)
+	background := canvas.NewRectangle(nxkitListColor(nxkitListColorBackground))
 	border := canvas.NewRectangle(color.NRGBA{A: 0})
-	border.StrokeColor = forwarderPreviewBorderColor
+	border.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	border.StrokeWidth = 1
 	return container.NewMax(background, content, border)
 }

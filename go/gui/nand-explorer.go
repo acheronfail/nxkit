@@ -49,15 +49,6 @@ var nxPartitions = map[string]nxPartitionInfo{
 	"2b777f63-e842-47af-94c4-25a7f18b2280": {format: "fat32", bisKeyID: 3, hasBISKeyID: true, magicOffset: 0x47, magicBytes: []byte("NO NAME")},
 }
 
-var (
-	nandListBackgroundColor = color.NRGBA{R: 0x0a, G: 0x0b, B: 0x0e, A: 0xff}
-	nandListBorderColor     = color.NRGBA{R: 0x3e, G: 0x42, B: 0x4a, A: 0xff}
-	nandListRowEvenColor    = color.NRGBA{R: 0x10, G: 0x11, B: 0x15, A: 0xff}
-	nandListRowOddColor     = color.NRGBA{R: 0x18, G: 0x19, B: 0x1e, A: 0xff}
-	nandListDragColor       = color.NRGBA{R: 0x24, G: 0x2d, B: 0x3a, A: 0xff}
-	nandListDropTargetColor = color.NRGBA{R: 0x1f, G: 0x36, B: 0x2d, A: 0xff}
-)
-
 const nandDirectoryOpenTapThreshold = 350 * time.Millisecond
 
 type nandExplorerState struct {
@@ -832,16 +823,16 @@ func isMountablePartition(info nxPartitionInfo) bool {
 }
 
 func newNandListPanel(content fyne.CanvasObject) fyne.CanvasObject {
-	background := canvas.NewRectangle(nandListBackgroundColor)
+	background := canvas.NewRectangle(nxkitListColor(nxkitListColorBackground))
 	border := canvas.NewRectangle(color.NRGBA{A: 0})
-	border.StrokeColor = nandListBorderColor
+	border.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	border.StrokeWidth = 1
 	return container.NewMax(background, content, border)
 }
 
 func newNandDragPreview(label *widget.Label) fyne.CanvasObject {
-	background := canvas.NewRectangle(nandListDragColor)
-	background.StrokeColor = nandListBorderColor
+	background := canvas.NewRectangle(nxkitListColor(nxkitListColorDrag))
+	background.StrokeColor = nxkitListColor(nxkitListColorBorder)
 	background.StrokeWidth = 1
 	return container.NewMax(background, container.NewPadded(label))
 }
@@ -978,12 +969,12 @@ func (r *nandFileListRow) Cursor() desktop.Cursor {
 }
 
 func (r *nandFileListRow) CreateRenderer() fyne.WidgetRenderer {
-	background := canvas.NewRectangle(nandListRowEvenColor)
+	background := canvas.NewRectangle(nxkitListColor(nxkitListColorRowEven))
 	typeIcon := widget.NewIcon(nil)
-	nameText := canvas.NewText("", theme.Color(theme.ColorNameForeground))
+	nameText := canvas.NewText("", nxkitThemeColor(theme.ColorNameForeground))
 	nameText.TextStyle = fyne.TextStyle{Monospace: true}
 	nameText.TextSize = theme.Size(theme.SizeNameText)
-	sizeText := canvas.NewText("", theme.Color(theme.ColorNameForeground))
+	sizeText := canvas.NewText("", nxkitThemeColor(theme.ColorNameForeground))
 	sizeText.Alignment = fyne.TextAlignTrailing
 	sizeText.TextStyle = fyne.TextStyle{Monospace: true}
 	sizeText.TextSize = theme.Size(theme.SizeNameText)
@@ -1056,20 +1047,24 @@ func (r *nandFileListRowRenderer) MinSize() fyne.Size {
 }
 
 func (r *nandFileListRowRenderer) Refresh() {
-	r.nameText.Color = theme.Color(theme.ColorNameForeground)
+	textColor := nxkitThemeColor(theme.ColorNameForeground)
+	if r.row.selected && !r.row.dropTarget && !r.row.dragging {
+		textColor = nxkitThemeColor(theme.ColorNameForegroundOnPrimary)
+	}
+	r.nameText.Color = textColor
 	r.nameText.TextSize = theme.Size(theme.SizeNameText)
-	r.sizeText.Color = theme.Color(theme.ColorNameForeground)
+	r.sizeText.Color = textColor
 	r.sizeText.TextSize = theme.Size(theme.SizeNameText)
 	if r.row.dropTarget {
-		r.background.FillColor = nandListDropTargetColor
+		r.background.FillColor = nxkitListColor(nxkitListColorDropTarget)
 	} else if r.row.dragging {
-		r.background.FillColor = nandListDragColor
+		r.background.FillColor = nxkitListColor(nxkitListColorDrag)
 	} else if r.row.selected {
-		r.background.FillColor = theme.Color(theme.ColorNameSelection)
+		r.background.FillColor = nxkitThemeColor(theme.ColorNameSelection)
 	} else if r.row.index%2 == 0 {
-		r.background.FillColor = nandListRowEvenColor
+		r.background.FillColor = nxkitListColor(nxkitListColorRowEven)
 	} else {
-		r.background.FillColor = nandListRowOddColor
+		r.background.FillColor = nxkitListColor(nxkitListColorRowOdd)
 	}
 	r.background.Refresh()
 
