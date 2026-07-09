@@ -12,6 +12,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	"github.com/acheronfail/nxkit/lib/keys"
 	"github.com/acheronfail/nxkit/lib/tools"
 )
 
@@ -29,11 +30,34 @@ var (
 )
 
 const (
-	toolsDividerThickness       float32 = 6
+	toolsDividerThickness       float32 = 3
+	toolsPanelPadding           float32 = 18
 	toolsSingleColumnBreakpoint float32 = 900
 )
 
 func ToolsTab() fyne.CanvasObject {
+	return newToolsTab(defaultToolsTabDependencies())
+}
+
+type toolsTabDependencies struct {
+	chooseFile func(title string, filters []nativeFileFilter, onChosen func(string))
+	split      func(context.Context, string, bool, bool, int64, tools.ProgressFunc) (string, error)
+	merge      func(context.Context, string, bool, tools.ProgressFunc) (string, error)
+	compress   func(context.Context, string, keys.Keys, tools.ProgressFunc) (string, error)
+	decompress func(context.Context, string, tools.ProgressFunc) (string, error)
+}
+
+func defaultToolsTabDependencies() toolsTabDependencies {
+	return toolsTabDependencies{
+		chooseFile: chooseNativeFile,
+		split:      tools.SplitWithProgressContext,
+		merge:      tools.MergeWithProgressContext,
+		compress:   tools.CompressNSZWithProgressContext,
+		decompress: tools.DecompressNSZWithProgressContext,
+	}
+}
+
+func newToolsTab(deps toolsTabDependencies) fyne.CanvasObject {
 	s := fyne.TextStyle{Bold: true}
 
 	splitDescription := widget.NewRichTextFromMarkdown(splitAsFileMarkdown)
@@ -68,7 +92,7 @@ func ToolsTab() fyne.CanvasObject {
 			compressCancel()
 		}
 	})
-	compressCancelButton.Disable()
+	compressCancelButton.Hide()
 
 	decompressProgressLabel := widget.NewLabel("")
 	decompressProgress := widget.NewProgressBar()
@@ -80,7 +104,7 @@ func ToolsTab() fyne.CanvasObject {
 			decompressCancel()
 		}
 	})
-	decompressCancelButton.Disable()
+	decompressCancelButton.Hide()
 
 	splitProgressLabel := widget.NewLabel("")
 	splitProgress := widget.NewProgressBar()
@@ -92,7 +116,7 @@ func ToolsTab() fyne.CanvasObject {
 			splitCancel()
 		}
 	})
-	splitCancelButton.Disable()
+	splitCancelButton.Hide()
 
 	mergeProgressLabel := widget.NewLabel("")
 	mergeProgress := widget.NewProgressBar()
@@ -104,7 +128,7 @@ func ToolsTab() fyne.CanvasObject {
 			mergeCancel()
 		}
 	})
-	mergeCancelButton.Disable()
+	mergeCancelButton.Hide()
 
 	var splitButton *widget.Button
 	var mergeButton *widget.Button
@@ -150,11 +174,21 @@ func ToolsTab() fyne.CanvasObject {
 		})
 	}
 
+	setOperationRunning := func(chooseButton, cancelButton *widget.Button, running bool) {
+		if running {
+			chooseButton.Hide()
+			cancelButton.Show()
+			return
+		}
+		cancelButton.Hide()
+		chooseButton.Show()
+	}
+
 	splitButton = widget.NewButton("Choose file to split", func() {
-		chooseNativeFile("Choose file to split", nil, func(path string) {
+		deps.chooseFile("Choose file to split", nil, func(path string) {
 			asArchive := splitAsArchive.Checked
 			inPlace := !splitMakeCopy.Checked
-			splitButton.Disable()
+			setOperationRunning(splitButton, splitCancelButton, true)
 			splitAsArchive.Disable()
 			splitMakeCopy.Disable()
 			splitProgress.SetValue(0)
@@ -162,17 +196,15 @@ func ToolsTab() fyne.CanvasObject {
 			splitProgressContainer.Show()
 			ctx, cancel := context.WithCancel(context.Background())
 			splitCancel = cancel
-			splitCancelButton.Enable()
 			go func() {
-				output, err := tools.SplitWithProgressContext(ctx, path, asArchive, inPlace, 0, func(done, total int64) {
+				output, err := deps.split(ctx, path, asArchive, inPlace, 0, func(done, total int64) {
 					setProgress(splitProgressLabel, splitProgress, done, total)
 				})
 				fyne.Do(func() {
-					splitButton.Enable()
+					setOperationRunning(splitButton, splitCancelButton, false)
 					splitAsArchive.Enable()
 					splitMakeCopy.Enable()
 					splitCancel = nil
-					splitCancelButton.Disable()
 				})
 				if err != nil {
 					fyne.Do(func() {
@@ -197,16 +229,15 @@ func ToolsTab() fyne.CanvasObject {
 	updateSplitButtonImportance()
 
 	mergeButton = widget.NewButton("Choose file to merge", func() {
-		chooseNativeFile("Choose file to merge", nil, func(inputPath string) {
+		deps.chooseFile("Choose file to merge", nil, func(inputPath string) {
 			inPlace := !mergeMakeCopy.Checked
-			mergeButton.Disable()
+			setOperationRunning(mergeButton, mergeCancelButton, true)
 			mergeMakeCopy.Disable()
 			mergeProgress.SetValue(0)
 			mergeProgressLabel.SetText("Starting merge...")
 			mergeProgressContainer.Show()
 			ctx, cancel := context.WithCancel(context.Background())
 			mergeCancel = cancel
-			mergeCancelButton.Enable()
 			go func() {
 				path := inputPath
 				stat, err := os.Stat(path)
@@ -215,15 +246,14 @@ func ToolsTab() fyne.CanvasObject {
 				}
 				var output string
 				if err == nil {
-					output, err = tools.MergeWithProgressContext(ctx, path, inPlace, func(done, total int64) {
+					output, err = deps.merge(ctx, path, inPlace, func(done, total int64) {
 						setProgress(mergeProgressLabel, mergeProgress, done, total)
 					})
 				}
 				fyne.Do(func() {
-					mergeButton.Enable()
+					setOperationRunning(mergeButton, mergeCancelButton, false)
 					mergeMakeCopy.Enable()
 					mergeCancel = nil
-					mergeCancelButton.Disable()
 				})
 				if err != nil {
 					fyne.Do(func() {
@@ -249,7 +279,7 @@ func ToolsTab() fyne.CanvasObject {
 
 	var compressButton *widget.Button
 	compressButton = widget.NewButton("Choose NSP to compress", func() {
-		chooseNativeFile("Choose NSP to compress", []nativeFileFilter{
+		deps.chooseFile("Choose NSP to compress", []nativeFileFilter{
 			extensionFilter("Nintendo Submission Package", ".nsp"),
 		}, func(path string) {
 			if state.Keys == nil {
@@ -257,21 +287,19 @@ func ToolsTab() fyne.CanvasObject {
 				return
 			}
 
-			compressButton.Disable()
+			setOperationRunning(compressButton, compressCancelButton, true)
 			compressProgress.SetValue(0)
 			compressProgressLabel.SetText("Starting compression...")
 			compressProgressContainer.Show()
 			ctx, cancel := context.WithCancel(context.Background())
 			compressCancel = cancel
-			compressCancelButton.Enable()
 			go func() {
-				output, err := tools.CompressNSZWithProgressContext(ctx, path, *state.Keys, func(done, total int64) {
+				output, err := deps.compress(ctx, path, *state.Keys, func(done, total int64) {
 					setProgress(compressProgressLabel, compressProgress, done, total)
 				})
 				fyne.Do(func() {
-					compressButton.Enable()
+					setOperationRunning(compressButton, compressCancelButton, false)
 					compressCancel = nil
-					compressCancelButton.Disable()
 				})
 				if err != nil {
 					fyne.Do(func() {
@@ -297,24 +325,22 @@ func ToolsTab() fyne.CanvasObject {
 
 	var decompressButton *widget.Button
 	decompressButton = widget.NewButton("Choose NSZ to decompress", func() {
-		chooseNativeFile("Choose NSZ to decompress", []nativeFileFilter{
+		deps.chooseFile("Choose NSZ to decompress", []nativeFileFilter{
 			extensionFilter("Nintendo Submission Package Zipped", ".nsz"),
 		}, func(path string) {
-			decompressButton.Disable()
+			setOperationRunning(decompressButton, decompressCancelButton, true)
 			decompressProgress.SetValue(0)
 			decompressProgressLabel.SetText("Starting decompression...")
 			decompressProgressContainer.Show()
 			ctx, cancel := context.WithCancel(context.Background())
 			decompressCancel = cancel
-			decompressCancelButton.Enable()
 			go func() {
-				output, err := tools.DecompressNSZWithProgressContext(ctx, path, func(done, total int64) {
+				output, err := deps.decompress(ctx, path, func(done, total int64) {
 					setProgress(decompressProgressLabel, decompressProgress, done, total)
 				})
 				fyne.Do(func() {
-					decompressButton.Enable()
+					setOperationRunning(decompressButton, decompressCancelButton, false)
 					decompressCancel = nil
-					decompressCancelButton.Disable()
 				})
 				if err != nil {
 					fyne.Do(func() {
@@ -342,8 +368,7 @@ func ToolsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("File Splitter", fyne.TextAlignCenter, s),
 		splitDescription,
 		container.NewHBox(
-			splitButton,
-			splitCancelButton,
+			newToolActionSlot(splitButton, splitCancelButton),
 			layout.NewSpacer(),
 			splitAsArchive,
 			splitMakeCopy,
@@ -354,8 +379,7 @@ func ToolsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("File Merger", fyne.TextAlignCenter, s),
 		mergeDescription,
 		container.NewHBox(
-			mergeButton,
-			mergeCancelButton,
+			newToolActionSlot(mergeButton, mergeCancelButton),
 			layout.NewSpacer(),
 			mergeMakeCopy,
 		),
@@ -365,8 +389,7 @@ func ToolsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("NSZ Compressor", fyne.TextAlignCenter, s),
 		compressDescription,
 		container.NewHBox(
-			compressButton,
-			compressCancelButton,
+			newToolActionSlot(compressButton, compressCancelButton),
 			layout.NewSpacer(),
 		),
 		compressProgressContainer,
@@ -375,8 +398,7 @@ func ToolsTab() fyne.CanvasObject {
 		widget.NewLabelWithStyle("NSZ Decompressor", fyne.TextAlignCenter, s),
 		decompressDescription,
 		container.NewHBox(
-			decompressButton,
-			decompressCancelButton,
+			newToolActionSlot(decompressButton, decompressCancelButton),
 			layout.NewSpacer(),
 		),
 		decompressProgressContainer,
@@ -384,15 +406,43 @@ func ToolsTab() fyne.CanvasObject {
 
 	return container.New(
 		toolsGridLayout{},
-		container.NewPadded(splitPanel),
+		newToolPanel(splitPanel),
 		widget.NewSeparator(),
-		container.NewPadded(mergePanel),
+		newToolPanel(mergePanel),
 		widget.NewSeparator(),
-		container.NewPadded(compressPanel),
+		newToolPanel(compressPanel),
 		widget.NewSeparator(),
-		container.NewPadded(decompressPanel),
+		newToolPanel(decompressPanel),
 		widget.NewSeparator(),
 	)
+}
+
+func newToolPanel(panel fyne.CanvasObject) fyne.CanvasObject {
+	return container.New(
+		layout.NewCustomPaddedLayout(toolsPanelPadding, toolsPanelPadding, toolsPanelPadding, toolsPanelPadding),
+		panel,
+	)
+}
+
+func newToolActionSlot(chooseButton, cancelButton *widget.Button) fyne.CanvasObject {
+	return container.New(toolActionSlotLayout{}, chooseButton, cancelButton)
+}
+
+type toolActionSlotLayout struct{}
+
+func (toolActionSlotLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
+	for _, object := range objects {
+		object.Move(fyne.NewPos(0, 0))
+		object.Resize(size)
+	}
+}
+
+func (toolActionSlotLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
+	minSize := fyne.NewSize(0, 0)
+	for _, object := range objects {
+		minSize = minSize.Max(object.MinSize())
+	}
+	return minSize
 }
 
 type toolsGridLayout struct{}
