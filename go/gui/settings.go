@@ -22,10 +22,24 @@ func SettingsTab() fyne.CanvasObject {
 		state.SetShowAdvanced(checked)
 	})
 	advanced.SetChecked(state.ShowAdvanced)
-	version := widget.NewLabelWithStyle(fmt.Sprintf("Version %s", packageVersion), fyne.TextAlignTrailing, fyne.TextStyle{Monospace: true})
-	version.Importance = widget.LowImportance
-	version.Selectable = true
-	version.SizeName = theme.SizeNameCaptionText
+	versionStyle := widget.RichTextStyle{
+		ColorName: theme.ColorNamePrimary,
+		Inline:    true,
+		SizeName:  theme.SizeNameCaptionText,
+		TextStyle: fyne.TextStyle{Monospace: true},
+	}
+	version := widget.NewRichText(
+		&widget.TextSegment{Text: "version ", Style: versionStyle},
+		&widget.TextSegment{
+			Text: packageVersion,
+			Style: widget.RichTextStyle{
+				ColorName: theme.ColorNameError,
+				Inline:    true,
+				SizeName:  theme.SizeNameCaptionText,
+				TextStyle: fyne.TextStyle{Monospace: true},
+			},
+		},
+	)
 
 	var clearKeys *widget.Button
 	refreshStatus := func() {
