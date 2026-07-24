@@ -8,8 +8,12 @@ import (
 )
 
 var (
-	switchNeonBlue = color.NRGBA{R: 0x00, G: 0xc3, B: 0xe3, A: 0xff}
-	switchNeonRed  = color.NRGBA{R: 0xff, G: 0x45, B: 0x54, A: 0xff}
+	switchNeonBlue     = color.NRGBA{R: 0x00, G: 0xc3, B: 0xe3, A: 0xff}
+	switchNeonRed      = color.NRGBA{R: 0xff, G: 0x45, B: 0x54, A: 0xff}
+	switchHoverLight   = color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x40}
+	switchPressedLight = color.NRGBA{R: 0x00, G: 0x00, B: 0x00, A: 0x80}
+	switchHoverDark    = color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x40}
+	switchPressedDark  = color.NRGBA{R: 0xff, G: 0xff, B: 0xff, A: 0x80}
 )
 
 type nxkitTheme struct {
@@ -35,6 +39,16 @@ func (t nxkitTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) c
 	switch name {
 	case theme.ColorNamePrimary, theme.ColorNameFocus, theme.ColorNameHyperlink, theme.ColorNameSelection:
 		return switchNeonBlue
+	case theme.ColorNameHover:
+		if variant == theme.VariantLight {
+			return switchHoverLight
+		}
+		return switchHoverDark
+	case theme.ColorNamePressed:
+		if variant == theme.VariantLight {
+			return switchPressedLight
+		}
+		return switchPressedDark
 	case theme.ColorNameForegroundOnPrimary:
 		return color.Black
 	case theme.ColorNameError:

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -146,6 +147,15 @@ func SplitWithProgressContext(ctx context.Context, filePath string, asArchive, i
 	}
 
 	outputPath := filepath.Dir(getSplitPath())
+	if asArchive {
+		// The Switch treats a directory containing 00, 01, ... as one
+		// concatenated file only when the directory has the FAT archive bit.
+		// This is best-effort because some host filesystems do not expose that
+		// bit and a later copy may not preserve it.
+		if err := setArchiveBit(outputPath); err != nil {
+			log.Printf("warning: could not set archive bit on %s: %v", outputPath, err)
+		}
+	}
 	return outputPath, nil
 }
 

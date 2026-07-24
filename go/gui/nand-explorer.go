@@ -728,7 +728,7 @@ func NandExplorerTab() fyne.CanvasObject {
 			newFolderButton.Disable()
 			deleteButton.Disable()
 		}
-		mainWindow.SetOnDropped(func(position fyne.Position, uris []fyne.URI) {
+		registerWindowDropHandler(windowDropHandlerNAND, func(position fyne.Position, uris []fyne.URI) {
 			if model.fs == nil || model.part == nil || model.readOnly {
 				return
 			}

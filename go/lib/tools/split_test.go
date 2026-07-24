@@ -391,3 +391,29 @@ func TestSplit(t *testing.T) {
 		}
 	})
 }
+
+func TestSplitAsArchiveAttemptsToSetArchiveBit(t *testing.T) {
+	dir := createTempDir(t)
+	filePath := filepath.Join(dir, "file.nsp")
+	if err := os.WriteFile(filePath, sequentialBuffer(100, 0), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	originalSetArchiveBit := setArchiveBit
+	t.Cleanup(func() {
+		setArchiveBit = originalSetArchiveBit
+	})
+	var archivePath string
+	setArchiveBit = func(path string) error {
+		archivePath = path
+		return nil
+	}
+
+	outputPath, err := Split(filePath, true, false, 30)
+	if err != nil {
+		t.Fatalf("Split failed: %v", err)
+	}
+	if archivePath != outputPath {
+		t.Fatalf("archive bit path = %q, want %q", archivePath, outputPath)
+	}
+}

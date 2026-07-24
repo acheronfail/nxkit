@@ -41,16 +41,26 @@ func StartGuiApp(options Options) {
 
 	payloadInjector := newPayloadInjectorTab()
 	payloadInjectorItem := newScrollableTabItem("Payload Injector", payloadInjector.content)
+	nandExplorerItem := newScrollableTabItem("NAND Explorer", NandExplorerTab())
+	toolsItem := newScrollableTabItem("Tools", ToolsTab())
 	tabs := container.NewAppTabs(
 		payloadInjectorItem,
 		newScrollableTabItem("NRO Forwarder", NroForwarderTab()),
-		newScrollableTabItem("NAND Explorer", NandExplorerTab()),
-		newScrollableTabItem("Tools", ToolsTab()),
+		nandExplorerItem,
+		toolsItem,
 		newScrollableTabItem("Settings", SettingsTab()),
 	)
 
 	tabs.SetTabLocation(container.TabLocationTop)
 	tabs.OnSelected = func(item *container.TabItem) {
+		switch item {
+		case nandExplorerItem:
+			setActiveWindowDropHandler(windowDropHandlerNAND)
+		case toolsItem:
+			setActiveWindowDropHandler(windowDropHandlerTools)
+		default:
+			setActiveWindowDropHandler("")
+		}
 		if item == payloadInjectorItem {
 			payloadInjector.startWatching()
 		}
@@ -74,6 +84,7 @@ func StartGuiApp(options Options) {
 	}
 
 	mainWindow.SetContent(tabs)
+	mainWindow.SetOnDropped(dispatchWindowDrop)
 	payloadInjector.startWatching()
 
 	mainWindow.ShowAndRun()

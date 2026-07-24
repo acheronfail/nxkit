@@ -6,7 +6,10 @@ import (
 	"testing"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
+	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/theme"
+	"fyne.io/fyne/v2/widget"
 )
 
 func TestNXKitThemeUsesCompactSpacingAndText(t *testing.T) {
@@ -61,6 +64,55 @@ func TestNXKitPrimaryForegroundHasReadableContrast(t *testing.T) {
 			nxkit.Color(theme.ColorNamePrimary, variant),
 		); got < 4.5 {
 			t.Fatalf("primary foreground contrast in variant %v = %.2f, want at least 4.5", variant, got)
+		}
+	}
+}
+
+func TestNXKitThemeUsesVisibleButtonInteractionColors(t *testing.T) {
+	nxkit := newNXKitTheme()
+
+	for _, tc := range []struct {
+		variant fyne.ThemeVariant
+		hover   color.NRGBA
+		pressed color.NRGBA
+	}{
+		{theme.VariantLight, switchHoverLight, switchPressedLight},
+		{theme.VariantDark, switchHoverDark, switchPressedDark},
+	} {
+		if got := nxkit.Color(theme.ColorNameHover, tc.variant); got != tc.hover {
+			t.Fatalf("hover color in variant %v = %v, want %v", tc.variant, got, tc.hover)
+		}
+		if got := nxkit.Color(theme.ColorNamePressed, tc.variant); got != tc.pressed {
+			t.Fatalf("pressed color in variant %v = %v, want %v", tc.variant, got, tc.pressed)
+		}
+		if tc.pressed.A <= tc.hover.A {
+			t.Fatalf("pressed alpha in variant %v = %d, want greater than hover alpha %d", tc.variant, tc.pressed.A, tc.hover.A)
+		}
+	}
+}
+
+func TestNXKitButtonHoverChangesEveryButtonImportance(t *testing.T) {
+	app := test.NewTempApp(t)
+	app.Settings().SetTheme(newNXKitTheme())
+
+	for _, importance := range []widget.Importance{
+		widget.MediumImportance,
+		widget.HighImportance,
+		widget.DangerImportance,
+	} {
+		button := widget.NewButton("Action", nil)
+		button.Importance = importance
+		renderer := test.TempWidgetRenderer(t, button)
+		renderer.Refresh()
+		background := renderer.Objects()[0].(*canvas.Rectangle)
+		before := color.NRGBAModel.Convert(background.FillColor)
+
+		button.MouseIn(nil)
+		renderer.Refresh()
+		after := color.NRGBAModel.Convert(background.FillColor)
+
+		if before == after {
+			t.Fatalf("hover did not change button background for importance %v", importance)
 		}
 	}
 }

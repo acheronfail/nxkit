@@ -30,7 +30,7 @@ var (
 )
 
 const (
-	toolsDividerThickness       float32 = 3
+	toolsPanelGap               float32 = 12
 	toolsPanelPadding           float32 = 18
 	toolsSingleColumnBreakpoint float32 = 900
 )
@@ -59,6 +59,7 @@ func defaultToolsTabDependencies() toolsTabDependencies {
 
 func newToolsTab(deps toolsTabDependencies) fyne.CanvasObject {
 	s := fyne.TextStyle{Bold: true}
+	var dropTargets []*toolDropTarget
 
 	splitDescription := widget.NewRichTextFromMarkdown(splitAsFileMarkdown)
 	splitDescription.Wrapping = fyne.TextWrapWord
@@ -184,183 +185,199 @@ func newToolsTab(deps toolsTabDependencies) fyne.CanvasObject {
 		chooseButton.Show()
 	}
 
+	startSplit := func(path string) {
+		if splitCancel != nil {
+			return
+		}
+		asArchive := splitAsArchive.Checked
+		inPlace := !splitMakeCopy.Checked
+		setOperationRunning(splitButton, splitCancelButton, true)
+		splitAsArchive.Disable()
+		splitMakeCopy.Disable()
+		splitProgress.SetValue(0)
+		splitProgressLabel.SetText("Starting split...")
+		splitProgressContainer.Show()
+		ctx, cancel := context.WithCancel(context.Background())
+		splitCancel = cancel
+		go func() {
+			output, err := deps.split(ctx, path, asArchive, inPlace, 0, func(done, total int64) {
+				setProgress(splitProgressLabel, splitProgress, done, total)
+			})
+			fyne.Do(func() {
+				setOperationRunning(splitButton, splitCancelButton, false)
+				splitAsArchive.Enable()
+				splitMakeCopy.Enable()
+				splitCancel = nil
+			})
+			if err != nil {
+				fyne.Do(func() {
+					if errors.Is(err, context.Canceled) {
+						splitProgressLabel.SetText("Split canceled")
+						return
+					}
+					splitProgressLabel.SetText("Split failed")
+					showError(err)
+				})
+				return
+			}
+			fyne.Do(func() {
+				splitProgressLabel.SetText("Split complete")
+				splitProgress.SetValue(1)
+				showError(revealPath(output))
+				sendAppNotification("Split file complete", fmt.Sprintf("Successfully split file: %s", filepath.Base(path)))
+			})
+		}()
+	}
 	splitButton = widget.NewButton("Choose file to split", func() {
-		deps.chooseFile("Choose file to split", nil, func(path string) {
-			asArchive := splitAsArchive.Checked
-			inPlace := !splitMakeCopy.Checked
-			setOperationRunning(splitButton, splitCancelButton, true)
-			splitAsArchive.Disable()
-			splitMakeCopy.Disable()
-			splitProgress.SetValue(0)
-			splitProgressLabel.SetText("Starting split...")
-			splitProgressContainer.Show()
-			ctx, cancel := context.WithCancel(context.Background())
-			splitCancel = cancel
-			go func() {
-				output, err := deps.split(ctx, path, asArchive, inPlace, 0, func(done, total int64) {
-					setProgress(splitProgressLabel, splitProgress, done, total)
-				})
-				fyne.Do(func() {
-					setOperationRunning(splitButton, splitCancelButton, false)
-					splitAsArchive.Enable()
-					splitMakeCopy.Enable()
-					splitCancel = nil
-				})
-				if err != nil {
-					fyne.Do(func() {
-						if errors.Is(err, context.Canceled) {
-							splitProgressLabel.SetText("Split canceled")
-							return
-						}
-						splitProgressLabel.SetText("Split failed")
-						showError(err)
-					})
-					return
-				}
-				fyne.Do(func() {
-					splitProgressLabel.SetText("Split complete")
-					splitProgress.SetValue(1)
-					showError(revealPath(output))
-					sendAppNotification("Split file complete", fmt.Sprintf("Successfully split file: %s", filepath.Base(path)))
-				})
-			}()
-		})
+		deps.chooseFile("Choose file to split", nil, startSplit)
 	})
 	updateSplitButtonImportance()
 
+	startMerge := func(inputPath string) {
+		if mergeCancel != nil {
+			return
+		}
+		inPlace := !mergeMakeCopy.Checked
+		setOperationRunning(mergeButton, mergeCancelButton, true)
+		mergeMakeCopy.Disable()
+		mergeProgress.SetValue(0)
+		mergeProgressLabel.SetText("Starting merge...")
+		mergeProgressContainer.Show()
+		ctx, cancel := context.WithCancel(context.Background())
+		mergeCancel = cancel
+		go func() {
+			path := inputPath
+			stat, err := os.Stat(path)
+			if err == nil && stat.IsDir() {
+				path = filepath.Join(path, "00")
+			}
+			var output string
+			if err == nil {
+				output, err = deps.merge(ctx, path, inPlace, func(done, total int64) {
+					setProgress(mergeProgressLabel, mergeProgress, done, total)
+				})
+			}
+			fyne.Do(func() {
+				setOperationRunning(mergeButton, mergeCancelButton, false)
+				mergeMakeCopy.Enable()
+				mergeCancel = nil
+			})
+			if err != nil {
+				fyne.Do(func() {
+					if errors.Is(err, context.Canceled) {
+						mergeProgressLabel.SetText("Merge canceled")
+						return
+					}
+					mergeProgressLabel.SetText("Merge failed")
+					showError(err)
+				})
+				return
+			}
+			fyne.Do(func() {
+				mergeProgressLabel.SetText("Merge complete")
+				mergeProgress.SetValue(1)
+				showError(revealPath(output))
+				sendAppNotification("Merge file complete", fmt.Sprintf("Successfully merged file: %s", filepath.Base(inputPath)))
+			})
+		}()
+	}
 	mergeButton = widget.NewButton("Choose file to merge", func() {
-		deps.chooseFile("Choose file to merge", nil, func(inputPath string) {
-			inPlace := !mergeMakeCopy.Checked
-			setOperationRunning(mergeButton, mergeCancelButton, true)
-			mergeMakeCopy.Disable()
-			mergeProgress.SetValue(0)
-			mergeProgressLabel.SetText("Starting merge...")
-			mergeProgressContainer.Show()
-			ctx, cancel := context.WithCancel(context.Background())
-			mergeCancel = cancel
-			go func() {
-				path := inputPath
-				stat, err := os.Stat(path)
-				if err == nil && stat.IsDir() {
-					path = filepath.Join(path, "00")
-				}
-				var output string
-				if err == nil {
-					output, err = deps.merge(ctx, path, inPlace, func(done, total int64) {
-						setProgress(mergeProgressLabel, mergeProgress, done, total)
-					})
-				}
-				fyne.Do(func() {
-					setOperationRunning(mergeButton, mergeCancelButton, false)
-					mergeMakeCopy.Enable()
-					mergeCancel = nil
-				})
-				if err != nil {
-					fyne.Do(func() {
-						if errors.Is(err, context.Canceled) {
-							mergeProgressLabel.SetText("Merge canceled")
-							return
-						}
-						mergeProgressLabel.SetText("Merge failed")
-						showError(err)
-					})
-					return
-				}
-				fyne.Do(func() {
-					mergeProgressLabel.SetText("Merge complete")
-					mergeProgress.SetValue(1)
-					showError(revealPath(output))
-					sendAppNotification("Merge file complete", fmt.Sprintf("Successfully merged file: %s", filepath.Base(inputPath)))
-				})
-			}()
-		})
+		deps.chooseFile("Choose file to merge", nil, startMerge)
 	})
 	updateMergeButtonImportance()
 
 	var compressButton *widget.Button
+	startCompress := func(path string) {
+		if compressCancel != nil {
+			return
+		}
+		if state.Keys == nil {
+			showError(fmt.Errorf("prod.keys are required; configure them in Settings"))
+			return
+		}
+
+		setOperationRunning(compressButton, compressCancelButton, true)
+		compressProgress.SetValue(0)
+		compressProgressLabel.SetText("Starting compression...")
+		compressProgressContainer.Show()
+		ctx, cancel := context.WithCancel(context.Background())
+		compressCancel = cancel
+		go func() {
+			output, err := deps.compress(ctx, path, *state.Keys, func(done, total int64) {
+				setProgress(compressProgressLabel, compressProgress, done, total)
+			})
+			fyne.Do(func() {
+				setOperationRunning(compressButton, compressCancelButton, false)
+				compressCancel = nil
+			})
+			if err != nil {
+				fyne.Do(func() {
+					if errors.Is(err, context.Canceled) {
+						compressProgressLabel.SetText("Compression canceled")
+						return
+					}
+					compressProgressLabel.SetText("Compression failed")
+					showError(err)
+				})
+				return
+			}
+			fyne.Do(func() {
+				compressProgressLabel.SetText("Compression complete")
+				compressProgress.SetValue(1)
+				showError(revealPath(output))
+				sendAppNotification("NSZ compression complete", fmt.Sprintf("Successfully compressed file: %s", filepath.Base(path)))
+			})
+		}()
+	}
 	compressButton = widget.NewButton("Choose NSP to compress", func() {
 		deps.chooseFile("Choose NSP to compress", []nativeFileFilter{
 			extensionFilter("Nintendo Submission Package", ".nsp"),
-		}, func(path string) {
-			if state.Keys == nil {
-				showError(fmt.Errorf("prod.keys are required; configure them in Settings"))
-				return
-			}
-
-			setOperationRunning(compressButton, compressCancelButton, true)
-			compressProgress.SetValue(0)
-			compressProgressLabel.SetText("Starting compression...")
-			compressProgressContainer.Show()
-			ctx, cancel := context.WithCancel(context.Background())
-			compressCancel = cancel
-			go func() {
-				output, err := deps.compress(ctx, path, *state.Keys, func(done, total int64) {
-					setProgress(compressProgressLabel, compressProgress, done, total)
-				})
-				fyne.Do(func() {
-					setOperationRunning(compressButton, compressCancelButton, false)
-					compressCancel = nil
-				})
-				if err != nil {
-					fyne.Do(func() {
-						if errors.Is(err, context.Canceled) {
-							compressProgressLabel.SetText("Compression canceled")
-							return
-						}
-						compressProgressLabel.SetText("Compression failed")
-						showError(err)
-					})
-					return
-				}
-				fyne.Do(func() {
-					compressProgressLabel.SetText("Compression complete")
-					compressProgress.SetValue(1)
-					showError(revealPath(output))
-					sendAppNotification("NSZ compression complete", fmt.Sprintf("Successfully compressed file: %s", filepath.Base(path)))
-				})
-			}()
-		})
+		}, startCompress)
 	})
 	compressButton.Importance = widget.HighImportance
 
 	var decompressButton *widget.Button
+	startDecompress := func(path string) {
+		if decompressCancel != nil {
+			return
+		}
+		setOperationRunning(decompressButton, decompressCancelButton, true)
+		decompressProgress.SetValue(0)
+		decompressProgressLabel.SetText("Starting decompression...")
+		decompressProgressContainer.Show()
+		ctx, cancel := context.WithCancel(context.Background())
+		decompressCancel = cancel
+		go func() {
+			output, err := deps.decompress(ctx, path, func(done, total int64) {
+				setProgress(decompressProgressLabel, decompressProgress, done, total)
+			})
+			fyne.Do(func() {
+				setOperationRunning(decompressButton, decompressCancelButton, false)
+				decompressCancel = nil
+			})
+			if err != nil {
+				fyne.Do(func() {
+					if errors.Is(err, context.Canceled) {
+						decompressProgressLabel.SetText("Decompression canceled")
+						return
+					}
+					decompressProgressLabel.SetText("Decompression failed")
+					showError(err)
+				})
+				return
+			}
+			fyne.Do(func() {
+				decompressProgressLabel.SetText("Decompression complete")
+				decompressProgress.SetValue(1)
+				showError(revealPath(output))
+				sendAppNotification("NSZ decompression complete", fmt.Sprintf("Successfully decompressed file: %s", filepath.Base(path)))
+			})
+		}()
+	}
 	decompressButton = widget.NewButton("Choose NSZ to decompress", func() {
 		deps.chooseFile("Choose NSZ to decompress", []nativeFileFilter{
 			extensionFilter("Nintendo Submission Package Zipped", ".nsz"),
-		}, func(path string) {
-			setOperationRunning(decompressButton, decompressCancelButton, true)
-			decompressProgress.SetValue(0)
-			decompressProgressLabel.SetText("Starting decompression...")
-			decompressProgressContainer.Show()
-			ctx, cancel := context.WithCancel(context.Background())
-			decompressCancel = cancel
-			go func() {
-				output, err := deps.decompress(ctx, path, func(done, total int64) {
-					setProgress(decompressProgressLabel, decompressProgress, done, total)
-				})
-				fyne.Do(func() {
-					setOperationRunning(decompressButton, decompressCancelButton, false)
-					decompressCancel = nil
-				})
-				if err != nil {
-					fyne.Do(func() {
-						if errors.Is(err, context.Canceled) {
-							decompressProgressLabel.SetText("Decompression canceled")
-							return
-						}
-						decompressProgressLabel.SetText("Decompression failed")
-						showError(err)
-					})
-					return
-				}
-				fyne.Do(func() {
-					decompressProgressLabel.SetText("Decompression complete")
-					decompressProgress.SetValue(1)
-					showError(revealPath(output))
-					sendAppNotification("NSZ decompression complete", fmt.Sprintf("Successfully decompressed file: %s", filepath.Base(path)))
-				})
-			}()
-		})
+		}, startDecompress)
 	})
 	decompressButton.Importance = widget.HighImportance
 
@@ -404,24 +421,39 @@ func newToolsTab(deps toolsTabDependencies) fyne.CanvasObject {
 		decompressProgressContainer,
 	)
 
-	return container.New(
+	splitToolPanel, splitTarget := newToolPanel(splitPanel, startSplit)
+	mergeToolPanel, mergeTarget := newToolPanel(mergePanel, startMerge)
+	compressToolPanel, compressTarget := newToolPanel(compressPanel, startCompress)
+	decompressToolPanel, decompressTarget := newToolPanel(decompressPanel, startDecompress)
+	dropTargets = append(dropTargets, splitTarget, mergeTarget, compressTarget, decompressTarget)
+
+	content := container.New(
 		toolsGridLayout{},
-		newToolPanel(splitPanel),
-		widget.NewSeparator(),
-		newToolPanel(mergePanel),
-		widget.NewSeparator(),
-		newToolPanel(compressPanel),
-		widget.NewSeparator(),
-		newToolPanel(decompressPanel),
-		widget.NewSeparator(),
+		splitToolPanel,
+		layout.NewSpacer(),
+		mergeToolPanel,
+		layout.NewSpacer(),
+		compressToolPanel,
+		layout.NewSpacer(),
+		decompressToolPanel,
+		layout.NewSpacer(),
 	)
+	if mainWindow != nil {
+		registerWindowDropHandler(windowDropHandlerTools, func(position fyne.Position, uris []fyne.URI) {
+			handleToolDrop(position, uris, dropTargets)
+		})
+	}
+	return content
 }
 
-func newToolPanel(panel fyne.CanvasObject) fyne.CanvasObject {
-	return container.New(
+func newToolPanel(panel fyne.CanvasObject, onDrop func(string)) (fyne.CanvasObject, *toolDropTarget) {
+	paddedPanel := container.New(
 		layout.NewCustomPaddedLayout(toolsPanelPadding, toolsPanelPadding, toolsPanelPadding, toolsPanelPadding),
 		panel,
 	)
+	borderedPanel := container.NewMax(newToolPanelBorder(), paddedPanel)
+	target := newToolDropTarget(borderedPanel, onDrop)
+	return borderedPanel, target
 }
 
 func newToolActionSlot(chooseButton, cancelButton *widget.Button) fyne.CanvasObject {
@@ -457,14 +489,12 @@ func (toolsGridLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 		return
 	}
 
-	separatorHeight := max(objects[3].MinSize().Height, toolsDividerThickness)
-	separatorWidth := max(objects[7].MinSize().Width, toolsDividerThickness)
+	separatorHeight := max(objects[3].MinSize().Height, toolsPanelGap)
+	separatorWidth := max(objects[7].MinSize().Width, toolsPanelGap)
 	columnWidth := max(float32(0), (size.Width-separatorWidth)/2)
 	topHeight := max(objects[0].MinSize().Height, objects[2].MinSize().Height)
-	if topHeight+separatorHeight > size.Height {
-		topHeight = max(float32(0), size.Height-separatorHeight)
-	}
-	bottomHeight := max(float32(0), size.Height-topHeight-separatorHeight)
+	bottomHeight := max(objects[4].MinSize().Height, objects[6].MinSize().Height)
+	gridHeight := topHeight + separatorHeight + bottomHeight
 
 	objects[0].Move(fyne.NewPos(0, 0))
 	objects[0].Resize(fyne.NewSize(columnWidth, topHeight))
@@ -479,7 +509,7 @@ func (toolsGridLayout) Layout(objects []fyne.CanvasObject, size fyne.Size) {
 	objects[6].Move(fyne.NewPos(columnWidth+separatorWidth, topHeight+separatorHeight))
 	objects[6].Resize(fyne.NewSize(columnWidth, bottomHeight))
 	objects[7].Move(fyne.NewPos(columnWidth, 0))
-	objects[7].Resize(fyne.NewSize(separatorWidth, size.Height))
+	objects[7].Resize(fyne.NewSize(separatorWidth, gridHeight))
 }
 
 func (toolsGridLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
@@ -489,21 +519,17 @@ func (toolsGridLayout) MinSize(objects []fyne.CanvasObject) fyne.Size {
 
 	split := objects[0].MinSize()
 	merge := objects[2].MinSize()
-	separatorA := objects[1].MinSize()
 	separatorB := objects[3].MinSize()
 	compress := objects[4].MinSize()
-	separatorC := objects[5].MinSize()
 	decompress := objects[6].MinSize()
+	separatorWidth := max(objects[7].MinSize().Width, toolsPanelGap)
+	columnWidth := max(split.Width, merge.Width, compress.Width, decompress.Width)
 
 	return fyne.NewSize(
-		max(split.Width, merge.Width, compress.Width, decompress.Width),
-		split.Height+
-			max(separatorA.Height, toolsDividerThickness)+
-			merge.Height+
-			max(separatorB.Height, toolsDividerThickness)+
-			compress.Height+
-			max(separatorC.Height, toolsDividerThickness)+
-			decompress.Height,
+		columnWidth*2+separatorWidth,
+		max(split.Height, merge.Height)+
+			max(separatorB.Height, toolsPanelGap)+
+			max(compress.Height, decompress.Height),
 	)
 }
 
@@ -514,7 +540,7 @@ func layoutToolsSingleColumn(objects []fyne.CanvasObject, size fyne.Size) {
 	for _, index := range []int{0, 1, 2, 3, 4, 5, 6} {
 		height := objects[index].MinSize().Height
 		if index == 1 || index == 3 || index == 5 {
-			height = max(height, toolsDividerThickness)
+			height = max(height, toolsPanelGap)
 		}
 		objects[index].Move(fyne.NewPos(0, y))
 		objects[index].Resize(fyne.NewSize(size.Width, height))

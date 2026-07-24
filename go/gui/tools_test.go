@@ -3,12 +3,14 @@ package gui
 import (
 	"context"
 	"errors"
+	"image/color"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 	"github.com/acheronfail/nxkit/lib/keys"
@@ -138,6 +140,42 @@ func TestToolActionSlotKeepsButtonPlacementStableWhenButtonsAreHidden(t *testing
 	if got := slot.MinSize(); got != fullSize {
 		t.Fatalf("slot minimum size with cancel hidden = %v, want %v", got, fullSize)
 	}
+}
+
+func TestToolsGridLayoutUsesCompactTwoRowSize(t *testing.T) {
+	objects := []fyne.CanvasObject{
+		sizedRectangle(100, 100),
+		sizedRectangle(1, 1),
+		sizedRectangle(120, 80),
+		sizedRectangle(1, 1),
+		sizedRectangle(90, 40),
+		sizedRectangle(1, 1),
+		sizedRectangle(110, 60),
+		sizedRectangle(1, 1),
+	}
+	grid := toolsGridLayout{}
+
+	if got, want := grid.MinSize(objects), fyne.NewSize(252, 172); got != want {
+		t.Fatalf("grid minimum size = %v, want %v", got, want)
+	}
+
+	grid.Layout(objects, fyne.NewSize(1000, 700))
+
+	if got, want := objects[4].Size().Height, float32(60); got != want {
+		t.Fatalf("compressor pane height = %v, want %v", got, want)
+	}
+	if got, want := objects[6].Size().Height, float32(60); got != want {
+		t.Fatalf("decompressor pane height = %v, want %v", got, want)
+	}
+	if got, want := objects[7].Size().Height, float32(172); got != want {
+		t.Fatalf("vertical separator height = %v, want %v", got, want)
+	}
+}
+
+func sizedRectangle(width, height float32) fyne.CanvasObject {
+	rectangle := canvas.NewRectangle(color.Transparent)
+	rectangle.SetMinSize(fyne.NewSize(width, height))
+	return rectangle
 }
 
 type blockingToolsOperation struct {
